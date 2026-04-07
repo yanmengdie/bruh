@@ -371,3 +371,19 @@ private struct MessageDetailView: View {
         }
     }
 }
+
+#Preview {
+    ContentView()
+        .modelContainer(
+            for: [
+                Persona.self,
+                PersonaPost.self,
+                SourceItem.self,
+                MessageThread.self,
+                PersonaMessage.self,
+                FeedComment.self,
+                FeedLike.self,
+            ],
+            inMemory: true
+        )
+}
