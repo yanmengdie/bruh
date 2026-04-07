@@ -4,6 +4,7 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\MessageThread.lastMessageAt, order: .reverse)]) private var threads: [MessageThread]
+    @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
 
     @State private var currentDestination: AppDestination? = nil
     @State private var messageService = MessageService()
@@ -206,15 +207,23 @@ struct ContentView: View {
     }
 
     private func persona(for personaId: String) -> (name: String, tint: Color) {
+        if let contact = contacts.first(where: { $0.linkedPersonaId == personaId }) {
+            return (contact.name, tint(for: personaId))
+        }
+
+        return (personaId.capitalized, tint(for: personaId))
+    }
+
+    private func tint(for personaId: String) -> Color {
         switch personaId {
         case "trump":
-            return ("Donald Trump", .orange)
+            return .orange
         case "musk":
-            return ("Elon Musk", .blue)
+            return .blue
         case "zuckerberg":
-            return ("Mark Zuckerberg", .purple)
+            return .purple
         default:
-            return (personaId.capitalized, .gray)
+            return .gray
         }
     }
 
@@ -230,6 +239,7 @@ struct ContentView: View {
 private struct MessageDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var messages: [PersonaMessage]
+    @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
 
     let thread: MessageThread
     let service: MessageService
@@ -345,12 +355,7 @@ private struct MessageDetailView: View {
     }
 
     private var displayName: String {
-        switch thread.personaId {
-        case "trump": return "Donald Trump"
-        case "musk": return "Elon Musk"
-        case "zuckerberg": return "Mark Zuckerberg"
-        default: return thread.personaId.capitalized
-        }
+        contacts.first(where: { $0.linkedPersonaId == thread.personaId })?.name ?? thread.personaId.capitalized
     }
 
     private func send() {
@@ -387,35 +392,6 @@ private struct MessageDetailView: View {
                     .foregroundStyle(.red)
             }
         }
-    }
-}
-
-@Model
-final class Contact {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var phoneNumber: String
-    var email: String
-    var isFavorite: Bool
-    var createdAt: Date
-    var updatedAt: Date
-
-    init(
-        id: UUID = UUID(),
-        name: String,
-        phoneNumber: String,
-        email: String = "",
-        isFavorite: Bool = false,
-        createdAt: Date = .now,
-        updatedAt: Date = .now
-    ) {
-        self.id = id
-        self.name = name
-        self.phoneNumber = phoneNumber
-        self.email = email
-        self.isFavorite = isFavorite
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
     }
 }
 
@@ -623,19 +599,7 @@ private struct ContactsView: View {
     }
 
     private func seedContactsIfNeeded() {
-        guard contacts.isEmpty else { return }
-
-        let sampleContacts = [
-            Contact(name: "Alice Johnson", phoneNumber: "+1 415 555 0123", email: "alice@example.com", isFavorite: true),
-            Contact(name: "Bob Chen", phoneNumber: "+1 628 555 0199", email: "bob@example.com"),
-            Contact(name: "Charlie Smith", phoneNumber: "+1 650 555 0175", email: "charlie@example.com"),
-        ]
-
-        for contact in sampleContacts {
-            modelContext.insert(contact)
-        }
-
-        try? modelContext.save()
+        seedSystemContacts(into: modelContext)
     }
 }
 

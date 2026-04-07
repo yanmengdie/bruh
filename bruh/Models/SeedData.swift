@@ -12,6 +12,38 @@ func seedPersonas(into context: ModelContext) {
 }
 
 @MainActor
+func seedSystemContacts(into context: ModelContext) {
+    let existingContacts: [Contact] = (try? context.fetch(FetchDescriptor<Contact>())) ?? []
+    let existingPersonaIds = Set(existingContacts.compactMap(\.linkedPersonaId))
+
+    let metadataByPersonaId: [String: (phone: String, email: String, location: String)] = [
+        "musk": ("+1 310 555 0142", "elon@x.ai", "X HQ"),
+        "trump": ("+1 561 555 0145", "donald@truthsocial.com", "海湖庄园"),
+        "zuckerberg": ("+1 650 555 0108", "mark@meta.com", "Meta Park"),
+    ]
+
+    for persona in Persona.all where !existingPersonaIds.contains(persona.id) {
+        guard let meta = metadataByPersonaId[persona.id] else { continue }
+
+        context.insert(
+            Contact(
+                linkedPersonaId: persona.id,
+                name: persona.displayName,
+                phoneNumber: meta.phone,
+                email: meta.email,
+                avatarName: persona.avatarName,
+                locationLabel: meta.location,
+                isFavorite: true
+            )
+        )
+    }
+
+    if context.hasChanges {
+        try? context.save()
+    }
+}
+
+@MainActor
 func seedPosts(into context: ModelContext) {
     let existing: [PersonaPost] = (try? context.fetch(FetchDescriptor<PersonaPost>())) ?? []
     guard existing.isEmpty else { return }
