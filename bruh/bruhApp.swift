@@ -14,7 +14,8 @@ struct BruhApp: App {
             MessageThread.self,
             PersonaMessage.self,
             FeedComment.self,
-            FeedLike.self
+            FeedLike.self,
+            Contact.self
         ))
     }
 
