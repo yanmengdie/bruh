@@ -1,0 +1,16 @@
+project_id = "bruh"
+
+[functions.feed]
+verify_jwt = false
+
+[functions.ingest-x-posts]
+verify_jwt = false
+
+[functions.build-feed]
+verify_jwt = false
+
+[functions.generate-message]
+verify_jwt = false
+
+[functions.generate-post-interactions]
+verify_jwt = false

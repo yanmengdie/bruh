@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+xcuserdata/
+
+# Swift Package Manager / Xcode build artifacts
+.build/
+.swiftpm/
+
+# Supabase local/dev artifacts
+supabase/.temp/
+supabase/.branches/
+supabase/.postgres/
+
+# Env / secrets
+.env
+.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Logs
+*.log
+

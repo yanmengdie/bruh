@@ -1,0 +1,40 @@
+import Foundation
+import SwiftData
+
+@Model
+final class PersonaPost {
+    @Attribute(.unique) var id: String
+    var personaId: String
+    var content: String
+    var sourceType: String   // "x" | "news"
+    var sourceUrl: String?
+    var topic: String?
+    var importanceScore: Double
+    var publishedAt: Date
+    var fetchedAt: Date
+    var isDelivered: Bool
+
+    init(
+        id: String = UUID().uuidString,
+        personaId: String,
+        content: String,
+        sourceType: String,
+        sourceUrl: String? = nil,
+        topic: String? = nil,
+        importanceScore: Double = 0.5,
+        publishedAt: Date = .now,
+        fetchedAt: Date = .now,
+        isDelivered: Bool = false
+    ) {
+        self.id = id
+        self.personaId = personaId
+        self.content = content
+        self.sourceType = sourceType
+        self.sourceUrl = sourceUrl
+        self.topic = topic
+        self.importanceScore = importanceScore
+        self.publishedAt = publishedAt
+        self.fetchedAt = fetchedAt
+        self.isDelivered = isDelivered
+    }
+}
