@@ -10,30 +10,38 @@ struct AppItem: Identifiable {
     let badgeText: String?
 }
 
-enum AppDestination {
+enum AppDestination: Equatable {
     case feed
     case imessage
     case contacts
+    case album
     case settings
 }
 
 struct HomeScreen: View {
     let onNavigate: (AppDestination) -> Void
+    let messageUnreadCount: Int
+    let momentsUnreadCount: Int
+    let hasNewAlbumBadge: Bool
 
-    private let gridApps: [AppItem] = [
-        AppItem(name: "Contacts", icon: "person.crop.circle.fill", iconColor: .green, destination: .contacts, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Messages", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: 12, badgeText: nil),
-        AppItem(name: "朋友圈", icon: "globe", iconColor: Color(red: 1.0, green: 0.72, blue: 0.62), destination: .feed, unreadCount: 8, badgeText: nil),
-        AppItem(name: "News", icon: "newspaper.fill", iconColor: .red, destination: nil, unreadCount: 0, badgeText: "NEW"),
-        AppItem(name: "Settings", icon: "gearshape.fill", iconColor: Color(red: 0.55, green: 0.62, blue: 0.95), destination: .settings, unreadCount: 0, badgeText: nil),
-    ]
+    private var gridApps: [AppItem] {
+        [
+            AppItem(name: "Contacts", icon: "person.crop.circle.fill", iconColor: .green, destination: .contacts, unreadCount: 0, badgeText: nil),
+            AppItem(name: "Messages", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: messageUnreadCount, badgeText: nil),
+            AppItem(name: "朋友圈", icon: "globe", iconColor: Color(red: 1.0, green: 0.72, blue: 0.62), destination: .feed, unreadCount: momentsUnreadCount, badgeText: nil),
+            AppItem(name: "Album", icon: "photo.on.rectangle.angled", iconColor: .red, destination: .album, unreadCount: 0, badgeText: hasNewAlbumBadge ? "NEW" : nil),
+            AppItem(name: "Settings", icon: "gearshape.fill", iconColor: Color(red: 0.55, green: 0.62, blue: 0.95), destination: .settings, unreadCount: 0, badgeText: nil),
+        ]
+    }
 
-    private let dockApps: [AppItem] = [
-        AppItem(name: "Contacts", icon: "person.crop.circle.fill", iconColor: .green, destination: .contacts, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Messages", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: 12, badgeText: nil),
-        AppItem(name: "朋友圈", icon: "globe", iconColor: Color(red: 1.0, green: 0.72, blue: 0.62), destination: .feed, unreadCount: 8, badgeText: nil),
-        AppItem(name: "News", icon: "newspaper.fill", iconColor: .red, destination: nil, unreadCount: 0, badgeText: nil),
-    ]
+    private var dockApps: [AppItem] {
+        [
+            AppItem(name: "Contacts", icon: "person.crop.circle.fill", iconColor: .green, destination: .contacts, unreadCount: 0, badgeText: nil),
+            AppItem(name: "Messages", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: messageUnreadCount, badgeText: nil),
+            AppItem(name: "朋友圈", icon: "globe", iconColor: Color(red: 1.0, green: 0.72, blue: 0.62), destination: .feed, unreadCount: momentsUnreadCount, badgeText: nil),
+            AppItem(name: "Album", icon: "photo.on.rectangle.angled", iconColor: .red, destination: .album, unreadCount: 0, badgeText: nil),
+        ]
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -212,5 +220,5 @@ private struct AppIconView: View {
 }
 
 #Preview {
-    HomeScreen(onNavigate: { _ in })
+    HomeScreen(onNavigate: { _ in }, messageUnreadCount: 3, momentsUnreadCount: 5, hasNewAlbumBadge: true)
 }

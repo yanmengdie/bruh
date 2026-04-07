@@ -4,7 +4,10 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\MessageThread.lastMessageAt, order: .reverse)]) private var threads: [MessageThread]
+    @Query(sort: [SortDescriptor(\PersonaPost.publishedAt, order: .reverse)]) private var posts: [PersonaPost]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
+    @AppStorage("hasOpenedAlbum") private var hasOpenedAlbum = false
+    @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
 
     @State private var currentDestination: AppDestination? = nil
     @State private var messageService = MessageService()
@@ -17,10 +20,16 @@ struct ContentView: View {
                     .transition(.move(edge: .trailing))
             } else {
                 HomeScreen(onNavigate: { destination in
+                    if destination == .feed {
+                        lastViewedFeedAtInterval = Date().timeIntervalSince1970
+                    }
+                    if destination == .album {
+                        hasOpenedAlbum = true
+                    }
                     withAnimation(.easeInOut(duration: 0.25)) {
                         currentDestination = destination
                     }
-                })
+                }, messageUnreadCount: totalUnreadMessages, momentsUnreadCount: totalUnreadMoments, hasNewAlbumBadge: !hasOpenedAlbum)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
             }
@@ -75,7 +84,6 @@ struct ContentView: View {
                     .padding(.bottom, 20)
                 }
                 .background(Color(red: 0.95, green: 0.96, blue: 0.98))
-                .navigationTitle("Messages")
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         backButton
@@ -95,6 +103,35 @@ struct ContentView: View {
                             backButton
                         }
                     }
+            }
+            .swipeBackGesture(onBack: goBackToHome)
+
+        case .album:
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 14) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 34))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 18)
+
+                        Text("Album")
+                            .font(.system(size: 24, weight: .bold))
+
+                        Text("这里将展示你的照片与回忆。")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 28)
+                }
+                .navigationTitle("")
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        backButton
+                    }
+                }
             }
             .swipeBackGesture(onBack: goBackToHome)
 
@@ -127,6 +164,18 @@ struct ContentView: View {
     private func goBackToHome() {
         withAnimation {
             currentDestination = nil
+        }
+    }
+
+    private var totalUnreadMessages: Int {
+        max(0, threads.reduce(0) { $0 + max(0, $1.unreadCount) })
+    }
+
+    private var totalUnreadMoments: Int {
+        guard lastViewedFeedAtInterval > 0 else { return posts.count }
+        let lastViewed = Date(timeIntervalSince1970: lastViewedFeedAtInterval)
+        return posts.reduce(0) { count, post in
+            count + (post.publishedAt > lastViewed ? 1 : 0)
         }
     }
 
