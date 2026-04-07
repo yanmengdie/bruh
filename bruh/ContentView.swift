@@ -120,10 +120,7 @@ struct ContentView: View {
         Button {
             goBackToHome()
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "chevron.left")
-                Text("桌面")
-            }
+            Image(systemName: "chevron.left")
         }
     }
 
@@ -455,7 +452,7 @@ private struct ContactsView: View {
                             Button {
                                 toggleFavorite(contact)
                             } label: {
-                                Label(contact.isFavorite ? "Unfavorite" : "Favorite", systemImage: contact.isFavorite ? "star.slash.fill" : "star.fill")
+                                Image(systemName: contact.isFavorite ? "star.slash.fill" : "star.fill")
                             }
                             .tint(contact.isFavorite ? .gray : .orange)
                         }
