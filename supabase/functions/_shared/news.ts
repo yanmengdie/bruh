@@ -1,0 +1,267 @@
+import { personaMap, resolvePersonaById } from "./personas.ts"
+
+export type FeedDefinition = {
+  slug: string
+  url: string
+  sourceName: string
+  category: string
+}
+
+export type ParsedNewsArticle = {
+  id: string
+  sourceName: string
+  sourceType: string
+  feedSlug: string
+  title: string
+  summary: string
+  articleUrl: string
+  category: string
+  interestTags: string[]
+  publishedAt: string
+  importanceScore: number
+  rawPayload: Record<string, unknown>
+}
+
+export type NewsEventRow = {
+  id: string
+  title: string
+  summary: string
+  category: string
+  interest_tags: string[]
+  representative_url: string | null
+  representative_source_name: string
+  importance_score: number
+  global_rank: number | null
+  is_global_top: boolean
+  published_at: string
+}
+
+const stopWords = new Set([
+  "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+  "in", "into", "is", "it", "of", "on", "or", "that", "the", "to",
+  "with", "after", "amid", "over", "under", "up", "down",
+])
+
+const entityKeywords: Record<string, string[]> = {
+  musk: ["elon", "musk", "tesla", "spacex", "xai", "openai", "grok", "x.com", "x "],
+  trump: ["trump", "white house", "republican", "election", "tariff", "china", "trade", "washington"],
+  zuckerberg: ["meta", "zuckerberg", "instagram", "facebook", "threads", "llama", "quest"],
+}
+
+export const defaultNewsFeeds: FeedDefinition[] = [
+  {
+    slug: "bbc-politics",
+    url: "https://feeds.bbci.co.uk/news/politics/rss.xml",
+    sourceName: "BBC",
+    category: "politics",
+  },
+  {
+    slug: "bbc-business",
+    url: "https://feeds.bbci.co.uk/news/business/rss.xml",
+    sourceName: "BBC",
+    category: "finance",
+  },
+  {
+    slug: "bbc-technology",
+    url: "https://feeds.bbci.co.uk/news/technology/rss.xml",
+    sourceName: "BBC",
+    category: "tech",
+  },
+  {
+    slug: "bbc-world",
+    url: "https://feeds.bbci.co.uk/news/world/rss.xml",
+    sourceName: "BBC",
+    category: "world",
+  },
+]
+
+export function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+export function stableHash(value: string) {
+  let hash = 5381
+  for (const char of value) {
+    hash = ((hash << 5) + hash) ^ char.charCodeAt(0)
+  }
+  return (hash >>> 0).toString(16)
+}
+
+export function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/<!\[CDATA\[(.*?)\]\]>/gs, "$1")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+}
+
+export function stripHtml(value: string) {
+  return decodeHtmlEntities(value)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+export function extractTag(block: string, tag: string) {
+  const match = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"))
+  return match ? stripHtml(match[1]) : ""
+}
+
+export function parseRssItems(xml: string) {
+  const normalized = decodeHtmlEntities(xml)
+  return [...normalized.matchAll(/<item\b[\s\S]*?>([\s\S]*?)<\/item>/gi)].map((match) => {
+    const item = match[1]
+    const title = extractTag(item, "title")
+    const link = extractTag(item, "link")
+    const guid = extractTag(item, "guid")
+    const description = extractTag(item, "description")
+    const pubDate = extractTag(item, "pubDate")
+    return { title, link, guid, description, pubDate }
+  })
+}
+
+export function normalizeHeadline(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\s*[-–|:]\s*bbc.*$/i, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length > 1 && !stopWords.has(token))
+    .slice(0, 8)
+    .join(" ")
+}
+
+export function inferInterestTags(text: string, category: string) {
+  const lower = `${category} ${text}`.toLowerCase()
+  const tags = new Set<string>(["global", category])
+
+  if (["politics", "world"].includes(category)) tags.add("politics")
+  if (["finance"].includes(category) || /market|stocks?|trade|economy|fed|bank|tariff/.test(lower)) tags.add("finance")
+  if (["tech"].includes(category) || /ai|tech|software|meta|tesla|spacex|xai|openai|chip|semiconductor/.test(lower)) tags.add("tech")
+  if (/china|beijing|shanghai/.test(lower)) tags.add("china")
+  if (/war|ukraine|russia|middle east|taiwan|nato|election|congress|government|white house/.test(lower)) tags.add("politics")
+  if (/social|threads|instagram|facebook|tiktok|xiaohongshu/.test(lower)) tags.add("social")
+
+  return [...tags]
+}
+
+export function scoreNewsRecency(publishedAt: string) {
+  const ageHours = Math.max((Date.now() - Date.parse(publishedAt)) / (1000 * 60 * 60), 0)
+  if (ageHours <= 6) return 2.2
+  if (ageHours <= 24) return 1.5
+  if (ageHours <= 48) return 1.0
+  return 0.4
+}
+
+export function buildEventKey(title: string, category: string) {
+  const normalized = normalizeHeadline(title)
+  return `${category}:${normalized || stableHash(title.toLowerCase()).slice(0, 10)}`
+}
+
+export function scorePersonaForEvent(personaId: string, title: string, summary: string, interestTags: string[]) {
+  const persona = resolvePersonaById(personaId)
+  if (!persona) {
+    return { score: 0, reasonCodes: [] as string[], matchedInterests: [] as string[] }
+  }
+
+  const lower = `${title} ${summary}`.toLowerCase()
+  const reasonCodes: string[] = []
+  const matchedInterests = interestTags.filter((tag) => persona.domains.includes(tag))
+  let score = 0
+
+  for (const domain of persona.domains) {
+    if (interestTags.includes(domain)) {
+      score += 2.5
+      reasonCodes.push("domain_match")
+    }
+  }
+
+  for (const keyword of persona.triggerKeywords) {
+    if (lower.includes(keyword.toLowerCase())) {
+      score += 1.8
+      reasonCodes.push("keyword_hit")
+    }
+  }
+
+  for (const keyword of entityKeywords[personaId] ?? []) {
+    if (lower.includes(keyword.toLowerCase())) {
+      score += 3.2
+      reasonCodes.push("entity_hit")
+    }
+  }
+
+  if (interestTags.includes("global")) {
+    score += 0.8
+    reasonCodes.push("global_top")
+  }
+
+  return {
+    score,
+    reasonCodes: [...new Set(reasonCodes)],
+    matchedInterests: [...new Set(matchedInterests)],
+  }
+}
+
+export function categorizeFeedScore(category: string) {
+  switch (category) {
+    case "politics":
+      return 1.4
+    case "finance":
+      return 1.2
+    case "tech":
+      return 1.1
+    default:
+      return 0.9
+  }
+}
+
+export function parseFeedsFromBody(body: Record<string, unknown>) {
+  const customFeeds = Array.isArray(body.feeds) ? body.feeds : []
+  if (customFeeds.length === 0) return defaultNewsFeeds
+
+  const parsed = customFeeds
+    .map((item) => {
+      const row = item as Record<string, unknown>
+      const slug = asString(row.slug)
+      const url = asString(row.url)
+      const sourceName = asString(row.sourceName)
+      const category = asString(row.category)
+      if (!slug || !url || !sourceName || !category) return null
+      return { slug, url, sourceName, category }
+    })
+    .filter((item): item is FeedDefinition => item !== null)
+
+  return parsed.length > 0 ? parsed : defaultNewsFeeds
+}
+
+export function topNewsSummaryBlock(events: NewsEventRow[]) {
+  if (events.length === 0) return ""
+  return events
+    .map((event, index) => {
+      const rank = event.global_rank ?? index + 1
+      const tags = event.interest_tags.filter((tag) => tag !== "global").join(", ")
+      return `#${rank} ${event.title}${tags ? ` [${tags}]` : ""}`
+    })
+    .join("\n")
+}
+
+export function defaultStarterMessage(personaId: string, title: string) {
+  switch (personaId) {
+    case "musk":
+      return `Big story today: ${title}. The engineering angle is underrated.`
+    case "trump":
+      return `Huge headline today: ${title}. A lot of people are talking about it.`
+    case "zuckerberg":
+      return `Worth watching: ${title}. The downstream product impact could be real.`
+    default:
+      return title
+  }
+}
+
+export function allPersonaIds() {
+  return Object.values(personaMap).map((persona) => persona.personaId)
+}

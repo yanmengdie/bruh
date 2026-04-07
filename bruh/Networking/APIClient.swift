@@ -65,7 +65,8 @@ actor APIClient {
     func sendMessage(
         personaId: String,
         userMessage: String,
-        conversation: [MessageTurnDTO]
+        conversation: [MessageTurnDTO],
+        userInterests: [String]
     ) async throws -> MessageReplyDTO {
         guard let url = URL(string: "\(baseURL)/generate-message") else {
             throw NetworkError.invalidURL
@@ -80,7 +81,8 @@ actor APIClient {
             SendMessageRequestDTO(
                 personaId: personaId,
                 userMessage: userMessage,
-                conversation: conversation
+                conversation: conversation,
+                userInterests: userInterests
             )
         )
 
@@ -93,6 +95,34 @@ actor APIClient {
         decoder.dateDecodingStrategy = .iso8601
         do {
             return try decoder.decode(MessageReplyDTO.self, from: data)
+        } catch {
+            throw NetworkError.decodingError
+        }
+    }
+
+    func fetchMessageStarters(userInterests: [String]) async throws -> MessageStarterReplyDTO {
+        guard let url = URL(string: "\(baseURL)/message-starters") else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(
+            MessageStarterRequestDTO(userInterests: userInterests)
+        )
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else { throw NetworkError.noData }
+        guard (200...299).contains(http.statusCode) else { throw NetworkError.httpError(http.statusCode) }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        do {
+            return try decoder.decode(MessageStarterReplyDTO.self, from: data)
         } catch {
             throw NetworkError.decodingError
         }
@@ -165,6 +195,7 @@ struct SendMessageRequestDTO: Codable {
     let personaId: String
     let userMessage: String
     let conversation: [MessageTurnDTO]
+    let userInterests: [String]
 }
 
 struct MessageReplyDTO: Codable, Identifiable {
@@ -220,4 +251,25 @@ struct FeedInteractionReplyDTO: Codable {
     let likes: [FeedInteractionLikeDTO]
     let comments: [FeedInteractionCommentDTO]
     let generatedAt: Date
+}
+
+struct MessageStarterRequestDTO: Codable {
+    let userInterests: [String]
+}
+
+struct MessageStarterDTO: Codable, Identifiable {
+    let id: String
+    let personaId: String
+    let text: String
+    let sourcePostIds: [String]
+    let createdAt: Date
+    let category: String
+    let headline: String
+    let articleUrl: String?
+    let isGlobalTop: Bool
+}
+
+struct MessageStarterReplyDTO: Codable {
+    let starters: [MessageStarterDTO]
+    let topSummary: String
 }

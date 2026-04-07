@@ -14,3 +14,12 @@ verify_jwt = false
 
 [functions.generate-post-interactions]
 verify_jwt = false
+
+[functions.ingest-top-news]
+verify_jwt = false
+
+[functions.build-news-events]
+verify_jwt = false
+
+[functions.message-starters]
+verify_jwt = false

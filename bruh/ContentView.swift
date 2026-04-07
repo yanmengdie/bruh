@@ -7,7 +7,6 @@ struct ContentView: View {
 
     @State private var currentDestination: AppDestination? = nil
     @State private var messageService = MessageService()
-
     var body: some View {
         ZStack {
             if let destination = currentDestination {
@@ -27,7 +26,10 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.easeInOut(duration: 0.25), value: currentDestination)
         .task {
-            try? messageService.ensureThreadsExist(modelContext: modelContext)
+            try? await messageService.ensureThreadsExist(
+                modelContext: modelContext,
+                userInterests: InterestPreferences.selectedInterests()
+            )
         }
     }
 
@@ -74,6 +76,12 @@ struct ContentView: View {
                 }
                 .background(Color(red: 0.95, green: 0.96, blue: 0.98))
                 .navigationTitle("Messages")
+                .task {
+                    try? await messageService.ensureThreadsExist(
+                        modelContext: modelContext,
+                        userInterests: InterestPreferences.selectedInterests()
+                    )
+                }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         backButton
@@ -86,11 +94,7 @@ struct ContentView: View {
 
         case .settings:
             NavigationStack {
-                List {
-                    Label("通知设置", systemImage: "bell.badge")
-                    Label("内容偏好", systemImage: "slider.horizontal.3")
-                    Label("关于 Bruh", systemImage: "info.circle")
-                }
+                SettingsView()
                 .navigationTitle("设置")
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
@@ -206,6 +210,36 @@ struct ContentView: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+private struct SettingsView: View {
+    var body: some View {
+        List {
+            Section("内容偏好") {
+                ForEach(NewsInterest.allCases) { interest in
+                    Toggle(isOn: Binding(
+                        get: { InterestPreferences.isEnabled(interest) },
+                        set: { newValue in
+                            InterestPreferences.set(newValue, for: interest)
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(interest.title)
+                            Text(interest.subtitle)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            Section("说明") {
+                Label("全局 TOP 默认进入消息上下文", systemImage: "globe")
+                Label("兴趣 TOP 根据你的勾选决定", systemImage: "slider.horizontal.3")
+                Label("X / 小红书用于朋友圈，新闻源用于私聊", systemImage: "newspaper")
+            }
+        }
     }
 }
 
@@ -345,7 +379,12 @@ private struct MessageDetailView: View {
 
         Task {
             do {
-                try await service.sendMessage(personaId: thread.personaId, text: text, modelContext: modelContext)
+                try await service.sendMessage(
+                    personaId: thread.personaId,
+                    text: text,
+                    modelContext: modelContext,
+                    userInterests: InterestPreferences.selectedInterests()
+                )
             } catch {
                 errorMessage = error.localizedDescription
             }

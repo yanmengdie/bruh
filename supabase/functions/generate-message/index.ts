@@ -1,5 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
+import { topNewsSummaryBlock } from "../_shared/news.ts"
 import { resolvePersonaById } from "../_shared/personas.ts"
 
 type ConversationTurn = {
@@ -14,6 +15,21 @@ type ContextRow = {
   topic: string | null
   importance_score: number
   published_at: string
+}
+
+type NewsEventRow = {
+  id: string
+  title: string
+  summary: string
+  category: string
+  interest_tags: string[]
+  importance_score: number
+  published_at: string
+}
+
+type PersonaNewsScoreRow = {
+  score: number
+  news_events: NewsEventRow | NewsEventRow[] | null
 }
 
 type OpenAIMessage = {
@@ -35,6 +51,11 @@ function normalizeConversation(value: unknown): ConversationTurn[] {
     }))
     .filter((item) => (item.role === "user" || item.role === "assistant") && item.content.length > 0)
     .slice(-6)
+}
+
+function normalizeInterests(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return [...new Set(value.map((item) => asString(item)).filter((item) => item.length > 0))]
 }
 
 function keywordOverlapScore(text: string, keywords: string[]): number {
@@ -160,6 +181,14 @@ function buildSystemPrompt(persona: NonNullable<ReturnType<typeof resolvePersona
   ].join("\n")
 }
 
+function buildStructuredNewsContext(events: NewsEventRow[]) {
+  if (events.length === 0) return ""
+  return [
+    "Here are the news events most relevant right now:",
+    ...events.map((event) => `- ${event.title} (${event.category}): ${event.summary}`),
+  ].join("\n")
+}
+
 async function generateWithOpenAICompatible(
   apiKey: string,
   baseUrl: string,
@@ -270,6 +299,7 @@ Deno.serve(async (request) => {
     const userMessage = asString(body.userMessage)
     const conversation = normalizeConversation(body.conversation)
     const newsContext = asString(body.newsContext)
+    const userInterests = normalizeInterests(body.userInterests)
 
     if (!personaId) {
       return Response.json({ error: "personaId is required" }, { status: 400, headers: corsHeaders })
@@ -311,8 +341,55 @@ Deno.serve(async (request) => {
       rows = (sourcePosts ?? []) as ContextRow[]
     }
 
+    const { data: personaNewsRows, error: personaNewsError } = await supabase
+      .from("persona_news_scores")
+      .select(`
+        score,
+        news_events (
+          id,
+          title,
+          summary,
+          category,
+          interest_tags,
+          importance_score,
+          published_at
+        )
+      `)
+      .eq("persona_id", personaId)
+      .order("score", { ascending: false })
+      .limit(20)
+
+    if (personaNewsError && !personaNewsError.message.includes("persona_news_scores")) {
+      throw new Error(personaNewsError.message)
+    }
+
+    const relevantNews = ((personaNewsRows ?? []) as PersonaNewsScoreRow[])
+      .map((row) => Array.isArray(row.news_events) ? row.news_events[0] : row.news_events)
+      .filter((row): row is NewsEventRow => row !== null)
+      .filter((row) => row.interest_tags.includes("global") || userInterests.some((interest) => row.interest_tags.includes(interest)))
+      .slice(0, 3)
+
     const selected = selectContext(rows, personaId, userMessage, persona.triggerKeywords)
-    const system = buildSystemPrompt(persona, selected, newsContext)
+    const combinedNewsContext = [
+      newsContext,
+      buildStructuredNewsContext(relevantNews),
+      relevantNews.length > 0 ? `Current top news snapshot:\n${topNewsSummaryBlock(relevantNews.map((event, index) => ({
+        id: event.id,
+        title: event.title,
+        summary: event.summary,
+        category: event.category,
+        interest_tags: event.interest_tags,
+        representative_url: null,
+        representative_source_name: "News",
+        importance_score: event.importance_score,
+        global_rank: index + 1,
+        is_global_top: event.interest_tags.includes("global"),
+        published_at: event.published_at,
+      })))}`
+      : "",
+    ].filter((item) => item.length > 0).join("\n\n")
+
+    const system = buildSystemPrompt(persona, selected, combinedNewsContext)
     const content = await generateWithOpenAICompatible(
       openaiApiKey,
       openaiBaseUrl,
@@ -328,7 +405,7 @@ Deno.serve(async (request) => {
         id: `msg-${crypto.randomUUID()}`,
         personaId,
         content,
-        sourcePostIds: selected.map((row) => row.id),
+        sourcePostIds: [...selected.map((row) => row.id), ...relevantNews.map((row) => row.id)],
         generatedAt,
       },
       { headers: corsHeaders },

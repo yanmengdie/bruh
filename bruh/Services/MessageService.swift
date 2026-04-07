@@ -9,30 +9,16 @@ final class MessageService {
         self.api = api
     }
 
-    func ensureThreadsExist(modelContext: ModelContext) throws {
+    func ensureThreadsExist(modelContext: ModelContext, userInterests: [String]) async throws {
         for persona in Persona.all {
             let thread = try ensureThread(for: persona.id, modelContext: modelContext)
-            let threadId = persona.id
+            _ = thread
+        }
 
-            var descriptor = FetchDescriptor<PersonaMessage>(
-                predicate: #Predicate { $0.threadId == threadId }
-            )
-            descriptor.fetchLimit = 1
-
-            if try modelContext.fetch(descriptor).isEmpty {
-                let starter = PersonaMessage(
-                    id: "starter-\(persona.id)",
-                    threadId: persona.id,
-                    personaId: persona.id,
-                    text: starterMessage(for: persona.id),
-                    isIncoming: true,
-                    createdAt: Date(),
-                    deliveryState: "sent",
-                    isSeedMessage: true
-                )
-                modelContext.insert(starter)
-                updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: 1)
-            }
+        do {
+            try await syncStarterMessages(modelContext: modelContext, userInterests: userInterests)
+        } catch {
+            try seedFallbackStarterMessagesIfNeeded(modelContext: modelContext)
         }
 
         if modelContext.hasChanges {
@@ -40,7 +26,7 @@ final class MessageService {
         }
     }
 
-    func sendMessage(personaId: String, text: String, modelContext: ModelContext) async throws {
+    func sendMessage(personaId: String, text: String, modelContext: ModelContext, userInterests: [String]) async throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
@@ -62,7 +48,8 @@ final class MessageService {
             let reply = try await api.sendMessage(
                 personaId: personaId,
                 userMessage: trimmed,
-                conversation: try recentConversation(for: thread.id, modelContext: modelContext)
+                conversation: try recentConversation(for: thread.id, modelContext: modelContext),
+                userInterests: userInterests
             )
 
             outgoing.deliveryState = "sent"
@@ -117,6 +104,69 @@ final class MessageService {
         )
         modelContext.insert(thread)
         return thread
+    }
+
+    private func syncStarterMessages(modelContext: ModelContext, userInterests: [String]) async throws {
+        let reply = try await api.fetchMessageStarters(userInterests: userInterests)
+
+        if reply.starters.isEmpty {
+            try seedFallbackStarterMessagesIfNeeded(modelContext: modelContext)
+            return
+        }
+
+        for starter in reply.starters {
+            let thread = try ensureThread(for: starter.personaId, modelContext: modelContext)
+            let messageId = starter.id
+            var descriptor = FetchDescriptor<PersonaMessage>(
+                predicate: #Predicate { $0.id == messageId }
+            )
+            descriptor.fetchLimit = 1
+
+            if try modelContext.fetch(descriptor).first == nil {
+                let message = PersonaMessage(
+                    id: starter.id,
+                    threadId: starter.personaId,
+                    personaId: starter.personaId,
+                    text: starter.text,
+                    isIncoming: true,
+                    createdAt: starter.createdAt,
+                    deliveryState: "sent",
+                    sourcePostIds: starter.sourcePostIds,
+                    isSeedMessage: true
+                )
+                modelContext.insert(message)
+                updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: max(thread.unreadCount, 1))
+            }
+        }
+
+        try seedFallbackStarterMessagesIfNeeded(modelContext: modelContext)
+    }
+
+    private func seedFallbackStarterMessagesIfNeeded(modelContext: ModelContext) throws {
+        for persona in Persona.all {
+            let thread = try ensureThread(for: persona.id, modelContext: modelContext)
+            let threadId = persona.id
+
+            var descriptor = FetchDescriptor<PersonaMessage>(
+                predicate: #Predicate { $0.threadId == threadId }
+            )
+            descriptor.fetchLimit = 1
+
+            if try modelContext.fetch(descriptor).isEmpty {
+                let starter = PersonaMessage(
+                    id: "starter-\(persona.id)",
+                    threadId: persona.id,
+                    personaId: persona.id,
+                    text: starterMessage(for: persona.id),
+                    isIncoming: true,
+                    createdAt: Date(),
+                    deliveryState: "sent",
+                    isSeedMessage: true
+                )
+                modelContext.insert(starter)
+                updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: 1)
+            }
+        }
     }
 
     private func recentConversation(

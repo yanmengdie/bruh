@@ -28,6 +28,7 @@
 		A10000130000000000000013 /* FeedComment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000130000000000000013 /* FeedComment.swift */; };
 		A10000140000000000000014 /* FeedLike.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000140000000000000014 /* FeedLike.swift */; };
 		A10000150000000000000015 /* FeedInteractionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000150000000000000015 /* FeedInteractionService.swift */; };
+		A10000160000000000000016 /* NewsInterest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000160000000000000016 /* NewsInterest.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -52,6 +53,7 @@
 		B10000130000000000000013 /* FeedComment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedComment.swift; sourceTree = "<group>"; };
 		B10000140000000000000014 /* FeedLike.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedLike.swift; sourceTree = "<group>"; };
 		B10000150000000000000015 /* FeedInteractionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedInteractionService.swift; sourceTree = "<group>"; };
+		B10000160000000000000016 /* NewsInterest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsInterest.swift; sourceTree = "<group>"; };
 		C1000001000000000000001 /* bruh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bruh.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -98,6 +100,7 @@
 				B10000110000000000000011 /* PersonaMessage.swift */,
 				B10000130000000000000013 /* FeedComment.swift */,
 				B10000140000000000000014 /* FeedLike.swift */,
+				B10000160000000000000016 /* NewsInterest.swift */,
 				B1000005000000000000005 /* SeedData.swift */,
 				B1000006000000000000006 /* SourceItem.swift */,
 			);
@@ -244,6 +247,7 @@
 				A10000110000000000000011 /* PersonaMessage.swift in Sources */,
 				A10000130000000000000013 /* FeedComment.swift in Sources */,
 				A10000140000000000000014 /* FeedLike.swift in Sources */,
+				A10000160000000000000016 /* NewsInterest.swift in Sources */,
 				A1000005000000000000005 /* SeedData.swift in Sources */,
 				A1000006000000000000006 /* SourceItem.swift in Sources */,
 				A1000007000000000000007 /* FeedView.swift in Sources */,
