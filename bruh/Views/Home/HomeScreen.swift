@@ -24,13 +24,6 @@ struct HomeScreen: View {
         AppItem(name: "朋友圈", icon: "globe", iconColor: Color(red: 1.0, green: 0.72, blue: 0.62), destination: .feed, unreadCount: 8, badgeText: nil),
         AppItem(name: "News", icon: "newspaper.fill", iconColor: .red, destination: nil, unreadCount: 0, badgeText: "NEW"),
         AppItem(name: "Phone", icon: "phone.fill", iconColor: .green, destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "FaceTime", icon: "video.fill", iconColor: Color(red: 0.48, green: 0.46, blue: 0.9), destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Games", icon: "gamecontroller.fill", iconColor: .pink, destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Camera", icon: "camera.fill", iconColor: .black, destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Music", icon: "music.note", iconColor: Color(red: 1.0, green: 0.62, blue: 0.45), destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Weather", icon: "cloud.fill", iconColor: .cyan, destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Maps", icon: "map.fill", iconColor: Color(red: 0.83, green: 0.92, blue: 0.9), destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Calendar", icon: "calendar", iconColor: .white, destination: nil, unreadCount: 0, badgeText: nil),
         AppItem(name: "Settings", icon: "gearshape.fill", iconColor: Color(red: 0.55, green: 0.62, blue: 0.95), destination: .settings, unreadCount: 0, badgeText: nil),
     ]
 
@@ -138,7 +131,7 @@ private struct AppIconView: View {
 
                         Image(systemName: app.icon)
                             .font(.system(size: iconSize * 0.42, weight: .medium))
-                            .foregroundStyle(app.name == "Calendar" ? .red : .white)
+                            .foregroundStyle(.white)
                     }
 
                     if let badgeText = app.badgeText {
