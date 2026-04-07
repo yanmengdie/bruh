@@ -34,61 +34,63 @@ struct HomeScreen: View {
         AppItem(name: "News", icon: "newspaper.fill", iconColor: .red, destination: nil, unreadCount: 0, badgeText: nil),
     ]
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 18), count: 4)
-
     var body: some View {
-        VStack(spacing: 0) {
-            LazyVGrid(columns: columns, spacing: 26) {
-                ForEach(gridApps) { app in
-                    AppIconView(app: app) {
-                        guard let destination = app.destination else { return }
-                        onNavigate(destination)
+        GeometryReader { proxy in
+            let layout = makeLayout(for: proxy.size)
+
+            VStack(spacing: 0) {
+                LazyVGrid(columns: layout.columns, spacing: layout.gridRowSpacing) {
+                    ForEach(gridApps) { app in
+                        AppIconView(app: app, iconSize: layout.gridIconSize) {
+                            guard let destination = app.destination else { return }
+                            onNavigate(destination)
+                        }
                     }
                 }
+                .padding(.horizontal, layout.gridHorizontalPadding)
+                .padding(.top, layout.gridTopPadding)
+
+                Spacer(minLength: 0)
+
+                dock(iconSize: layout.dockIconSize, iconSpacing: layout.dockIconSpacing)
+                    .padding(.horizontal, layout.dockHorizontalPadding)
+                    .padding(.bottom, layout.dockBottomPadding)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .safeAreaPadding(.top, layout.safeTopPadding)
+            .background {
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.17, green: 0.22, blue: 0.52),
+                            Color(red: 0.42, green: 0.35, blue: 0.75),
+                            Color(red: 0.94, green: 0.47, blue: 0.52),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
 
-            Spacer(minLength: 0)
+                    Circle()
+                        .fill(Color.white.opacity(0.16))
+                        .blur(radius: 60)
+                        .frame(width: 220, height: 220)
+                        .offset(x: -70, y: -180)
 
-            dock
-                .padding(.horizontal, 14)
-                .padding(.bottom, 6)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .safeAreaPadding(.top, 8)
-        .background {
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.17, green: 0.22, blue: 0.52),
-                        Color(red: 0.42, green: 0.35, blue: 0.75),
-                        Color(red: 0.94, green: 0.47, blue: 0.52),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                Circle()
-                    .fill(Color.white.opacity(0.16))
-                    .blur(radius: 60)
-                    .frame(width: 220, height: 220)
-                    .offset(x: -70, y: -180)
-
-                Circle()
-                    .fill(Color.blue.opacity(0.18))
-                    .blur(radius: 80)
-                    .frame(width: 260, height: 260)
-                    .offset(x: 90, y: 220)
+                    Circle()
+                        .fill(Color.blue.opacity(0.18))
+                        .blur(radius: 80)
+                        .frame(width: 260, height: 260)
+                        .offset(x: 90, y: 220)
+                }
+                .ignoresSafeArea()
             }
-            .ignoresSafeArea()
         }
     }
 
-    private var dock: some View {
-        HStack(spacing: 22) {
+    private func dock(iconSize: CGFloat, iconSpacing: CGFloat) -> some View {
+        HStack(spacing: iconSpacing) {
             ForEach(dockApps) { app in
-                AppIconView(app: app, iconSize: 58, labelHidden: true) {
+                AppIconView(app: app, iconSize: iconSize, labelHidden: true) {
                     guard let destination = app.destination else { return }
                     onNavigate(destination)
                 }
@@ -99,6 +101,38 @@ struct HomeScreen: View {
         .background(.ultraThinMaterial.opacity(0.95))
         .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
     }
+
+    private func makeLayout(for size: CGSize) -> HomeLayout {
+        let isWidePhone = size.width >= 400
+        let iconSize = min(62, max(56, size.width * 0.15))
+        let dockIconSize = iconSize - 2
+
+        return HomeLayout(
+            columns: Array(repeating: GridItem(.flexible(), spacing: isWidePhone ? 14 : 16), count: isWidePhone ? 5 : 4),
+            gridIconSize: iconSize,
+            dockIconSize: dockIconSize,
+            gridRowSpacing: isWidePhone ? 22 : 24,
+            gridHorizontalPadding: isWidePhone ? 16 : 18,
+            gridTopPadding: isWidePhone ? 16 : 12,
+            safeTopPadding: isWidePhone ? 12 : 8,
+            dockIconSpacing: isWidePhone ? 18 : 22,
+            dockHorizontalPadding: isWidePhone ? 12 : 14,
+            dockBottomPadding: isWidePhone ? 10 : 6
+        )
+    }
+}
+
+private struct HomeLayout {
+    let columns: [GridItem]
+    let gridIconSize: CGFloat
+    let dockIconSize: CGFloat
+    let gridRowSpacing: CGFloat
+    let gridHorizontalPadding: CGFloat
+    let gridTopPadding: CGFloat
+    let safeTopPadding: CGFloat
+    let dockIconSpacing: CGFloat
+    let dockHorizontalPadding: CGFloat
+    let dockBottomPadding: CGFloat
 }
 
 private struct AppIconView: View {
@@ -177,9 +211,5 @@ private struct AppIconView: View {
 }
 
 #Preview {
-    PhoneFrame {
-        HomeScreen(onNavigate: { _ in })
-    }
-    .padding(40)
-    .background(Color.black)
+    HomeScreen(onNavigate: { _ in })
 }
