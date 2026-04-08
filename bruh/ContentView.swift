@@ -49,7 +49,7 @@ struct ContentView: View {
             .tag(MainTab.feed)
 
             NavigationStack {
-                albumView
+                AlbumView()
             }
             .enableUnifiedSwipeBack()
             .tabItem {
@@ -98,28 +98,6 @@ struct ContentView: View {
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
     }
-
-    private var albumView: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 34))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 18)
-
-                Text("Album")
-                    .font(.system(size: 24, weight: .bold))
-
-                Text("这里将展示你的照片与回忆。")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 28)
-        }
-        .navigationTitle("")
-    }
 }
 
 private enum MainTab: Hashable {
@@ -127,6 +105,122 @@ private enum MainTab: Hashable {
     case messages
     case feed
     case album
+}
+
+private struct AlbumView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                topBar
+                    .padding(.top, 8)
+
+                sectionTitle(
+                    title: "Recents",
+                    subtitle: "Today — 128 photos & videos"
+                )
+
+                recentsMosaic
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                sectionTitle(
+                    title: "Yesterday",
+                    subtitle: "Apr 7 — 84 photos & videos"
+                )
+                .padding(.top, 6)
+
+                HStack(spacing: 2) {
+                    Color(red: 0.12, green: 0.70, blue: 0.52)
+                    Color(red: 0.82, green: 0.18, blue: 0.26)
+                    Color(red: 0.90, green: 0.34, blue: 0.62)
+                }
+                .frame(height: 6)
+                .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 28)
+        }
+        .scrollIndicators(.hidden)
+        .background(AppTheme.messagesBackground)
+        .navigationTitle("")
+    }
+
+    private var topBar: some View {
+        HStack(alignment: .center) {
+            Text("ALBUM")
+                .font(.system(size: 24, weight: .black, design: .rounded))
+                .foregroundStyle(Color.black.opacity(0.9))
+
+            Spacer()
+
+            CircleButton(symbol: "plus")
+            CircleButton(symbol: "ellipsis")
+        }
+    }
+
+    private func sectionTitle(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 40, weight: .bold))
+                .foregroundStyle(Color.black.opacity(0.88))
+
+            Text(subtitle)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.black.opacity(0.32))
+        }
+    }
+
+    private var recentsMosaic: some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 2) {
+                tile(Color(red: 0.80, green: 0.08, blue: 0.15), height: 194)
+                VStack(spacing: 2) {
+                    tile(Color(red: 0.20, green: 0.29, blue: 0.52), height: 96)
+                    tile(Color(red: 0.86, green: 0.66, blue: 0.12), height: 96)
+                }
+            }
+
+            HStack(spacing: 2) {
+                tile(Color(red: 0.16, green: 0.55, blue: 0.34), height: 96)
+                tile(Color(red: 0.24, green: 0.52, blue: 0.86), height: 96)
+                tile(Color(red: 0.96, green: 0.44, blue: 0.12), height: 96)
+            }
+
+            HStack(spacing: 2) {
+                tile(Color(red: 0.43, green: 0.71, blue: 0.86), height: 96)
+                tile(Color(red: 0.95, green: 0.52, blue: 0.18), height: 96)
+                tile(Color(red: 0.36, green: 0.32, blue: 0.85), height: 96)
+            }
+        }
+    }
+
+    private func tile(_ color: Color, height: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 0, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [color.opacity(0.95), color.opacity(0.78)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+    }
+}
+
+private struct CircleButton: View {
+    let symbol: String
+
+    var body: some View {
+        Button {} label: {
+            Image(systemName: symbol)
+                .font(.system(size: 18, weight: .regular))
+                .foregroundStyle(Color.black.opacity(0.58))
+                .frame(width: 56, height: 56)
+                .background(Color.white.opacity(0.45))
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+    }
 }
 
 private struct SettingsScreen: View {

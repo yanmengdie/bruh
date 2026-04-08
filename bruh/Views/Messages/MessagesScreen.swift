@@ -1,4 +1,5 @@
 import Foundation
+import AVKit
 import SafariServices
 import SwiftUI
 import SwiftData
@@ -152,6 +153,8 @@ private struct MessageDetailView: View {
 
     let thread: MessageThread
     let service: MessageService
+    private let timestampProvider: any MessageTimestampProviding
+    private let initialUnreadCount: Int
 
     @State private var draft = ""
     @State private var isSending = false
@@ -160,11 +163,20 @@ private struct MessageDetailView: View {
     @StateObject private var webPreviewStore = OpenGraphPreviewStore()
     @State private var presentedSourceURL: URL?
     @State private var isPresentingSafari = false
+    @State private var effectPlayer: AVPlayer?
+    @State private var isShowingExcitedEffect = false
+    @State private var hasCheckedEntryEffect = false
     private let quickReactionOptions = ["👍", "🖤", "😂", "🔥"]
 
-    init(thread: MessageThread, service: MessageService) {
+    init(
+        thread: MessageThread,
+        service: MessageService,
+        timestampProvider: any MessageTimestampProviding = HardcodedMessageTimestampProvider()
+    ) {
         self.thread = thread
         self.service = service
+        self.timestampProvider = timestampProvider
+        self.initialUnreadCount = thread.unreadCount
         let threadId = thread.id
         _messages = Query(
             filter: #Predicate<PersonaMessage> { $0.threadId == threadId },
@@ -185,7 +197,14 @@ private struct MessageDetailView: View {
                 ScrollView {
                     VStack(spacing: 14) {
                         LazyVStack(spacing: 10) {
-                            ForEach(messages, id: \.id) { message in
+                            ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                                if let timestamp = timestampProvider.timestampLabel(
+                                    for: message,
+                                    previous: index > 0 ? messages[index - 1] : nil
+                                ) {
+                                    messageTimestamp(timestamp)
+                                }
+
                                 messageRow(for: message)
                                 .id(message.id)
                             }
@@ -238,8 +257,41 @@ private struct MessageDetailView: View {
                     .ignoresSafeArea()
             }
         }
+        .overlay {
+            if isShowingExcitedEffect, let effectPlayer {
+                ZStack {
+                    Color.black.opacity(0.12)
+                        .ignoresSafeArea()
+
+                    EffectVideoView(player: effectPlayer)
+                        .frame(width: 240, height: 240)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+                }
+                .transition(.opacity)
+            }
+        }
         .task {
             try? service.markThreadRead(personaId: thread.personaId, modelContext: modelContext)
+        }
+        .task(id: messages.count) {
+            maybePlayEntryExcitedEffect()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { note in
+            guard let currentItem = effectPlayer?.currentItem,
+                  let endedItem = note.object as? AVPlayerItem,
+                  endedItem == currentItem else {
+                return
+            }
+
+            isShowingExcitedEffect = false
+            effectPlayer?.pause()
+            effectPlayer = nil
+        }
+        .onDisappear {
+            effectPlayer?.pause()
+            effectPlayer = nil
+            isShowingExcitedEffect = false
         }
     }
 
@@ -371,6 +423,15 @@ private struct MessageDetailView: View {
                 }
             }
         }
+    }
+
+    private func messageTimestamp(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Color.black.opacity(0.30))
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 2)
+            .padding(.bottom, 4)
     }
 
     @ViewBuilder
@@ -608,12 +669,37 @@ private struct MessageDetailView: View {
     }
 
     private func reaction(for messageId: String) -> MessageReaction {
+        if let forcedId = forcedExcitedMessageIdForTesting, forcedId == messageId {
+            return MessageReaction.presets.first(where: { $0.mood == "excited" }) ?? .init(emoji: "🔥", mood: "excited")
+        }
+
         let list = MessageReaction.presets
         let stableSeed = messageId.unicodeScalars.reduce(0) { partial, scalar in
             (partial &* 31 &+ Int(scalar.value)) & 0x7fffffff
         }
         let index = stableSeed % list.count
         return list[index]
+    }
+
+    private var forcedExcitedMessageIdForTesting: String? {
+        guard thread.personaId == "trump" else { return nil }
+        return messages.last(where: { $0.isIncoming })?.id
+    }
+
+    private func maybePlayEntryExcitedEffect() {
+        guard !hasCheckedEntryEffect else { return }
+        guard !messages.isEmpty else { return }
+        hasCheckedEntryEffect = true
+
+        guard initialUnreadCount > 0 else { return }
+        guard let latestIncoming = messages.last(where: { $0.isIncoming }) else { return }
+        guard reaction(for: latestIncoming.id).mood == "excited" else { return }
+        guard let videoURL = Bundle.main.url(forResource: "trump_joy", withExtension: "mp4") else { return }
+
+        let player = AVPlayer(url: videoURL)
+        effectPlayer = player
+        isShowingExcitedEffect = true
+        player.play()
     }
 
     private func toggleQuickReaction(_ emoji: String, for messageId: String) {
@@ -668,6 +754,27 @@ private struct MessageReaction {
     ]
 }
 
+private protocol MessageTimestampProviding {
+    func timestampLabel(for message: PersonaMessage, previous: PersonaMessage?) -> String?
+}
+
+private struct HardcodedMessageTimestampProvider: MessageTimestampProviding {
+    private let labelsByMessageId: [String: String]
+
+    init(labelsByMessageId: [String: String] = [
+        "preview-1": "Today 11:12 AM",
+        "preview-2": "11:15 AM",
+        "preview-3": "11:18 AM",
+        "seed-trump-reuters-og": "11:20 AM"
+    ]) {
+        self.labelsByMessageId = labelsByMessageId
+    }
+
+    func timestampLabel(for message: PersonaMessage, previous: PersonaMessage?) -> String? {
+        labelsByMessageId[message.id]
+    }
+}
+
 private struct InAppSafariView: UIViewControllerRepresentable {
     let url: URL
 
@@ -678,6 +785,23 @@ private struct InAppSafariView: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
+}
+
+private struct EffectVideoView: UIViewControllerRepresentable {
+    let player: AVPlayer
+
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.showsPlaybackControls = false
+        controller.videoGravity = .resizeAspectFill
+        controller.view.backgroundColor = .clear
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
+        uiViewController.player = player
+    }
 }
 
 @MainActor
