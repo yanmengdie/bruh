@@ -4,10 +4,10 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\MessageThread.lastMessageAt, order: .reverse)]) private var threads: [MessageThread]
-    @Query(sort: [SortDescriptor(\PersonaPost.publishedAt, order: .reverse)]) private var posts: [PersonaPost]
+    @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
-    @AppStorage("hasOpenedAlbum") private var hasOpenedAlbum = false
     @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
+    @AppStorage("lastViewedAlbumAt") private var lastViewedAlbumAtInterval: Double = 0
 
     @State private var selectedTab: MainTab = .contacts
     @State private var messageService = MessageService()
@@ -55,7 +55,7 @@ struct ContentView: View {
             .tabItem {
                 Label("album", systemImage: "photo.on.rectangle.angled")
             }
-            .badge(!hasOpenedAlbum ? Text("NEW") : nil)
+            .badge(unseenAlbumCount > 0 ? Text("NEW") : nil)
             .tag(MainTab.album)
         }
         .onChange(of: selectedTab) { _, newValue in
@@ -63,7 +63,7 @@ struct ContentView: View {
                 lastViewedFeedAtInterval = Date().timeIntervalSince1970
             }
             if newValue == .album {
-                hasOpenedAlbum = true
+                lastViewedAlbumAtInterval = Date().timeIntervalSince1970
             }
         }
         .task {
@@ -82,14 +82,8 @@ struct ContentView: View {
     }
 
     private var totalUnreadMessages: Int {
-        let visiblePersonaIds = Set(
-            contacts
-                .filter { $0.relationshipStatusValue == .accepted }
-                .compactMap(\.linkedPersonaId)
-        )
-
         return max(0, threads.reduce(0) { count, thread in
-            guard visiblePersonaIds.contains(thread.personaId) else { return count }
+            guard acceptedPersonaIds.contains(thread.personaId) else { return count }
             return count + max(0, thread.unreadCount)
         })
     }
@@ -99,16 +93,43 @@ struct ContentView: View {
     }
 
     private var totalUnreadMoments: Int {
-        let visiblePersonaIds = Set(
+        guard lastViewedFeedAtInterval > 0 else { return feedDeliveries.count }
+        let lastViewed = Date(timeIntervalSince1970: lastViewedFeedAtInterval)
+        return feedDeliveries.reduce(0) { count, delivery in
+            count + (delivery.sortDate > lastViewed ? 1 : 0)
+        }
+    }
+
+    private var unseenAlbumCount: Int {
+        guard lastViewedAlbumAtInterval > 0 else { return albumDeliveries.count }
+        let lastViewed = Date(timeIntervalSince1970: lastViewedAlbumAtInterval)
+        return albumDeliveries.reduce(0) { count, delivery in
+            count + (delivery.sortDate > lastViewed ? 1 : 0)
+        }
+    }
+
+    private var acceptedPersonaIds: Set<String> {
+        Set(
             contacts
                 .filter { $0.relationshipStatusValue == .accepted }
                 .compactMap(\.linkedPersonaId)
         )
-        let visiblePosts = posts.filter { visiblePersonaIds.contains($0.personaId) }
-        guard lastViewedFeedAtInterval > 0 else { return visiblePosts.count }
-        let lastViewed = Date(timeIntervalSince1970: lastViewedFeedAtInterval)
-        return visiblePosts.reduce(0) { count, post in
-            count + (post.publishedAt > lastViewed ? 1 : 0)
+    }
+
+    private var feedDeliveries: [ContentDelivery] {
+        deliveries.filter { delivery in
+            delivery.channelValue == .feed
+                && delivery.isVisible
+                && acceptedPersonaIds.contains(delivery.personaId ?? "")
+        }
+    }
+
+    private var albumDeliveries: [ContentDelivery] {
+        deliveries.filter { delivery in
+            delivery.channelValue == .album
+                && delivery.isVisible
+                && !(delivery.imageUrl?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+                && acceptedPersonaIds.contains(delivery.personaId ?? "")
         }
     }
 
@@ -130,33 +151,93 @@ private enum MainTab: Hashable {
 }
 
 private struct AlbumView: View {
+    @Query(
+        sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)],
+        animation: .default
+    ) private var deliveries: [ContentDelivery]
+    @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
+    @State private var selectedAsset: AlbumAssetSelection?
+
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 2),
+        GridItem(.flexible(), spacing: 2),
+        GridItem(.flexible(), spacing: 2),
+    ]
+
+    private var albumItems: [ContentDelivery] {
+        deliveries.filter { delivery in
+            delivery.channelValue == .album
+                && delivery.isVisible
+                && !(delivery.imageUrl?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+                && acceptedPersonaIds.contains(delivery.personaId ?? "")
+        }
+    }
+
+    private var acceptedPersonaIds: Set<String> {
+        Set(
+            contacts
+                .filter { $0.relationshipStatusValue == .accepted }
+                .compactMap(\.linkedPersonaId)
+        )
+    }
+
+    private var sections: [AlbumSection] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)
+        let grouped = Dictionary(grouping: albumItems) { item in
+            calendar.startOfDay(for: item.sortDate)
+        }
+
+        return grouped.keys
+            .sorted(by: >)
+            .compactMap { day in
+                guard let items = grouped[day]?.sorted(by: { $0.sortDate > $1.sortDate }), !items.isEmpty else {
+                    return nil
+                }
+
+                let title: String
+                if day == today {
+                    title = "Today"
+                } else if day == yesterday {
+                    title = "Yesterday"
+                } else {
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "MMM d"
+                    title = formatter.string(from: day)
+                }
+
+                let subtitle = "\(items.count) photos"
+                return AlbumSection(id: day.formatted(date: .numeric, time: .omitted), title: title, subtitle: subtitle, items: items)
+            }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 topBar
                     .padding(.top, 8)
 
-                sectionTitle(
-                    title: "Recents",
-                    subtitle: "Today — 128 photos & videos"
-                )
+                if sections.isEmpty {
+                    albumEmptyState
+                        .padding(.top, 18)
+                } else {
+                    ForEach(sections) { section in
+                        VStack(alignment: .leading, spacing: 10) {
+                            sectionTitle(
+                                title: section.title,
+                                subtitle: section.subtitle
+                            )
 
-                recentsMosaic
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                sectionTitle(
-                    title: "Yesterday",
-                    subtitle: "Apr 7 — 84 photos & videos"
-                )
-                .padding(.top, 6)
-
-                HStack(spacing: 2) {
-                    Color(red: 0.12, green: 0.70, blue: 0.52)
-                    Color(red: 0.82, green: 0.18, blue: 0.26)
-                    Color(red: 0.90, green: 0.34, blue: 0.62)
+                            LazyVGrid(columns: gridColumns, spacing: 2) {
+                                ForEach(section.items) { item in
+                                    albumTile(for: item)
+                                }
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                    }
                 }
-                .frame(height: 6)
-                .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 28)
@@ -164,6 +245,9 @@ private struct AlbumView: View {
         .scrollIndicators(.hidden)
         .background(AppTheme.messagesBackground)
         .navigationTitle("")
+        .fullScreenCover(item: $selectedAsset) { asset in
+            AlbumPreviewView(asset: asset)
+        }
     }
 
     private var topBar: some View {
@@ -191,41 +275,167 @@ private struct AlbumView: View {
         }
     }
 
-    private var recentsMosaic: some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 2) {
-                tile(Color(red: 0.80, green: 0.08, blue: 0.15), height: 194)
-                VStack(spacing: 2) {
-                    tile(Color(red: 0.20, green: 0.29, blue: 0.52), height: 96)
-                    tile(Color(red: 0.86, green: 0.66, blue: 0.12), height: 96)
+    private var albumEmptyState: some View {
+        VStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.7))
+                .frame(height: 240)
+                .overlay {
+                    VStack(spacing: 10) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 34))
+                            .foregroundStyle(.secondary)
+                        Text("No Album Yet")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.black.opacity(0.84))
+                        Text("AI 图片回复会自动收进这里。")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            }
-
-            HStack(spacing: 2) {
-                tile(Color(red: 0.16, green: 0.55, blue: 0.34), height: 96)
-                tile(Color(red: 0.24, green: 0.52, blue: 0.86), height: 96)
-                tile(Color(red: 0.96, green: 0.44, blue: 0.12), height: 96)
-            }
-
-            HStack(spacing: 2) {
-                tile(Color(red: 0.43, green: 0.71, blue: 0.86), height: 96)
-                tile(Color(red: 0.95, green: 0.52, blue: 0.18), height: 96)
-                tile(Color(red: 0.36, green: 0.32, blue: 0.85), height: 96)
-            }
         }
     }
 
-    private func tile(_ color: Color, height: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: 0, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [color.opacity(0.95), color.opacity(0.78)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+    private func albumTile(for item: ContentDelivery) -> some View {
+        Button {
+            guard let imageURLString = item.imageUrl,
+                  let url = URL(string: imageURLString) else {
+                return
+            }
+            selectedAsset = AlbumAssetSelection(
+                id: item.id,
+                url: url,
+                caption: item.previewText,
+                createdAt: item.sortDate
             )
+        } label: {
+            ZStack(alignment: .bottomLeading) {
+                AsyncImage(url: URL(string: item.imageUrl ?? "")) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        RoundedRectangle(cornerRadius: 0, style: .continuous)
+                            .fill(Color.black.opacity(0.06))
+                            .overlay {
+                                Image(systemName: "photo")
+                                    .font(.system(size: 22))
+                                    .foregroundStyle(.secondary)
+                            }
+                    case .empty:
+                        RoundedRectangle(cornerRadius: 0, style: .continuous)
+                            .fill(Color.black.opacity(0.04))
+                            .overlay {
+                                ProgressView()
+                            }
+                    @unknown default:
+                        Color.black.opacity(0.04)
+                    }
+                }
+
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.28)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                Text(relativeAlbumTime(item.sortDate))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.94))
+                    .padding(8)
+            }
             .frame(maxWidth: .infinity)
-            .frame(height: height)
+            .aspectRatio(1, contentMode: .fit)
+            .clipped()
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func relativeAlbumTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+}
+
+private struct AlbumSection: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let items: [ContentDelivery]
+}
+
+private struct AlbumAssetSelection: Identifiable {
+    let id: String
+    let url: URL
+    let caption: String
+    let createdAt: Date
+}
+
+private struct AlbumPreviewView: View {
+    @Environment(\.dismiss) private var dismiss
+    let asset: AlbumAssetSelection
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+
+            AsyncImage(url: asset.url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black)
+                case .failure:
+                    ContentUnavailableView("图片加载失败", systemImage: "photo")
+                        .foregroundStyle(.white)
+                case .empty:
+                    ProgressView()
+                        .tint(.white)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                @unknown default:
+                    EmptyView()
+                }
+            }
+
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.white.opacity(0.92))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+
+                Spacer()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    if !asset.caption.isEmpty {
+                        Text(asset.caption)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(.white)
+                            .lineLimit(3)
+                    }
+
+                    Text(asset.createdAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.72))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 28)
+            }
+        }
     }
 }
 

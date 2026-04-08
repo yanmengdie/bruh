@@ -7,10 +7,12 @@ struct FeedView: View {
     @State private var hasLoadedInitially = false
 
     @Query(
-        sort: \PersonaPost.publishedAt,
+        sort: \ContentDelivery.sortDate,
         order: .reverse,
         animation: .default
-    ) private var posts: [PersonaPost]
+    ) private var deliveries: [ContentDelivery]
+
+    @Query private var posts: [PersonaPost]
 
     @Query private var contacts: [Contact]
 
@@ -24,8 +26,39 @@ struct FeedView: View {
         )
     }
 
-    private var visiblePosts: [PersonaPost] {
-        posts.filter { acceptedPersonaIds.contains($0.personaId) }
+    private var visibleEntries: [FeedEntry] {
+        let postsByLegacyId: [String: PersonaPost] = Dictionary(
+            uniqueKeysWithValues: posts.map { ($0.id, $0) }
+        )
+
+        let postsByEventId: [String: PersonaPost] = posts.reduce(into: [:]) { result, post in
+            guard let eventId = post.contentEventId else { return }
+            result[eventId] = post
+        }
+
+        var entries: [FeedEntry] = []
+
+        for delivery in deliveries {
+            guard delivery.channelValue == .feed,
+                  delivery.isVisible,
+                  acceptedPersonaIds.contains(delivery.personaId ?? "") else {
+                continue
+            }
+
+            let matchedPost = delivery.legacyPostId.flatMap { postsByLegacyId[$0] }
+                ?? postsByEventId[delivery.eventId]
+            let personaId = delivery.personaId ?? matchedPost?.personaId ?? ""
+
+            entries.append(
+                FeedEntry(
+                    delivery: delivery,
+                    post: matchedPost,
+                    contact: contacts.first(where: { $0.linkedPersonaId == personaId })
+                )
+            )
+        }
+
+        return entries
     }
 
     var body: some View {
@@ -34,7 +67,7 @@ struct FeedView: View {
                 momentsHeader
 
                 LazyVStack(spacing: 0) {
-                    if visiblePosts.isEmpty, !isRefreshing {
+                    if visibleEntries.isEmpty, !isRefreshing {
                         VStack(spacing: 12) {
                             Image(systemName: "bubble.left.and.exclamationmark.bubble.right")
                                 .font(.system(size: 28))
@@ -49,10 +82,11 @@ struct FeedView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 40)
                     } else {
-                        ForEach(visiblePosts) { post in
+                        ForEach(visibleEntries) { entry in
                             FeedCard(
-                                post: post,
-                                contact: contacts.first(where: { $0.linkedPersonaId == post.personaId })
+                                delivery: entry.delivery,
+                                post: entry.post,
+                                contact: entry.contact
                             )
                             .padding(.horizontal, 16)
                             .padding(.vertical, 14)
@@ -142,4 +176,12 @@ struct FeedView: View {
         }
         isRefreshing = false
     }
+}
+
+private struct FeedEntry: Identifiable {
+    let delivery: ContentDelivery
+    let post: PersonaPost?
+    let contact: Contact?
+
+    var id: String { delivery.id }
 }

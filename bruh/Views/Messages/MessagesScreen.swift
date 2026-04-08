@@ -5,6 +5,7 @@ import SwiftUI
 import SwiftData
 
 struct MessagesScreen: View {
+    @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     let threads: [MessageThread]
     let contacts: [Contact]
     let service: MessageService
@@ -12,12 +13,11 @@ struct MessagesScreen: View {
     @State private var searchText = ""
 
     private var visibleThreads: [MessageThread] {
-        let acceptedPersonaIds = Set(
-            contacts
-                .filter { $0.relationshipStatusValue == .accepted }
-                .compactMap(\.linkedPersonaId)
-        )
-        return threads.filter { acceptedPersonaIds.contains($0.personaId) }
+        threads
+            .filter { acceptedPersonaIds.contains($0.personaId) }
+            .sorted { left, right in
+                latestActivityDate(for: left) > latestActivityDate(for: right)
+            }
     }
 
     private var filteredThreads: [MessageThread] {
@@ -27,7 +27,7 @@ struct MessagesScreen: View {
         return visibleThreads.filter { thread in
             let personaName = persona(for: thread.personaId).name
             return personaName.localizedCaseInsensitiveContains(query)
-                || thread.lastMessagePreview.localizedCaseInsensitiveContains(query)
+                || latestPreview(for: thread).localizedCaseInsensitiveContains(query)
         }
     }
 
@@ -96,13 +96,13 @@ struct MessagesScreen: View {
                         .font(.system(size: 16, weight: thread.unreadCount > 0 ? .semibold : .regular))
                         .foregroundStyle(.primary)
                     Spacer()
-                    Text(relativeTime(thread.lastMessageAt))
+                    Text(relativeTime(latestActivityDate(for: thread)))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
 
                 HStack {
-                    Text(thread.lastMessagePreview.isEmpty ? "Start the conversation" : thread.lastMessagePreview)
+                    Text(latestPreview(for: thread))
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -156,6 +156,43 @@ struct MessagesScreen: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    private var acceptedPersonaIds: Set<String> {
+        Set(
+            contacts
+                .filter { $0.relationshipStatusValue == .accepted }
+                .compactMap(\.linkedPersonaId)
+        )
+    }
+
+    private var messageDeliveries: [ContentDelivery] {
+        deliveries.filter { delivery in
+            delivery.channelValue == .message
+                && delivery.isVisible
+                && acceptedPersonaIds.contains(delivery.personaId ?? "")
+        }
+    }
+
+    private func latestMessageDelivery(for personaId: String) -> ContentDelivery? {
+        messageDeliveries.first(where: { $0.personaId == personaId })
+    }
+
+    private func latestPreview(for thread: MessageThread) -> String {
+        let preview = thread.lastMessagePreview.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !preview.isEmpty {
+            return preview
+        }
+        if let preview = latestMessageDelivery(for: thread.personaId)?.previewText,
+           !preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return preview
+        }
+        return "Start the conversation"
+    }
+
+    private func latestActivityDate(for thread: MessageThread) -> Date {
+        let fallbackDate = latestMessageDelivery(for: thread.personaId)?.sortDate ?? .distantPast
+        return max(thread.lastMessageAt, fallbackDate)
     }
 }
 

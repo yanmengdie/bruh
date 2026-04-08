@@ -5,7 +5,8 @@ import SwiftData
 struct FeedCard: View {
     @Environment(\.modelContext) private var modelContext
 
-    let post: PersonaPost
+    let delivery: ContentDelivery
+    let post: PersonaPost?
     let contact: Contact?
 
     @State private var isLiked = false
@@ -26,12 +27,32 @@ struct FeedCard: View {
     private let imageSpacing: CGFloat = 6
 
     private var previewImageURLs: [URL] {
-        Array(post.mediaUrls.prefix(9)).compactMap(URL.init(string:))
+        Array(delivery.mediaUrls.prefix(9)).compactMap(URL.init(string:))
     }
 
     private var previewVideoURL: URL? {
-        guard let raw = post.videoUrl else { return nil }
+        guard let raw = delivery.videoUrl else { return nil }
         return URL(string: raw)
+    }
+
+    private var resolvedPersonaId: String {
+        post?.personaId ?? delivery.personaId ?? "unknown"
+    }
+
+    private var displayName: String {
+        contact?.name ?? delivery.personaId ?? post?.personaId ?? "Unknown"
+    }
+
+    private var bodyText: String {
+        let text = delivery.renderedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty {
+            return text
+        }
+        return post?.content ?? delivery.previewText
+    }
+
+    private var canInteract: Bool {
+        post != nil
     }
 
     private var imageColumnCount: Int {
@@ -73,11 +94,11 @@ struct FeedCard: View {
             avatar
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(contact?.name ?? post.personaId)
+                Text(displayName)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Color(red: 0.24, green: 0.34, blue: 0.56))
 
-                Text(post.content)
+                Text(bodyText)
                     .font(.system(size: 17))
                     .foregroundStyle(.primary)
                     .lineSpacing(5)
@@ -88,12 +109,14 @@ struct FeedCard: View {
                 HStack(spacing: 6) {
                     Text(locationText)
                     Text("·")
-                    Text(post.publishedAt, style: .relative)
+                    Text(delivery.sortDate, style: .relative)
                 }
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
 
-                interactionBar
+                if canInteract {
+                    interactionBar
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -123,14 +146,14 @@ struct FeedCard: View {
             .fill(avatarColor)
             .frame(width: 48, height: 48)
             .overlay {
-                Text(String((contact?.name ?? post.personaId).prefix(1)))
+                Text(String(displayName.prefix(1)))
                     .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(.white)
             }
     }
 
     private var avatarColor: Color {
-        switch post.personaId {
+        switch resolvedPersonaId {
         case "trump": .orange
         case "musk": Color(red: 0.12, green: 0.15, blue: 0.35)
         case "zuckerberg": .purple
@@ -311,7 +334,7 @@ struct FeedCard: View {
     }
 
     private var locationText: String {
-        if post.sourceType == "xiaohongshu" {
+        if post?.sourceType == "xiaohongshu" {
             return "中国"
         }
 
@@ -319,7 +342,7 @@ struct FeedCard: View {
             return location
         }
 
-        switch post.personaId {
+        switch resolvedPersonaId {
         case "trump": return "海湖庄园"
         case "musk": return "X HQ"
         case "zuckerberg": return "Meta Park"
@@ -348,6 +371,7 @@ struct FeedCard: View {
 
     private func loadInteractionsIfNeeded() async {
         guard !hasLoadedInteractions else { return }
+        guard let post else { return }
         hasLoadedInteractions = true
         isLoadingInteractions = true
         interactionError = nil
@@ -368,7 +392,7 @@ struct FeedCard: View {
 
     private func sendComment() {
         let text = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !isSendingComment else { return }
+        guard !text.isEmpty, !isSendingComment, let post else { return }
 
         commentDraft = ""
         interactionError = nil
@@ -399,6 +423,7 @@ struct FeedCard: View {
     }
 
     private func toggleLike() {
+        guard let post else { return }
         let targetState = !isLiked
         interactionError = nil
         isUpdatingLike = true
