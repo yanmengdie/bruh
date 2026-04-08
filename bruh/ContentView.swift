@@ -82,9 +82,13 @@ struct ContentView: View {
     }
 
     private var totalUnreadMessages: Int {
-        return max(0, threads.reduce(0) { count, thread in
-            guard acceptedPersonaIds.contains(thread.personaId) else { return count }
-            return count + max(0, thread.unreadCount)
+        return max(0, acceptedPersonaIds.reduce(0) { count, personaId in
+            let fallbackCount = threads.first(where: { $0.personaId == personaId })?.unreadCount ?? 0
+            return count + MessageReadStateStore.unreadCount(
+                for: personaId,
+                deliveries: messageDeliveries,
+                fallbackCount: fallbackCount
+            )
         })
     }
 
@@ -119,6 +123,14 @@ struct ContentView: View {
     private var feedDeliveries: [ContentDelivery] {
         deliveries.filter { delivery in
             delivery.channelValue == .feed
+                && delivery.isVisible
+                && acceptedPersonaIds.contains(delivery.personaId ?? "")
+        }
+    }
+
+    private var messageDeliveries: [ContentDelivery] {
+        deliveries.filter { delivery in
+            delivery.channelValue == .message
                 && delivery.isVisible
                 && acceptedPersonaIds.contains(delivery.personaId ?? "")
         }

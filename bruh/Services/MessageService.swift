@@ -98,7 +98,12 @@ final class MessageService {
 
     func markThreadRead(personaId: String, modelContext: ModelContext) throws {
         let thread = try ensureThread(for: personaId, modelContext: modelContext)
+        let latestIncomingAt = try latestIncomingMessageDate(for: personaId, modelContext: modelContext)
+        if let latestIncomingAt {
+            MessageReadStateStore.markRead(personaId: personaId, at: latestIncomingAt)
+        }
         thread.unreadCount = 0
+        thread.updatedAt = .now
         if modelContext.hasChanges {
             try modelContext.save()
         }
@@ -314,5 +319,50 @@ final class MessageService {
             .filter { $0.relationshipStatusValue == .accepted }
             .compactMap(\.linkedPersonaId)
         return Array(NSOrderedSet(array: ids)) as? [String] ?? ids
+    }
+
+    private func latestIncomingMessageDate(for personaId: String, modelContext: ModelContext) throws -> Date? {
+        let threadId = personaId
+        var descriptor = FetchDescriptor<PersonaMessage>(
+            predicate: #Predicate { $0.threadId == threadId && $0.isIncoming },
+            sortBy: [SortDescriptor(\PersonaMessage.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first?.createdAt
+    }
+}
+
+enum MessageReadStateStore {
+    private static let defaults = UserDefaults.standard
+    private static let keyPrefix = "message.lastReadAt."
+
+    static func lastReadAt(for personaId: String) -> Date? {
+        let interval = defaults.double(forKey: key(for: personaId))
+        guard interval > 0 else { return nil }
+        return Date(timeIntervalSince1970: interval)
+    }
+
+    static func markRead(personaId: String, at date: Date) {
+        let existing = lastReadAt(for: personaId) ?? .distantPast
+        guard date > existing else { return }
+        defaults.set(date.timeIntervalSince1970, forKey: key(for: personaId))
+    }
+
+    static func unreadCount(
+        for personaId: String,
+        deliveries: [ContentDelivery],
+        fallbackCount: Int = 0
+    ) -> Int {
+        let threadDeliveries = deliveries.filter { $0.personaId == personaId }
+        guard !threadDeliveries.isEmpty else { return max(0, fallbackCount) }
+
+        let cutoff = lastReadAt(for: personaId) ?? .distantPast
+        return threadDeliveries.reduce(0) { count, delivery in
+            count + (delivery.sortDate > cutoff ? 1 : 0)
+        }
+    }
+
+    private static func key(for personaId: String) -> String {
+        "\(keyPrefix)\(personaId)"
     }
 }

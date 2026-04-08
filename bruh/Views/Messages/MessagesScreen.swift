@@ -93,7 +93,7 @@ struct MessagesScreen: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(persona.name)
-                        .font(.system(size: 16, weight: thread.unreadCount > 0 ? .semibold : .regular))
+                        .font(.system(size: 16, weight: unreadCount(for: thread) > 0 ? .semibold : .regular))
                         .foregroundStyle(.primary)
                     Spacer()
                     Text(relativeTime(latestActivityDate(for: thread)))
@@ -109,8 +109,8 @@ struct MessagesScreen: View {
 
                     Spacer()
 
-                    if thread.unreadCount > 0 {
-                        Text("\(thread.unreadCount)")
+                    if unreadCount(for: thread) > 0 {
+                        Text("\(unreadCount(for: thread))")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 7)
@@ -194,6 +194,14 @@ struct MessagesScreen: View {
         let fallbackDate = latestMessageDelivery(for: thread.personaId)?.sortDate ?? .distantPast
         return max(thread.lastMessageAt, fallbackDate)
     }
+
+    private func unreadCount(for thread: MessageThread) -> Int {
+        MessageReadStateStore.unreadCount(
+            for: thread.personaId,
+            deliveries: messageDeliveries,
+            fallbackCount: thread.unreadCount
+        )
+    }
 }
 
 private struct MessageDetailView: View {
@@ -205,7 +213,6 @@ private struct MessageDetailView: View {
     let thread: MessageThread
     let service: MessageService
     private let timestampProvider: any MessageTimestampProviding
-    private let initialUnreadCount: Int
 
     @State private var draft = ""
     @State private var isSending = false
@@ -217,6 +224,7 @@ private struct MessageDetailView: View {
     @State private var effectPlayer: AVPlayer?
     @State private var isShowingExcitedEffect = false
     @State private var hasCheckedEntryEffect = false
+    @State private var entryUnreadCount = 0
     private let quickReactionOptions = ["👍", "🖤", "😂", "🔥"]
     private let isExcitedEntryEffectEnabled = false
 
@@ -228,7 +236,6 @@ private struct MessageDetailView: View {
         self.thread = thread
         self.service = service
         self.timestampProvider = timestampProvider
-        self.initialUnreadCount = thread.unreadCount
         let threadId = thread.id
         _messages = Query(
             filter: #Predicate<PersonaMessage> { $0.threadId == threadId },
@@ -349,6 +356,7 @@ private struct MessageDetailView: View {
             }
         }
         .task {
+            entryUnreadCount = currentUnreadCount
             try? service.markThreadRead(personaId: thread.personaId, modelContext: modelContext)
         }
         .task(id: messages.count) {
@@ -410,8 +418,22 @@ private struct MessageDetailView: View {
 
     private var presenceText: String {
         let threshold: TimeInterval = 10 * 60
-        let secondsSinceLastMessage = Date().timeIntervalSince(thread.lastMessageAt)
+        let secondsSinceLastMessage = Date().timeIntervalSince(latestConversationDate)
         return secondsSinceLastMessage <= threshold ? "online" : "offline"
+    }
+
+    private var latestConversationDate: Date {
+        messages.last?.createdAt ?? thread.lastMessageAt
+    }
+
+    private var currentUnreadCount: Int {
+        let incomingMessages = messages.filter(\.isIncoming)
+        guard !incomingMessages.isEmpty else { return max(0, thread.unreadCount) }
+
+        let cutoff = MessageReadStateStore.lastReadAt(for: thread.personaId) ?? .distantPast
+        return incomingMessages.reduce(0) { count, message in
+            count + (message.createdAt > cutoff ? 1 : 0)
+        }
     }
 
     private var headerAvatar: some View {
@@ -818,7 +840,7 @@ private struct MessageDetailView: View {
         guard !messages.isEmpty else { return }
         hasCheckedEntryEffect = true
 
-        guard initialUnreadCount > 0 else { return }
+        guard entryUnreadCount > 0 else { return }
         guard let latestIncoming = messages.last(where: { $0.isIncoming }) else { return }
         guard reaction(for: latestIncoming.id).mood == "excited" else { return }
         guard let videoURL = Bundle.main.url(forResource: "trump_joy", withExtension: "mp4") else { return }
