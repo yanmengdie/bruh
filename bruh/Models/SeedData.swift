@@ -12,6 +12,73 @@ func seedPersonas(into context: ModelContext) {
 }
 
 @MainActor
+func seedSystemContacts(into context: ModelContext) {
+    let existingContacts: [Contact] = (try? context.fetch(FetchDescriptor<Contact>())) ?? []
+    let existingPersonaIds = Set(existingContacts.compactMap(\.linkedPersonaId))
+
+    let metadataByPersonaId: [String: (phone: String, email: String, location: String, themeHex: String)] = [
+        "musk": ("+1 310 555 0142", "elon@x.ai", "X HQ", "#1F2A8A"),
+        "trump": ("+1 561 555 0145", "donald@truthsocial.com", "海湖庄园", "#D62839"),
+        "zuckerberg": ("+1 650 555 0108", "mark@meta.com", "Meta Park", "#6A5AE0"),
+    ]
+
+    for contact in existingContacts {
+        if let personaId = contact.linkedPersonaId, let meta = metadataByPersonaId[personaId] {
+            if contact.themeColorHex != meta.themeHex {
+                contact.themeColorHex = meta.themeHex
+                contact.updatedAt = .now
+            }
+        }
+
+        if contact.linkedPersonaId == nil, contact.name.caseInsensitiveCompare("Sam Altman") == .orderedSame {
+            if contact.themeColorHex != "#1AA987" {
+                contact.themeColorHex = "#1AA987"
+                contact.updatedAt = .now
+            }
+        }
+    }
+
+    for persona in Persona.all where !existingPersonaIds.contains(persona.id) {
+        guard let meta = metadataByPersonaId[persona.id] else { continue }
+
+        context.insert(
+            Contact(
+                linkedPersonaId: persona.id,
+                name: persona.displayName,
+                phoneNumber: meta.phone,
+                email: meta.email,
+                avatarName: persona.avatarName,
+                themeColorHex: meta.themeHex,
+                locationLabel: meta.location,
+                isFavorite: true
+            )
+        )
+    }
+
+    // Example non-persona contact used for theme-color binding demonstrations.
+    let hasSam = existingContacts.contains {
+        $0.linkedPersonaId == nil && $0.name.caseInsensitiveCompare("Sam Altman") == .orderedSame
+    }
+    if !hasSam {
+        context.insert(
+            Contact(
+                name: "Sam Altman",
+                phoneNumber: "+1 415 555 0124",
+                email: "sam@openai.com",
+                avatarName: "avatar_default",
+                themeColorHex: "#1AA987",
+                locationLabel: "San Francisco",
+                isFavorite: true
+            )
+        )
+    }
+
+    if context.hasChanges {
+        try? context.save()
+    }
+}
+
+@MainActor
 func seedPosts(into context: ModelContext) {
     let existing: [PersonaPost] = (try? context.fetch(FetchDescriptor<PersonaPost>())) ?? []
     guard existing.isEmpty else { return }

@@ -12,7 +12,7 @@ struct FeedView: View {
         animation: .default
     ) private var posts: [PersonaPost]
 
-    @Query private var personas: [Persona]
+    @Query private var contacts: [Contact]
 
     private var feedService = FeedService()
 
@@ -40,7 +40,7 @@ struct FeedView: View {
                         ForEach(posts) { post in
                             FeedCard(
                                 post: post,
-                                persona: personas.first(where: { $0.id == post.personaId })
+                                contact: contacts.first(where: { $0.linkedPersonaId == post.personaId })
                             )
                             .padding(.horizontal, 16)
                             .padding(.vertical, 14)

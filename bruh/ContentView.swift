@@ -4,409 +4,396 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\MessageThread.lastMessageAt, order: .reverse)]) private var threads: [MessageThread]
+    @Query(sort: [SortDescriptor(\PersonaPost.publishedAt, order: .reverse)]) private var posts: [PersonaPost]
+    @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
+    @AppStorage("hasOpenedAlbum") private var hasOpenedAlbum = false
+    @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
 
-    @State private var currentDestination: AppDestination? = nil
+    @State private var selectedTab: MainTab = .contacts
     @State private var messageService = MessageService()
-    var body: some View {
-        ZStack {
-            if let destination = currentDestination {
-                destinationView(for: destination)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.move(edge: .trailing))
-            } else {
-                HomeScreen(onNavigate: { destination in
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        currentDestination = destination
-                    }
-                })
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .transition(.opacity)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.easeInOut(duration: 0.25), value: currentDestination)
-        .task {
-            try? await messageService.ensureThreadsExist(
-                modelContext: modelContext,
-                userInterests: InterestPreferences.selectedInterests()
-            )
-        }
-    }
 
-    @ViewBuilder
-    private func destinationView(for destination: AppDestination) -> some View {
-        switch destination {
-        case .feed:
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            NavigationStack {
+                ContactsView()
+            }
+            .tabItem {
+                Label("Contacts", systemImage: "person.crop.circle.fill")
+            }
+            .tag(MainTab.contacts)
+
+            NavigationStack {
+                MessagesScreen(
+                    threads: threads,
+                    contacts: contacts,
+                    service: messageService,
+                    backgroundColor: messagesScreenBackground
+                )
+            }
+            .tabItem {
+                Label("message", systemImage: "message.fill")
+            }
+            .badge(totalUnreadMessages > 0 ? Text("\(totalUnreadMessages)") : nil)
+            .tag(MainTab.messages)
+
             NavigationStack {
                 FeedView()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            backButton
-                        }
-                    }
             }
+            .tabItem {
+                Label("朋友圈", systemImage: "globe")
+            }
+            .badge(totalUnreadMoments > 0 ? Text("\(totalUnreadMoments)") : nil)
+            .tag(MainTab.feed)
 
-        case .imessage:
             NavigationStack {
-                ScrollView {
-                    VStack(spacing: 14) {
-                        messageSearchBar
-                            .padding(.horizontal, 16)
+                albumView
+            }
+            .tabItem {
+                Label("album", systemImage: "photo.on.rectangle.angled")
+            }
+            .badge(!hasOpenedAlbum ? Text("NEW") : nil)
+            .tag(MainTab.album)
+        }
+        .onChange(of: selectedTab) { _, newValue in
+            if newValue == .feed {
+                lastViewedFeedAtInterval = Date().timeIntervalSince1970
+            }
+            if newValue == .album {
+                hasOpenedAlbum = true
+            }
+        }
+        .task {
+            try? await messageService.ensureThreadsExist(modelContext: modelContext, userInterests: InterestPreferences.selectedInterests())
+        }
+    }
 
-                        VStack(spacing: 0) {
-                            ForEach(Array(threads.enumerated()), id: \.element.id) { index, thread in
-                                NavigationLink {
-                                    MessageDetailView(thread: thread, service: messageService)
-                                } label: {
-                                    messageRow(thread: thread)
-                                }
-                                .buttonStyle(.plain)
+    private var totalUnreadMessages: Int {
+        max(0, threads.reduce(0) { $0 + max(0, $1.unreadCount) })
+    }
 
-                                if index < threads.count - 1 {
-                                    divider
-                                }
+    private var messagesScreenBackground: Color {
+        AppTheme.messagesBackground
+    }
+
+    private var totalUnreadMoments: Int {
+        guard lastViewedFeedAtInterval > 0 else { return posts.count }
+        let lastViewed = Date(timeIntervalSince1970: lastViewedFeedAtInterval)
+        return posts.reduce(0) { count, post in
+            count + (post.publishedAt > lastViewed ? 1 : 0)
+        }
+    }
+
+    private var albumView: some View {
+        ScrollView {
+            VStack(spacing: 14) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 34))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 18)
+
+                Text("Album")
+                    .font(.system(size: 24, weight: .bold))
+
+                Text("这里将展示你的照片与回忆。")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 28)
+        }
+        .navigationTitle("")
+    }
+}
+
+private enum MainTab: Hashable {
+    case contacts
+    case messages
+    case feed
+    case album
+}
+
+private struct SettingsScreen: View {
+    var body: some View {
+        List {
+            Label("通知设置", systemImage: "bell.badge")
+            Label("内容偏好", systemImage: "slider.horizontal.3")
+            Label("关于 Bruh", systemImage: "info.circle")
+        }
+        .navigationTitle("设置")
+    }
+}
+
+private struct ContactDraft {
+    var name: String = ""
+    var phoneNumber: String = ""
+    var email: String = ""
+    var isFavorite: Bool = false
+}
+
+private struct ContactsView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
+
+    @State private var searchText = ""
+    @State private var isPresentingForm = false
+    @State private var editingContact: Contact?
+    @State private var draft = ContactDraft()
+    @State private var validationError: String?
+
+    private var filteredContacts: [Contact] {
+        let sorted = contacts.sorted {
+            if $0.isFavorite != $1.isFavorite { return $0.isFavorite && !$1.isFavorite }
+            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return sorted }
+
+        return sorted.filter { contact in
+            contact.name.localizedCaseInsensitiveContains(query)
+                || contact.phoneNumber.localizedCaseInsensitiveContains(query)
+                || contact.email.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    var body: some View {
+        List {
+            if filteredContacts.isEmpty {
+                ContentUnavailableView(
+                    searchText.isEmpty ? "No Contacts" : "No Results",
+                    systemImage: searchText.isEmpty ? "person.crop.circle.badge.plus" : "magnifyingglass",
+                    description: Text(searchText.isEmpty ? "Tap + to add your first contact." : "Try another name, phone number, or email.")
+                )
+                .frame(maxWidth: .infinity, alignment: .center)
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(filteredContacts, id: \.id) { contact in
+                    contactRow(contact)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button("Delete", role: .destructive) {
+                                delete(contact)
                             }
+
+                            Button("Edit") {
+                                startEditing(contact)
+                            }
+                            .tint(.blue)
                         }
-                        .background(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .padding(.horizontal, 16)
-                    }
-                    .padding(.top, 10)
-                    .padding(.bottom, 20)
-                }
-                .background(Color(red: 0.95, green: 0.96, blue: 0.98))
-                .navigationTitle("Messages")
-                .task {
-                    try? await messageService.ensureThreadsExist(
-                        modelContext: modelContext,
-                        userInterests: InterestPreferences.selectedInterests()
-                    )
-                }
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        backButton
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Image(systemName: "square.and.pencil")
-                    }
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            Button {
+                                toggleFavorite(contact)
+                            } label: {
+                                Image(systemName: contact.isFavorite ? "star.slash.fill" : "star.fill")
+                            }
+                            .tint(contact.isFavorite ? .gray : .orange)
+                        }
                 }
             }
-
-        case .settings:
+        }
+        .listStyle(.plain)
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
+        .navigationTitle("Contacts")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    startCreating()
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+        }
+        .sheet(isPresented: $isPresentingForm) {
             NavigationStack {
-                SettingsView()
-                .navigationTitle("设置")
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        backButton
-                    }
-                }
+                ContactFormView(
+                    title: editingContact == nil ? "New Contact" : "Edit Contact",
+                    draft: $draft,
+                    validationError: validationError,
+                    onCancel: {
+                        isPresentingForm = false
+                    },
+                    onSave: saveContact
+                )
             }
+        }
+        .task {
+            seedContactsIfNeeded()
         }
     }
 
-    private var backButton: some View {
-        Button {
-            withAnimation {
-                currentDestination = nil
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "chevron.left")
-                Text("桌面")
-            }
-        }
-    }
-
-    private var messageSearchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            Text("搜索")
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    private var divider: some View {
-        Rectangle()
-            .fill(Color.black.opacity(0.06))
-            .frame(height: 0.5)
-            .padding(.leading, 74)
-    }
-
-    private func messageRow(thread: MessageThread) -> some View {
-        let persona = persona(for: thread.personaId)
+    private func contactRow(_ contact: Contact) -> some View {
+        let themeColor = AppTheme.color(from: contact.themeColorHex, fallback: .blue)
 
         return HStack(spacing: 12) {
             Circle()
-                .fill(persona.tint.opacity(0.18))
-                .frame(width: 50, height: 50)
+                .fill(themeColor.opacity(contact.isFavorite ? 0.24 : 0.16))
+                .frame(width: 44, height: 44)
                 .overlay {
-                    Text(String(persona.name.prefix(1)))
-                        .font(.headline)
-                        .foregroundStyle(persona.tint)
+                    Text(String(contact.name.prefix(1)).uppercased())
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(themeColor)
                 }
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(persona.name)
-                        .font(.system(size: 16, weight: thread.unreadCount > 0 ? .semibold : .regular))
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Text(relativeTime(thread.lastMessageAt))
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(contact.name)
+                        .font(.system(size: 16, weight: .medium))
+                    if contact.isFavorite {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.orange)
+                    }
+                }
+
+                Text(contact.phoneNumber)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+
+                if !contact.email.isEmpty {
+                    Text(contact.email)
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Text(thread.lastMessagePreview.isEmpty ? "Start the conversation" : thread.lastMessagePreview)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    if thread.unreadCount > 0 {
-                        Text("\(thread.unreadCount)")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(Color.blue)
-                            .clipShape(Capsule())
-                    }
+                        .foregroundStyle(.tertiary)
                 }
             }
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 4)
     }
 
-    private func persona(for personaId: String) -> (name: String, tint: Color) {
-        switch personaId {
-        case "trump":
-            return ("Donald Trump", .orange)
-        case "musk":
-            return ("Elon Musk", .blue)
-        case "zuckerberg":
-            return ("Mark Zuckerberg", .purple)
-        default:
-            return (personaId.capitalized, .gray)
-        }
+    private func startCreating() {
+        editingContact = nil
+        draft = ContactDraft()
+        validationError = nil
+        isPresentingForm = true
     }
 
-    private func relativeTime(_ date: Date) -> String {
-        guard date > Date.distantPast else { return "Now" }
-
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-}
-
-private struct SettingsView: View {
-    var body: some View {
-        List {
-            Section("内容偏好") {
-                ForEach(NewsInterest.allCases) { interest in
-                    Toggle(isOn: Binding(
-                        get: { InterestPreferences.isEnabled(interest) },
-                        set: { newValue in
-                            InterestPreferences.set(newValue, for: interest)
-                        }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(interest.title)
-                            Text(interest.subtitle)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-
-            Section("说明") {
-                Label("全局 TOP 默认进入消息上下文", systemImage: "globe")
-                Label("兴趣 TOP 根据你的勾选决定", systemImage: "slider.horizontal.3")
-                Label("X / 小红书用于朋友圈，新闻源用于私聊", systemImage: "newspaper")
-            }
-        }
-    }
-}
-
-private struct MessageDetailView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var messages: [PersonaMessage]
-
-    let thread: MessageThread
-    let service: MessageService
-
-    @State private var draft = ""
-    @State private var isSending = false
-    @State private var errorMessage: String?
-
-    init(thread: MessageThread, service: MessageService) {
-        self.thread = thread
-        self.service = service
-        let threadId = thread.id
-        _messages = Query(
-            filter: #Predicate<PersonaMessage> { $0.threadId == threadId },
-            sort: [SortDescriptor(\PersonaMessage.createdAt, order: .forward)]
+    private func startEditing(_ contact: Contact) {
+        editingContact = contact
+        draft = ContactDraft(
+            name: contact.name,
+            phoneNumber: contact.phoneNumber,
+            email: contact.email,
+            isFavorite: contact.isFavorite
         )
+        validationError = nil
+        isPresentingForm = true
     }
+
+    private func saveContact() {
+        let normalizedName = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPhone = draft.phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedEmail = draft.email.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !normalizedName.isEmpty else {
+            validationError = "Name cannot be empty."
+            return
+        }
+
+        guard !normalizedPhone.isEmpty else {
+            validationError = "Phone number cannot be empty."
+            return
+        }
+
+        if let editingContact {
+            editingContact.name = normalizedName
+            editingContact.phoneNumber = normalizedPhone
+            editingContact.email = normalizedEmail
+            editingContact.isFavorite = draft.isFavorite
+            editingContact.updatedAt = .now
+        } else {
+            let contact = Contact(
+                name: normalizedName,
+                phoneNumber: normalizedPhone,
+                email: normalizedEmail,
+                isFavorite: draft.isFavorite
+            )
+            modelContext.insert(contact)
+        }
+
+        do {
+            try modelContext.save()
+            isPresentingForm = false
+            validationError = nil
+        } catch {
+            validationError = error.localizedDescription
+        }
+    }
+
+    private func delete(_ contact: Contact) {
+        modelContext.delete(contact)
+        try? modelContext.save()
+    }
+
+    private func toggleFavorite(_ contact: Contact) {
+        contact.isFavorite.toggle()
+        contact.updatedAt = .now
+        try? modelContext.save()
+    }
+
+    private func seedContactsIfNeeded() {
+        seedSystemContacts(into: modelContext)
+    }
+}
+
+private struct ContactFormView: View {
+    let title: String
+    @Binding var draft: ContactDraft
+    let validationError: String?
+    let onCancel: () -> Void
+    let onSave: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: 14) {
-                        Text("Messages with \(displayName)")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 8)
+        Form {
+            Section("Basic Info") {
+                TextField("Name", text: $draft.name)
+                    .textInputAutocapitalization(.words)
 
-                        LazyVStack(spacing: 10) {
-                            ForEach(messages, id: \.id) { message in
-                                HStack {
-                                    if message.isIncoming {
-                                        bubble(text: message.text, isIncoming: true, deliveryState: message.deliveryState)
-                                        Spacer(minLength: 48)
-                                    } else {
-                                        Spacer(minLength: 48)
-                                        bubble(text: message.text, isIncoming: false, deliveryState: message.deliveryState)
-                                    }
-                                }
-                                .id(message.id)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 12)
-                }
-                .onChange(of: messages.count) {
-                    if let last = messages.last {
-                        withAnimation {
-                            proxy.scrollTo(last.id, anchor: .bottom)
-                        }
-                    }
-                }
+                TextField("Phone Number", text: $draft.phoneNumber)
+                    .keyboardType(.phonePad)
+
+                TextField("Email", text: $draft.email)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.emailAddress)
+                    .autocorrectionDisabled(true)
             }
 
-            VStack(spacing: 8) {
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.system(size: 12))
+            Section("Options") {
+                Toggle("Favorite Contact", isOn: $draft.isFavorite)
+            }
+
+            if let validationError {
+                Section {
+                    Text(validationError)
                         .foregroundStyle(.red)
-                        .padding(.horizontal, 12)
+                        .font(.system(size: 13))
                 }
-
-                Divider()
-
-                HStack(alignment: .bottom, spacing: 8) {
-                    Button {} label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.blue)
-                    }
-
-                    HStack(alignment: .bottom, spacing: 8) {
-                        Image(systemName: "camera.fill")
-                            .foregroundStyle(.secondary)
-
-                        TextField("iMessage", text: $draft, axis: .vertical)
-                            .lineLimit(1...4)
-
-                        Spacer()
-
-                        if isSending {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Button {
-                                send()
-                            } label: {
-                                Image(systemName: "arrow.up.circle.fill")
-                                    .font(.system(size: 22))
-                                    .foregroundStyle(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .gray : .blue)
-                            }
-                            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
-                    .background(Color(.systemGray6))
-                    .clipShape(Capsule())
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
             }
-            .background(.ultraThinMaterial)
         }
-        .background(Color.white)
-        .navigationTitle(displayName)
+        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            try? service.markThreadRead(personaId: thread.personaId, modelContext: modelContext)
-        }
-    }
-
-    private var displayName: String {
-        switch thread.personaId {
-        case "trump": return "Donald Trump"
-        case "musk": return "Elon Musk"
-        case "zuckerberg": return "Mark Zuckerberg"
-        default: return thread.personaId.capitalized
-        }
-    }
-
-    private func send() {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !isSending else { return }
-
-        draft = ""
-        errorMessage = nil
-        isSending = true
-
-        Task {
-            do {
-                try await service.sendMessage(
-                    personaId: thread.personaId,
-                    text: text,
-                    modelContext: modelContext,
-                    userInterests: InterestPreferences.selectedInterests()
-                )
-            } catch {
-                errorMessage = error.localizedDescription
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Cancel", action: onCancel)
             }
-            isSending = false
-        }
-    }
-
-    private func bubble(text: String, isIncoming: Bool, deliveryState: String) -> some View {
-        VStack(alignment: isIncoming ? .leading : .trailing, spacing: 4) {
-            Text(text)
-                .font(.system(size: 16))
-                .foregroundColor(isIncoming ? .primary : .white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(isIncoming ? Color(.systemGray5) : Color.blue)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-
-            if !isIncoming && deliveryState == "failed" {
-                Text("Failed to send")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.red)
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Save", action: onSave)
             }
         }
     }
+}
+
+#Preview {
+    ContentView()
+        .modelContainer(
+            for: [
+                Persona.self,
+                PersonaPost.self,
+                SourceItem.self,
+                MessageThread.self,
+                PersonaMessage.self,
+                FeedComment.self,
+                FeedLike.self,
+                Contact.self,
+            ],
+            inMemory: true
+        )
 }

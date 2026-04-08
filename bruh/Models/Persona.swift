@@ -69,3 +69,44 @@ extension Persona {
 
     static let all: [Persona] = [.trump, .musk, .zuckerberg]
 }
+
+@Model
+final class Contact {
+    @Attribute(.unique) var id: UUID
+    var linkedPersonaId: String?
+    var name: String
+    var phoneNumber: String
+    var email: String
+    var avatarName: String
+    var themeColorHex: String
+    var locationLabel: String
+    var isFavorite: Bool
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(
+        id: UUID = UUID(),
+        linkedPersonaId: String? = nil,
+        name: String,
+        phoneNumber: String,
+        email: String = "",
+        avatarName: String = "avatar_default",
+        themeColorHex: String = "#3B82F6",
+        locationLabel: String = "",
+        isFavorite: Bool = false,
+        createdAt: Date = .now,
+        updatedAt: Date = .now
+    ) {
+        self.id = id
+        self.linkedPersonaId = linkedPersonaId
+        self.name = name
+        self.phoneNumber = phoneNumber
+        self.email = email
+        self.avatarName = avatarName
+        self.themeColorHex = themeColorHex
+        self.locationLabel = locationLabel
+        self.isFavorite = isFavorite
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}

@@ -5,7 +5,7 @@ struct FeedCard: View {
     @Environment(\.modelContext) private var modelContext
 
     let post: PersonaPost
-    let persona: Persona?
+    let contact: Contact?
 
     @State private var isLiked = false
     @State private var showComments = true
@@ -25,7 +25,7 @@ struct FeedCard: View {
             avatar
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(persona?.displayName ?? post.personaId)
+                Text(contact?.name ?? post.personaId)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Color(red: 0.24, green: 0.34, blue: 0.56))
 
@@ -60,7 +60,7 @@ struct FeedCard: View {
             .fill(avatarColor)
             .frame(width: 48, height: 48)
             .overlay {
-                Text(String((persona?.displayName ?? post.personaId).prefix(1)))
+                Text(String((contact?.name ?? post.personaId).prefix(1)))
                     .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(.white)
             }
@@ -207,6 +207,10 @@ struct FeedCard: View {
     }
 
     private var locationText: String {
+        if let location = contact?.locationLabel, !location.isEmpty {
+            return location
+        }
+
         switch post.personaId {
         case "trump": return "海湖庄园"
         case "musk": return "X HQ"

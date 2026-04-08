@@ -10,92 +10,96 @@ struct AppItem: Identifiable {
     let badgeText: String?
 }
 
-enum AppDestination {
+enum AppDestination: Equatable {
     case feed
     case imessage
+    case contacts
+    case album
     case settings
 }
 
 struct HomeScreen: View {
     let onNavigate: (AppDestination) -> Void
+    let messageUnreadCount: Int
+    let momentsUnreadCount: Int
+    let hasNewAlbumBadge: Bool
 
-    private let gridApps: [AppItem] = [
-        AppItem(name: "Messages", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: 12, badgeText: nil),
-        AppItem(name: "朋友圈", icon: "globe", iconColor: Color(red: 1.0, green: 0.72, blue: 0.62), destination: .feed, unreadCount: 8, badgeText: nil),
-        AppItem(name: "News", icon: "newspaper.fill", iconColor: .red, destination: nil, unreadCount: 0, badgeText: "NEW"),
-        AppItem(name: "Phone", icon: "phone.fill", iconColor: .green, destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "FaceTime", icon: "video.fill", iconColor: Color(red: 0.48, green: 0.46, blue: 0.9), destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Games", icon: "gamecontroller.fill", iconColor: .pink, destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Camera", icon: "camera.fill", iconColor: .black, destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Music", icon: "music.note", iconColor: Color(red: 1.0, green: 0.62, blue: 0.45), destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Weather", icon: "cloud.fill", iconColor: .cyan, destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Maps", icon: "map.fill", iconColor: Color(red: 0.83, green: 0.92, blue: 0.9), destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Calendar", icon: "calendar", iconColor: .white, destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Settings", icon: "gearshape.fill", iconColor: Color(red: 0.55, green: 0.62, blue: 0.95), destination: .settings, unreadCount: 0, badgeText: nil),
-    ]
+    private var gridApps: [AppItem] {
+        [
+            AppItem(name: "Contacts", icon: "person.crop.circle.fill", iconColor: .green, destination: .contacts, unreadCount: 0, badgeText: nil),
+            AppItem(name: "Messages", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: messageUnreadCount, badgeText: nil),
+            AppItem(name: "朋友圈", icon: "globe", iconColor: Color(red: 1.0, green: 0.72, blue: 0.62), destination: .feed, unreadCount: momentsUnreadCount, badgeText: nil),
+            AppItem(name: "Album", icon: "photo.on.rectangle.angled", iconColor: .red, destination: .album, unreadCount: 0, badgeText: hasNewAlbumBadge ? "NEW" : nil),
+            AppItem(name: "Settings", icon: "gearshape.fill", iconColor: Color(red: 0.55, green: 0.62, blue: 0.95), destination: .settings, unreadCount: 0, badgeText: nil),
+        ]
+    }
 
-    private let dockApps: [AppItem] = [
-        AppItem(name: "Phone", icon: "phone.fill", iconColor: .green, destination: nil, unreadCount: 0, badgeText: nil),
-        AppItem(name: "Messages", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: 12, badgeText: nil),
-        AppItem(name: "朋友圈", icon: "globe", iconColor: Color(red: 1.0, green: 0.72, blue: 0.62), destination: .feed, unreadCount: 8, badgeText: nil),
-        AppItem(name: "News", icon: "newspaper.fill", iconColor: .red, destination: nil, unreadCount: 0, badgeText: nil),
-    ]
-
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 18), count: 4)
+    private var dockApps: [AppItem] {
+        [
+            AppItem(name: "Contacts", icon: "person.crop.circle.fill", iconColor: .green, destination: .contacts, unreadCount: 0, badgeText: nil),
+            AppItem(name: "Messages", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: messageUnreadCount, badgeText: nil),
+            AppItem(name: "朋友圈", icon: "globe", iconColor: Color(red: 1.0, green: 0.72, blue: 0.62), destination: .feed, unreadCount: momentsUnreadCount, badgeText: nil),
+            AppItem(name: "Album", icon: "photo.on.rectangle.angled", iconColor: .red, destination: .album, unreadCount: 0, badgeText: nil),
+        ]
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            LazyVGrid(columns: columns, spacing: 26) {
-                ForEach(gridApps) { app in
-                    AppIconView(app: app) {
-                        guard let destination = app.destination else { return }
-                        onNavigate(destination)
+        GeometryReader { proxy in
+            let layout = makeLayout(for: proxy.size)
+
+            VStack(spacing: 0) {
+                LazyVGrid(columns: layout.columns, spacing: layout.gridRowSpacing) {
+                    ForEach(gridApps) { app in
+                        AppIconView(app: app, iconSize: layout.gridIconSize) {
+                            guard let destination = app.destination else { return }
+                            onNavigate(destination)
+                        }
                     }
                 }
+                .padding(.horizontal, layout.gridHorizontalPadding)
+                .padding(.top, layout.gridTopPadding)
+
+                Spacer(minLength: 0)
+
+                dock(iconSize: layout.dockIconSize, iconSpacing: layout.dockIconSpacing)
+                    .padding(.horizontal, layout.dockHorizontalPadding)
+                    .padding(.bottom, layout.dockBottomPadding)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .safeAreaPadding(.top, layout.safeTopPadding)
+            .background {
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.17, green: 0.22, blue: 0.52),
+                            Color(red: 0.42, green: 0.35, blue: 0.75),
+                            Color(red: 0.94, green: 0.47, blue: 0.52),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
 
-            Spacer(minLength: 0)
+                    Circle()
+                        .fill(Color.white.opacity(0.16))
+                        .blur(radius: 60)
+                        .frame(width: 220, height: 220)
+                        .offset(x: -70, y: -180)
 
-            dock
-                .padding(.horizontal, 14)
-                .padding(.bottom, 6)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .safeAreaPadding(.top, 8)
-        .background {
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.17, green: 0.22, blue: 0.52),
-                        Color(red: 0.42, green: 0.35, blue: 0.75),
-                        Color(red: 0.94, green: 0.47, blue: 0.52),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                Circle()
-                    .fill(Color.white.opacity(0.16))
-                    .blur(radius: 60)
-                    .frame(width: 220, height: 220)
-                    .offset(x: -70, y: -180)
-
-                Circle()
-                    .fill(Color.blue.opacity(0.18))
-                    .blur(radius: 80)
-                    .frame(width: 260, height: 260)
-                    .offset(x: 90, y: 220)
+                    Circle()
+                        .fill(Color.blue.opacity(0.18))
+                        .blur(radius: 80)
+                        .frame(width: 260, height: 260)
+                        .offset(x: 90, y: 220)
+                }
+                .ignoresSafeArea()
             }
-            .ignoresSafeArea()
         }
     }
 
-    private var dock: some View {
-        HStack(spacing: 22) {
+    private func dock(iconSize: CGFloat, iconSpacing: CGFloat) -> some View {
+        HStack(spacing: iconSpacing) {
             ForEach(dockApps) { app in
-                AppIconView(app: app, iconSize: 58, labelHidden: true) {
+                AppIconView(app: app, iconSize: iconSize, labelHidden: true) {
                     guard let destination = app.destination else { return }
                     onNavigate(destination)
                 }
@@ -106,6 +110,38 @@ struct HomeScreen: View {
         .background(.ultraThinMaterial.opacity(0.95))
         .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
     }
+
+    private func makeLayout(for size: CGSize) -> HomeLayout {
+        let isWidePhone = size.width >= 400
+        let iconSize = min(62, max(56, size.width * 0.15))
+        let dockIconSize = iconSize - 2
+
+        return HomeLayout(
+            columns: Array(repeating: GridItem(.flexible(), spacing: isWidePhone ? 14 : 16), count: isWidePhone ? 5 : 4),
+            gridIconSize: iconSize,
+            dockIconSize: dockIconSize,
+            gridRowSpacing: isWidePhone ? 22 : 24,
+            gridHorizontalPadding: isWidePhone ? 16 : 18,
+            gridTopPadding: isWidePhone ? 16 : 12,
+            safeTopPadding: isWidePhone ? 12 : 8,
+            dockIconSpacing: isWidePhone ? 18 : 22,
+            dockHorizontalPadding: isWidePhone ? 12 : 14,
+            dockBottomPadding: isWidePhone ? 10 : 6
+        )
+    }
+}
+
+private struct HomeLayout {
+    let columns: [GridItem]
+    let gridIconSize: CGFloat
+    let dockIconSize: CGFloat
+    let gridRowSpacing: CGFloat
+    let gridHorizontalPadding: CGFloat
+    let gridTopPadding: CGFloat
+    let safeTopPadding: CGFloat
+    let dockIconSpacing: CGFloat
+    let dockHorizontalPadding: CGFloat
+    let dockBottomPadding: CGFloat
 }
 
 private struct AppIconView: View {
@@ -138,7 +174,7 @@ private struct AppIconView: View {
 
                         Image(systemName: app.icon)
                             .font(.system(size: iconSize * 0.42, weight: .medium))
-                            .foregroundStyle(app.name == "Calendar" ? .red : .white)
+                            .foregroundStyle(.white)
                     }
 
                     if let badgeText = app.badgeText {
@@ -184,9 +220,5 @@ private struct AppIconView: View {
 }
 
 #Preview {
-    PhoneFrame {
-        HomeScreen(onNavigate: { _ in })
-    }
-    .padding(40)
-    .background(Color.black)
+    HomeScreen(onNavigate: { _ in }, messageUnreadCount: 3, momentsUnreadCount: 5, hasNewAlbumBadge: true)
 }
