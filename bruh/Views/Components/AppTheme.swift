@@ -5,6 +5,9 @@ enum AppTheme {
     static let messagesBackground = Color(red: 0.93, green: 0.91, blue: 0.87)
     static let messageBubbleBase = Color(red: 0.95, green: 0.95, blue: 0.95)
     static let outgoingBubbleBase = Color(red: 0.90, green: 0.88, blue: 0.82)
+    static let messageIncomingAvatarSize: CGFloat = 34
+    static let messageIncomingAvatarBubbleSpacing: CGFloat = 8
+    static let messageIncomingReactionLeadingInset: CGFloat = messageIncomingAvatarSize + messageIncomingAvatarBubbleSpacing
 
     static func color(from hex: String, fallback: Color = .blue) -> Color {
         let cleaned = hex.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "")

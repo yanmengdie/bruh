@@ -157,6 +157,8 @@ private struct MessageDetailView: View {
     @State private var draft = ""
     @State private var isSending = false
     @State private var errorMessage: String?
+    @State private var selectedQuickReactions: [String: String] = [:]
+    private let quickReactionOptions = ["👍", "🖤", "😂", "🔥"]
 
     init(thread: MessageThread, service: MessageService) {
         self.thread = thread
@@ -209,41 +211,15 @@ private struct MessageDetailView: View {
 
                 Divider()
 
-                HStack(alignment: .bottom, spacing: 8) {
-                    Button {} label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.blue)
+                TextField("Message \(displayName)...", text: $draft)
+                    .submitLabel(.send)
+                    .onSubmit {
+                        send()
                     }
-
-                    HStack(alignment: .bottom, spacing: 8) {
-                        Image(systemName: "camera.fill")
-                            .foregroundStyle(.secondary)
-
-                        TextField("iMessage", text: $draft, axis: .vertical)
-                            .lineLimit(1...4)
-
-                        Spacer()
-
-                        if isSending {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Button {
-                                send()
-                            } label: {
-                                Image(systemName: "arrow.up.circle.fill")
-                                    .font(.system(size: 22))
-                                    .foregroundStyle(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .gray : .blue)
-                            }
-                            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
-                    .background(Color(.systemGray6))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 14)
+                    .background(Color.white.opacity(0.65))
                     .clipShape(Capsule())
-                }
                 .padding(.horizontal, 12)
                 .padding(.top, 4)
                 .padding(.bottom, 8)
@@ -358,25 +334,35 @@ private struct MessageDetailView: View {
     private func messageRow(for message: PersonaMessage) -> some View {
         let content = parseContent(from: message)
         let personaTheme = persona(for: thread.personaId).tint
+        let reaction = reaction(for: message.id)
 
-        return HStack(alignment: .bottom, spacing: 8) {
+        return Group {
             if message.isIncoming {
-                incomingAvatar
-                messageContentView(
-                    content: content,
-                    isIncoming: true,
-                    deliveryState: message.deliveryState,
-                    themeColor: personaTheme
-                )
-                Spacer(minLength: 40)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .bottom, spacing: AppTheme.messageIncomingAvatarBubbleSpacing) {
+                        incomingAvatar
+                        messageContentView(
+                            content: content,
+                            isIncoming: true,
+                            deliveryState: message.deliveryState,
+                            themeColor: personaTheme
+                        )
+                        Spacer(minLength: 40)
+                    }
+
+                    incomingReactions(for: message.id, reaction: reaction)
+                        .padding(.leading, AppTheme.messageIncomingReactionLeadingInset)
+                }
             } else {
-                Spacer(minLength: 40)
-                messageContentView(
-                    content: content,
-                    isIncoming: false,
-                    deliveryState: message.deliveryState,
-                    themeColor: personaTheme
-                )
+                HStack(alignment: .bottom, spacing: 8) {
+                    Spacer(minLength: 40)
+                    messageContentView(
+                        content: content,
+                        isIncoming: false,
+                        deliveryState: message.deliveryState,
+                        themeColor: personaTheme
+                    )
+                }
             }
         }
     }
@@ -390,11 +376,26 @@ private struct MessageDetailView: View {
     ) -> some View {
         switch content {
         case .text(let text):
-            bubble(text: text, isIncoming: isIncoming, deliveryState: deliveryState, themeColor: themeColor)
+            bubble(
+                text: text,
+                isIncoming: isIncoming,
+                deliveryState: deliveryState,
+                themeColor: themeColor
+            )
         case .webPreview:
-            bubble(text: "[Web preview coming soon]", isIncoming: isIncoming, deliveryState: deliveryState, themeColor: themeColor)
+            bubble(
+                text: "[Web preview coming soon]",
+                isIncoming: isIncoming,
+                deliveryState: deliveryState,
+                themeColor: themeColor
+            )
         case .audio:
-            bubble(text: "[Audio message coming soon]", isIncoming: isIncoming, deliveryState: deliveryState, themeColor: themeColor)
+            bubble(
+                text: "[Audio message coming soon]",
+                isIncoming: isIncoming,
+                deliveryState: deliveryState,
+                themeColor: themeColor
+            )
         }
     }
 
@@ -408,7 +409,7 @@ private struct MessageDetailView: View {
 
         return Circle()
             .fill(persona.tint.opacity(0.18))
-            .frame(width: 34, height: 34)
+            .frame(width: AppTheme.messageIncomingAvatarSize, height: AppTheme.messageIncomingAvatarSize)
             .overlay {
                 Text(String(persona.name.prefix(1)))
                     .font(.system(size: 14, weight: .semibold))
@@ -416,7 +417,12 @@ private struct MessageDetailView: View {
             }
     }
 
-    private func bubble(text: String, isIncoming: Bool, deliveryState: String, themeColor: Color) -> some View {
+    private func bubble(
+        text: String,
+        isIncoming: Bool,
+        deliveryState: String,
+        themeColor: Color
+    ) -> some View {
         VStack(alignment: isIncoming ? .leading : .trailing, spacing: 4) {
             Text(text)
                 .font(.system(size: 16))
@@ -446,12 +452,79 @@ private struct MessageDetailView: View {
             }
         }
     }
+
+    @ViewBuilder
+    private func incomingReactions(for messageId: String, reaction: MessageReaction) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(reaction.emoji) \(reaction.mood)")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 2)
+
+            if let selected = selectedQuickReactions[messageId] {
+                Button {
+                    toggleQuickReaction(selected, for: messageId)
+                } label: {
+                    Text(selected)
+                        .font(.system(size: 13))
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 2)
+            } else {
+                HStack(spacing: 14) {
+                    ForEach(quickReactionOptions, id: \.self) { emoji in
+                        Button {
+                            toggleQuickReaction(emoji, for: messageId)
+                        } label: {
+                            Text(emoji)
+                                .font(.system(size: 13))
+                                .opacity(0.82)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 2)
+                .padding(.leading, 2)
+            }
+        }
+    }
+
+    private func reaction(for messageId: String) -> MessageReaction {
+        let list = MessageReaction.presets
+        let stableSeed = messageId.unicodeScalars.reduce(0) { partial, scalar in
+            (partial &* 31 &+ Int(scalar.value)) & 0x7fffffff
+        }
+        let index = stableSeed % list.count
+        return list[index]
+    }
+
+    private func toggleQuickReaction(_ emoji: String, for messageId: String) {
+        if selectedQuickReactions[messageId] == emoji {
+            selectedQuickReactions.removeValue(forKey: messageId)
+        } else {
+            selectedQuickReactions[messageId] = emoji
+        }
+    }
 }
 
 private enum MessageContent {
     case text(String)
     case webPreview(url: URL?)
     case audio(duration: TimeInterval?)
+}
+
+private struct MessageReaction {
+    let emoji: String
+    let mood: String
+
+    static let presets: [MessageReaction] = [
+        .init(emoji: "😌", mood: "chill"),
+        .init(emoji: "🔥", mood: "excited"),
+        .init(emoji: "😎", mood: "confident"),
+        .init(emoji: "🤔", mood: "curious"),
+        .init(emoji: "🙂", mood: "calm"),
+        .init(emoji: "🥳", mood: "hyped")
+    ]
 }
 
 private enum MessagesScreenPreviewData {
