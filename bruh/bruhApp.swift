@@ -16,7 +16,9 @@ struct BruhApp: App {
                 .task {
                     if !hasSeeded {
                         seedPersonas(into: modelContainer.mainContext)
+                        seedCurrentUserProfile(into: modelContainer.mainContext)
                         seedSystemContacts(into: modelContainer.mainContext)
+                        syncContentGraph(into: modelContainer.mainContext)
                         hasSeeded = true
                     }
                 }
@@ -29,11 +31,14 @@ struct BruhApp: App {
             Persona.self,
             PersonaPost.self,
             SourceItem.self,
+            ContentEvent.self,
+            ContentDelivery.self,
             MessageThread.self,
             PersonaMessage.self,
             FeedComment.self,
             FeedLike.self,
             Contact.self,
+            UserProfile.self,
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

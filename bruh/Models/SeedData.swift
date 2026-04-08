@@ -4,74 +4,120 @@ import SwiftData
 @MainActor
 func seedPersonas(into context: ModelContext) {
     let existing: [Persona] = (try? context.fetch(FetchDescriptor<Persona>())) ?? []
-    guard existing.isEmpty else { return }
+    let existingById = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
 
-    for persona in Persona.all {
-        context.insert(persona)
+    for seed in Persona.all {
+        if let persona = existingById[seed.id] {
+            persona.displayName = seed.displayName
+            persona.avatarName = seed.avatarName
+            persona.handle = seed.handle
+            persona.domains = seed.domains
+            persona.stance = seed.stance
+            persona.triggerKeywords = seed.triggerKeywords
+            persona.xUsername = seed.xUsername
+            persona.subtitle = seed.subtitle
+            persona.inviteMessage = seed.inviteMessage
+            persona.themeColorHex = seed.themeColorHex
+            persona.locationLabel = seed.locationLabel
+            persona.inviteOrder = seed.inviteOrder
+        } else {
+            context.insert(seed)
+        }
+    }
+
+    if context.hasChanges {
+        try? context.save()
+    }
+}
+
+@MainActor
+func seedCurrentUserProfile(into context: ModelContext) {
+    _ = CurrentUserProfileStore.fetchOrCreate(in: context)
+}
+
+@MainActor
+func syncContentGraph(into context: ModelContext) {
+    ContentGraphStore.backfill(in: context)
+
+    if context.hasChanges {
+        try? context.save()
     }
 }
 
 @MainActor
 func seedSystemContacts(into context: ModelContext) {
-    let existingContacts: [Contact] = (try? context.fetch(FetchDescriptor<Contact>())) ?? []
-    let existingPersonaIds = Set(existingContacts.compactMap(\.linkedPersonaId))
+    let personas: [Persona] = (try? context.fetch(FetchDescriptor<Persona>())) ?? []
+    let contacts: [Contact] = (try? context.fetch(FetchDescriptor<Contact>())) ?? []
+    let existingByPersonaId: [String: Contact] = Dictionary(
+        uniqueKeysWithValues: contacts.compactMap { contact in
+            guard let personaId = contact.linkedPersonaId else { return nil }
+            return (personaId, contact)
+        }
+    )
 
-    let metadataByPersonaId: [String: (phone: String, email: String, location: String, themeHex: String)] = [
-        "musk": ("+1 310 555 0142", "elon@x.ai", "X HQ", "#1F2A8A"),
-        "trump": ("+1 561 555 0145", "donald@truthsocial.com", "海湖庄园", "#D62839"),
-        "zuckerberg": ("+1 650 555 0108", "mark@meta.com", "Meta Park", "#6A5AE0"),
-    ]
+    let engagedPersonaIds = fetchEngagedPersonaIds(from: context)
+    let legacyInviteState = legacyInviteStateByPersonaId()
 
-    for contact in existingContacts {
-        if let personaId = contact.linkedPersonaId, let meta = metadataByPersonaId[personaId] {
-            if contact.themeColorHex != meta.themeHex {
-                contact.themeColorHex = meta.themeHex
-                contact.updatedAt = .now
+    for persona in personas.sorted(by: { $0.inviteOrder < $1.inviteOrder }) {
+        if let contact = existingByPersonaId[persona.id] {
+            let previousStatus = contact.relationshipStatusValue
+            contact.name = persona.displayName
+            contact.phoneNumber = defaultPhoneNumber(for: persona.id)
+            contact.email = defaultEmail(for: persona.id)
+            contact.avatarName = persona.avatarName
+            contact.themeColorHex = persona.themeColorHex
+            contact.locationLabel = persona.locationLabel
+            contact.inviteOrder = persona.inviteOrder
+
+            if previousStatus == .custom || previousStatus == .accepted {
+                contact.relationshipStatusValue = ContactRelationshipStatus.accepted
+                contact.acceptedAt = contact.acceptedAt ?? contact.updatedAt
+            } else if previousStatus == .ignored {
+                contact.ignoredAt = contact.ignoredAt ?? contact.updatedAt
+            } else {
+                let migratedStatus = resolvedInviteStatus(
+                    for: persona.id,
+                    legacyInviteState: legacyInviteState,
+                    engagedPersonaIds: engagedPersonaIds
+                )
+                contact.relationshipStatusValue = migratedStatus
+                if migratedStatus == .accepted {
+                    contact.acceptedAt = contact.acceptedAt ?? Date.now
+                }
+                if migratedStatus == .ignored {
+                    contact.ignoredAt = contact.ignoredAt ?? Date.now
+                }
             }
+
+            contact.updatedAt = Date.now
+            continue
         }
 
-        if contact.linkedPersonaId == nil, contact.name.caseInsensitiveCompare("Sam Altman") == .orderedSame {
-            if contact.themeColorHex != "#1AA987" {
-                contact.themeColorHex = "#1AA987"
-                contact.updatedAt = .now
-            }
-        }
-    }
-
-    for persona in Persona.all where !existingPersonaIds.contains(persona.id) {
-        guard let meta = metadataByPersonaId[persona.id] else { continue }
-
+        let status = resolvedInviteStatus(
+            for: persona.id,
+            legacyInviteState: legacyInviteState,
+            engagedPersonaIds: engagedPersonaIds
+        )
         context.insert(
             Contact(
                 linkedPersonaId: persona.id,
                 name: persona.displayName,
-                phoneNumber: meta.phone,
-                email: meta.email,
+                phoneNumber: defaultPhoneNumber(for: persona.id),
+                email: defaultEmail(for: persona.id),
                 avatarName: persona.avatarName,
-                themeColorHex: meta.themeHex,
-                locationLabel: meta.location,
-                isFavorite: true
+                themeColorHex: persona.themeColorHex,
+                locationLabel: persona.locationLabel,
+                isFavorite: status == .accepted,
+                relationshipStatus: status.rawValue,
+                inviteOrder: persona.inviteOrder,
+                acceptedAt: status == .accepted ? .now : nil,
+                ignoredAt: status == .ignored ? .now : nil,
+                affinityScore: status == .accepted ? 0.72 : 0.5
             )
         )
     }
 
-    // Example non-persona contact used for theme-color binding demonstrations.
-    let hasSam = existingContacts.contains {
-        $0.linkedPersonaId == nil && $0.name.caseInsensitiveCompare("Sam Altman") == .orderedSame
-    }
-    if !hasSam {
-        context.insert(
-            Contact(
-                name: "Sam Altman",
-                phoneNumber: "+1 415 555 0124",
-                email: "sam@openai.com",
-                avatarName: "avatar_default",
-                themeColorHex: "#1AA987",
-                locationLabel: "San Francisco",
-                isFavorite: true
-            )
-        )
-    }
+    normalizeInviteFrontier(in: context)
 
     if context.hasChanges {
         try? context.save()
@@ -145,5 +191,106 @@ func seedPosts(into context: ModelContext) {
             isDelivered: true
         )
         context.insert(post)
+    }
+}
+
+@MainActor
+private func fetchEngagedPersonaIds(from context: ModelContext) -> Set<String> {
+    let threads: [MessageThread] = (try? context.fetch(FetchDescriptor<MessageThread>())) ?? []
+    let messages: [PersonaMessage] = (try? context.fetch(FetchDescriptor<PersonaMessage>())) ?? []
+    let threadPersonaIds = threads.map(\.personaId)
+    let messagePersonaIds = messages.map(\.personaId)
+    return Set(threadPersonaIds + messagePersonaIds)
+}
+
+private func defaultPhoneNumber(for personaId: String) -> String {
+    switch personaId {
+    case "musk":
+        return "+1 310 555 0142"
+    case "trump":
+        return "+1 561 555 0145"
+    case "zuckerberg":
+        return "+1 650 555 0108"
+    default:
+        return "+1 555 0100"
+    }
+}
+
+private func defaultEmail(for personaId: String) -> String {
+    switch personaId {
+    case "musk":
+        return "elon@x.ai"
+    case "trump":
+        return "donald@truthsocial.com"
+    case "zuckerberg":
+        return "mark@meta.com"
+    default:
+        return "bruh@contact.local"
+    }
+}
+
+private func legacyInviteStateByPersonaId(userDefaults: UserDefaults = .standard) -> [String: ContactRelationshipStatus] {
+    let trumpAccepted = userDefaults.bool(forKey: "invite_trump_accepted")
+    let trumpIgnored = userDefaults.bool(forKey: "invite_trump_ignored")
+    let muskAccepted = userDefaults.bool(forKey: "invite_musk_accepted")
+    let muskIgnored = userDefaults.bool(forKey: "invite_musk_ignored")
+    let muskUnlocked = userDefaults.bool(forKey: "invite_musk_unlocked")
+    let zuckerbergAccepted = userDefaults.bool(forKey: "invite_zuckerberg_accepted")
+    let zuckerbergIgnored = userDefaults.bool(forKey: "invite_zuckerberg_ignored")
+    let zuckerbergUnlocked = userDefaults.bool(forKey: "invite_zuckerberg_unlocked")
+
+    var result: [String: ContactRelationshipStatus] = [:]
+    result["trump"] = trumpAccepted ? .accepted : (trumpIgnored ? .ignored : .pending)
+    result["musk"] = muskAccepted ? .accepted : (muskIgnored ? .ignored : (muskUnlocked ? .pending : .locked))
+    result["zuckerberg"] = zuckerbergAccepted ? .accepted : (zuckerbergIgnored ? .ignored : (zuckerbergUnlocked ? .pending : .locked))
+    return result
+}
+
+private func resolvedInviteStatus(
+    for personaId: String,
+    legacyInviteState: [String: ContactRelationshipStatus],
+    engagedPersonaIds: Set<String>
+) -> ContactRelationshipStatus {
+    if engagedPersonaIds.contains(personaId) {
+        return .accepted
+    }
+
+    if let status = legacyInviteState[personaId] {
+        return status
+    }
+
+    if let entry = PersonaCatalog.entry(for: personaId), entry.inviteOrder == 0 {
+        return .pending
+    }
+
+    return .locked
+}
+
+@MainActor
+private func normalizeInviteFrontier(in context: ModelContext) {
+    let contacts: [Contact] = (try? context.fetch(FetchDescriptor<Contact>())) ?? []
+    let personaContacts = contacts
+        .filter { $0.linkedPersonaId != nil }
+        .sorted { ($0.inviteOrder ?? 999) < ($1.inviteOrder ?? 999) }
+
+    var frontierLocked = false
+    for contact in personaContacts {
+        switch contact.relationshipStatusValue {
+        case .accepted, .ignored:
+            continue
+        case .pending:
+            if frontierLocked {
+                contact.relationshipStatusValue = .locked
+            } else {
+                frontierLocked = true
+            }
+        case .locked:
+            if !frontierLocked {
+                contact.relationshipStatusValue = .pending
+                frontierLocked = true
+            }
+        case .custom:
+            continue
+        }
     }
 }

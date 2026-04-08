@@ -17,6 +17,7 @@ final class FeedService {
     func refreshFeed(modelContext: ModelContext) async throws -> Int {
         try demoteSeedPostsIfNeeded(modelContext: modelContext)
         let dtos = try await api.fetchFeed(limit: 40)
+        let fetchDate = Date()
         var newCount = 0
 
         for dto in dtos {
@@ -34,27 +35,28 @@ final class FeedService {
                 existing.mediaUrls = dto.mediaUrls
                 existing.videoUrl = dto.videoUrl
                 existing.publishedAt = dto.publishedAt
-                existing.fetchedAt = .now
+                existing.fetchedAt = fetchDate
                 existing.isDelivered = true
+                ContentGraphStore.syncFeedPost(existing, in: modelContext)
                 continue
             }
 
-            modelContext.insert(
-                PersonaPost(
-                    id: dto.id,
-                    personaId: dto.personaId,
-                    content: dto.content,
-                    sourceType: dto.sourceType,
-                    sourceUrl: dto.sourceUrl,
-                    topic: dto.topic,
-                    importanceScore: dto.importanceScore,
-                    mediaUrls: dto.mediaUrls,
-                    videoUrl: dto.videoUrl,
-                    publishedAt: dto.publishedAt,
-                    fetchedAt: .now,
-                    isDelivered: true
-                )
+            let post = PersonaPost(
+                id: dto.id,
+                personaId: dto.personaId,
+                content: dto.content,
+                sourceType: dto.sourceType,
+                sourceUrl: dto.sourceUrl,
+                topic: dto.topic,
+                importanceScore: dto.importanceScore,
+                mediaUrls: dto.mediaUrls,
+                videoUrl: dto.videoUrl,
+                publishedAt: dto.publishedAt,
+                fetchedAt: fetchDate,
+                isDelivered: true
             )
+            modelContext.insert(post)
+            ContentGraphStore.syncFeedPost(post, in: modelContext)
             newCount += 1
         }
 
@@ -73,6 +75,7 @@ final class FeedService {
             if post.fetchedAt > seedBaselineDate {
                 post.fetchedAt = seedBaselineDate
             }
+            ContentGraphStore.syncFeedPost(post, in: modelContext)
             didChange = true
         }
 

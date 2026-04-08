@@ -6,18 +6,20 @@ final class PersonaMessage {
     @Attribute(.unique) var id: String
     var threadId: String
     var personaId: String
+    var contentEventId: String?
     var text: String
     var imageUrl: String?
     var isIncoming: Bool
     var createdAt: Date
     var deliveryState: String
-    var sourcePostIds: [String]
+    var sourcePostIds: [String] // upstream ids from backend, can be source post ids or news event ids
     var isSeedMessage: Bool
 
     init(
         id: String,
         threadId: String,
         personaId: String,
+        contentEventId: String? = nil,
         text: String,
         imageUrl: String? = nil,
         isIncoming: Bool,
@@ -29,6 +31,7 @@ final class PersonaMessage {
         self.id = id
         self.threadId = threadId
         self.personaId = personaId
+        self.contentEventId = contentEventId
         self.text = text
         self.imageUrl = imageUrl
         self.isIncoming = isIncoming

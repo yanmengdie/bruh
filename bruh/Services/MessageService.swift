@@ -10,8 +10,8 @@ final class MessageService {
     }
 
     func ensureThreadsExist(modelContext: ModelContext, userInterests: [String]) async throws {
-        for persona in Persona.all {
-            let thread = try ensureThread(for: persona.id, modelContext: modelContext)
+        for personaId in try acceptedPersonaIds(modelContext: modelContext) {
+            let thread = try ensureThread(for: personaId, modelContext: modelContext)
             _ = thread
         }
 
@@ -42,6 +42,7 @@ final class MessageService {
     ) async throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        guard try acceptedPersonaIds(modelContext: modelContext).contains(personaId) else { return }
         let wantsImage = requestImage || shouldRequestImage(for: trimmed)
 
         let thread = try ensureThread(for: personaId, modelContext: modelContext)
@@ -81,6 +82,7 @@ final class MessageService {
                 sourcePostIds: reply.sourcePostIds
             )
             modelContext.insert(incoming)
+            ContentGraphStore.syncIncomingMessage(incoming, in: modelContext)
             updateThread(thread, preview: replyPreview, at: reply.generatedAt, unreadCount: 0)
             try modelContext.save()
         } catch {
@@ -125,6 +127,7 @@ final class MessageService {
 
     private func syncStarterMessages(modelContext: ModelContext, userInterests: [String]) async throws {
         let reply = try await api.fetchMessageStarters(userInterests: userInterests)
+        let acceptedPersonaIds = Set(try acceptedPersonaIds(modelContext: modelContext))
 
         if reply.starters.isEmpty {
             try seedFallbackStarterMessagesIfNeeded(modelContext: modelContext)
@@ -139,6 +142,7 @@ final class MessageService {
         }
 
         for starter in sortedStarters {
+            guard acceptedPersonaIds.contains(starter.personaId) else { continue }
             let thread = try ensureThread(for: starter.personaId, modelContext: modelContext)
             let messageId = starter.id
             var descriptor = FetchDescriptor<PersonaMessage>(
@@ -157,6 +161,7 @@ final class MessageService {
                 existing.createdAt = starter.createdAt
                 existing.deliveryState = "sent"
                 existing.sourcePostIds = starter.sourcePostIds
+                ContentGraphStore.syncIncomingMessage(existing, in: modelContext)
 
                 let shouldRefreshPreview =
                     (thread.lastMessagePreview == previousText && thread.lastMessageAt == previousCreatedAt) ||
@@ -178,6 +183,7 @@ final class MessageService {
                     isSeedMessage: true
                 )
                 modelContext.insert(message)
+                ContentGraphStore.syncIncomingMessage(message, in: modelContext)
                 let nextUnreadCount = thread.unreadCount + 1
                 updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: nextUnreadCount)
             }
@@ -187,9 +193,9 @@ final class MessageService {
     }
 
     private func seedFallbackStarterMessagesIfNeeded(modelContext: ModelContext) throws {
-        for persona in Persona.all {
-            let thread = try ensureThread(for: persona.id, modelContext: modelContext)
-            let threadId = persona.id
+        for personaId in try acceptedPersonaIds(modelContext: modelContext) {
+            let thread = try ensureThread(for: personaId, modelContext: modelContext)
+            let threadId = personaId
 
             var descriptor = FetchDescriptor<PersonaMessage>(
                 predicate: #Predicate { $0.threadId == threadId }
@@ -198,16 +204,17 @@ final class MessageService {
 
             if try modelContext.fetch(descriptor).isEmpty {
                 let starter = PersonaMessage(
-                    id: "starter-\(persona.id)",
-                    threadId: persona.id,
-                    personaId: persona.id,
-                    text: starterMessage(for: persona.id),
+                    id: "starter-\(personaId)",
+                    threadId: personaId,
+                    personaId: personaId,
+                    text: starterMessage(for: personaId),
                     isIncoming: true,
                     createdAt: Date(),
                     deliveryState: "sent",
                     isSeedMessage: true
                 )
                 modelContext.insert(starter)
+                ContentGraphStore.syncIncomingMessage(starter, in: modelContext)
                 updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: 1)
             }
         }
@@ -269,6 +276,7 @@ final class MessageService {
     }
 
     private func ensureTrumpWebPreviewExample(modelContext: ModelContext) throws {
+        guard try acceptedPersonaIds(modelContext: modelContext).contains("trump") else { return }
         let demoId = "seed-trump-reuters-og"
         var messageDescriptor = FetchDescriptor<PersonaMessage>(
             predicate: #Predicate { $0.id == demoId }
@@ -293,9 +301,18 @@ final class MessageService {
             isSeedMessage: true
         )
         modelContext.insert(demo)
+        ContentGraphStore.syncIncomingMessage(demo, in: modelContext)
 
         if demoDate >= thread.lastMessageAt {
             updateThread(thread, preview: demoText, at: demoDate, unreadCount: max(thread.unreadCount, 1))
         }
+    }
+
+    private func acceptedPersonaIds(modelContext: ModelContext) throws -> [String] {
+        let contacts = try modelContext.fetch(FetchDescriptor<Contact>())
+        let ids = contacts
+            .filter { $0.relationshipStatusValue == .accepted }
+            .compactMap(\.linkedPersonaId)
+        return Array(NSOrderedSet(array: ids)) as? [String] ?? ids
     }
 }

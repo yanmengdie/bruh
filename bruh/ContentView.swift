@@ -67,7 +67,14 @@ struct ContentView: View {
             }
         }
         .task {
-            try? await messageService.ensureThreadsExist(modelContext: modelContext, userInterests: InterestPreferences.selectedInterests())
+            seedPersonas(into: modelContext)
+            seedCurrentUserProfile(into: modelContext)
+            seedSystemContacts(into: modelContext)
+            try? await messageService.ensureThreadsExist(
+                modelContext: modelContext,
+                userInterests: CurrentUserProfileStore.selectedInterests(in: modelContext)
+            )
+            syncContentGraph(into: modelContext)
         }
         .toolbarBackground(AppTheme.messagesBackground, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
@@ -75,7 +82,16 @@ struct ContentView: View {
     }
 
     private var totalUnreadMessages: Int {
-        max(0, threads.reduce(0) { $0 + max(0, $1.unreadCount) })
+        let visiblePersonaIds = Set(
+            contacts
+                .filter { $0.relationshipStatusValue == .accepted }
+                .compactMap(\.linkedPersonaId)
+        )
+
+        return max(0, threads.reduce(0) { count, thread in
+            guard visiblePersonaIds.contains(thread.personaId) else { return count }
+            return count + max(0, thread.unreadCount)
+        })
     }
 
     private var messagesScreenBackground: Color {
@@ -83,9 +99,15 @@ struct ContentView: View {
     }
 
     private var totalUnreadMoments: Int {
-        guard lastViewedFeedAtInterval > 0 else { return posts.count }
+        let visiblePersonaIds = Set(
+            contacts
+                .filter { $0.relationshipStatusValue == .accepted }
+                .compactMap(\.linkedPersonaId)
+        )
+        let visiblePosts = posts.filter { visiblePersonaIds.contains($0.personaId) }
+        guard lastViewedFeedAtInterval > 0 else { return visiblePosts.count }
         let lastViewed = Date(timeIntervalSince1970: lastViewedFeedAtInterval)
-        return posts.reduce(0) { count, post in
+        return visiblePosts.reduce(0) { count, post in
             count + (post.publishedAt > lastViewed ? 1 : 0)
         }
     }
@@ -244,6 +266,8 @@ private struct ContactDraft {
 private struct ContactsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
+    @Query(sort: [SortDescriptor(\Persona.inviteOrder, order: .forward)]) private var personas: [Persona]
+    @Query private var profiles: [UserProfile]
 
     @State private var searchText = ""
     @State private var isPresentingForm = false
@@ -253,19 +277,16 @@ private struct ContactsView: View {
     @State private var validationError: String?
     @State private var activeIndexLetter: String?
     @State private var lastIndexFeedbackLetter: String?
-    @AppStorage("invite_flow_initialized") private var inviteFlowInitialized = false
-    @AppStorage("invite_trump_accepted") private var inviteTrumpAccepted = false
-    @AppStorage("invite_musk_unlocked") private var inviteMuskUnlocked = false
-    @AppStorage("invite_musk_accepted") private var inviteMuskAccepted = false
-    @AppStorage("invite_musk_ignored") private var inviteMuskIgnored = false
-    @AppStorage("invite_zuckerberg_unlocked") private var inviteZuckerbergUnlocked = false
-    @AppStorage("invite_zuckerberg_accepted") private var inviteZuckerbergAccepted = false
-    @AppStorage("invite_zuckerberg_ignored") private var inviteZuckerbergIgnored = false
-    @AppStorage("invite_trump_ignored") private var inviteTrumpIgnored = false
     private static let alphabet: [String] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map(String.init) + ["#"]
 
+    private var currentProfile: UserProfile? {
+        profiles.first(where: { $0.id == CurrentUserProfileStore.userId })
+    }
+
     private var filteredContacts: [Contact] {
-        let sorted = contacts.sorted {
+        let sorted = contacts
+            .filter(\.isVisibleInContactsList)
+            .sorted {
             if $0.isFavorite != $1.isFavorite { return $0.isFavorite && !$1.isFavorite }
             return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
@@ -293,11 +314,16 @@ private struct ContactsView: View {
     }
 
     private var pendingInvitations: [BruhInvitation] {
-        var items: [BruhInvitation] = []
-        if !inviteTrumpAccepted, !inviteTrumpIgnored { items.append(.trump) }
-        if inviteMuskUnlocked, !inviteMuskAccepted, !inviteMuskIgnored { items.append(.musk) }
-        if inviteZuckerbergUnlocked, !inviteZuckerbergAccepted, !inviteZuckerbergIgnored { items.append(.zuckerberg) }
-        return items
+        contacts
+            .filter(\.isPendingInvitation)
+            .sorted { ($0.inviteOrder ?? 999) < ($1.inviteOrder ?? 999) }
+            .compactMap { contact in
+                guard let personaId = contact.linkedPersonaId,
+                      let persona = personas.first(where: { $0.id == personaId }) else {
+                    return nil
+                }
+                return BruhInvitation(persona: persona, contact: contact)
+            }
     }
 
     private var pendingInvitationCount: Int {
@@ -373,14 +399,16 @@ private struct ContactsView: View {
         .navigationDestination(item: $presentedInvitation) { invitation in
             NewBruhView(
                 invitation: invitation,
+                lockedCandidateNames: lockedCandidateNames(excluding: invitation.personaId),
                 onAccept: acceptInvitation,
                 onIgnore: ignoreInvitation
             )
         }
         .task {
-            bootstrapInviteFlowIfNeeded()
-            restoreInviteFlowIfNeeded()
-            ensureInvitationProgressConsistency()
+            seedPersonas(into: modelContext)
+            seedCurrentUserProfile(into: modelContext)
+            seedSystemContacts(into: modelContext)
+            normalizeInviteFrontier()
         }
     }
 
@@ -392,7 +420,10 @@ private struct ContactsView: View {
     }
 
     private var profileCard: some View {
-        HStack(spacing: 14) {
+        let profileName = currentProfile?.displayName ?? "You"
+        let profileHandle = currentProfile?.bruhHandle ?? "@yourboi"
+
+        return HStack(spacing: 14) {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(red: 0.84, green: 0.81, blue: 0.73))
                 .frame(width: 66, height: 66)
@@ -402,10 +433,10 @@ private struct ContactsView: View {
                 }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("You")
+                Text(profileName)
                     .font(.system(size: 21, weight: .bold))
                     .foregroundStyle(Color.black.opacity(0.86))
-                Text("bruh ID: @yourboi")
+                Text("bruh ID: \(profileHandle)")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color.black.opacity(0.3))
             }
@@ -650,53 +681,39 @@ private struct ContactsView: View {
     }
 
     private func openNewBruh() {
-        ensureInvitationProgressConsistency()
-        recoverPendingInvitationsIfNeeded()
-        if pendingInvitations.isEmpty {
-            forceRestartInvitationFlow()
-        }
+        normalizeInviteFrontier()
         guard let invitation = pendingInvitations.first else { return }
         presentedInvitation = invitation
     }
 
     private func acceptInvitation(_ invitation: BruhInvitation) {
-        addContactIfNeeded(for: invitation)
+        guard let contact = contact(for: invitation.personaId) else { return }
         presentedInvitation = nil
+        let wasAccepted = contact.relationshipStatusValue == .accepted
 
-        switch invitation.personaId {
-        case "trump":
-            inviteTrumpAccepted = true
-            inviteTrumpIgnored = false
+        contact.relationshipStatusValue = .accepted
+        contact.acceptedAt = contact.acceptedAt ?? .now
+        contact.ignoredAt = nil
+        contact.isFavorite = true
+        contact.updatedAt = .now
+
+        normalizeInviteFrontier()
+
+        if !wasAccepted && invitation.personaId == "trump" {
             scheduleTrumpFollowUps()
-        case "musk":
-            inviteMuskAccepted = true
-            inviteMuskIgnored = false
-            inviteZuckerbergUnlocked = true
-        case "zuckerberg":
-            inviteZuckerbergAccepted = true
-            inviteZuckerbergIgnored = false
-        default:
-            break
         }
-        ensureInvitationProgressConsistency()
+
         try? modelContext.save()
     }
 
     private func ignoreInvitation(_ invitation: BruhInvitation) {
+        guard let contact = contact(for: invitation.personaId) else { return }
         presentedInvitation = nil
-        switch invitation.personaId {
-        case "trump":
-            inviteTrumpIgnored = true
-            inviteMuskUnlocked = true
-        case "musk":
-            inviteMuskIgnored = true
-            inviteZuckerbergUnlocked = true
-        case "zuckerberg":
-            inviteZuckerbergIgnored = true
-        default:
-            break
-        }
-        ensureInvitationProgressConsistency()
+        contact.relationshipStatusValue = .ignored
+        contact.ignoredAt = .now
+        contact.isFavorite = false
+        contact.updatedAt = .now
+        normalizeInviteFrontier()
         try? modelContext.save()
     }
 
@@ -732,13 +749,15 @@ private struct ContactsView: View {
             editingContact.phoneNumber = normalizedPhone
             editingContact.email = normalizedEmail
             editingContact.isFavorite = draft.isFavorite
+            editingContact.relationshipStatusValue = .custom
             editingContact.updatedAt = .now
         } else {
             let contact = Contact(
                 name: normalizedName,
                 phoneNumber: normalizedPhone,
                 email: normalizedEmail,
-                isFavorite: draft.isFavorite
+                isFavorite: draft.isFavorite,
+                relationshipStatus: ContactRelationshipStatus.custom.rawValue
             )
             modelContext.insert(contact)
         }
@@ -763,117 +782,49 @@ private struct ContactsView: View {
         try? modelContext.save()
     }
 
-    private func bootstrapInviteFlowIfNeeded() {
-        guard !inviteFlowInitialized else { return }
+    private func normalizeInviteFrontier() {
+        let personaContacts = contacts
+            .filter { $0.linkedPersonaId != nil }
+            .sorted { ($0.inviteOrder ?? 999) < ($1.inviteOrder ?? 999) }
 
-        let existingContacts: [Contact] = (try? modelContext.fetch(FetchDescriptor<Contact>())) ?? []
-        for contact in existingContacts {
-            modelContext.delete(contact)
+        var frontierConsumed = false
+        for contact in personaContacts {
+            switch contact.relationshipStatusValue {
+            case .accepted, .ignored:
+                continue
+            case .pending:
+                if frontierConsumed {
+                    contact.relationshipStatusValue = .locked
+                    contact.updatedAt = .now
+                } else {
+                    frontierConsumed = true
+                }
+            case .locked:
+                if !frontierConsumed {
+                    contact.relationshipStatusValue = .pending
+                    contact.updatedAt = .now
+                    frontierConsumed = true
+                }
+            case .custom:
+                continue
+            }
         }
 
-        let existingThreads: [MessageThread] = (try? modelContext.fetch(FetchDescriptor<MessageThread>())) ?? []
-        for thread in existingThreads {
-            modelContext.delete(thread)
-        }
-
-        let existingMessages: [PersonaMessage] = (try? modelContext.fetch(FetchDescriptor<PersonaMessage>())) ?? []
-        for message in existingMessages {
-            modelContext.delete(message)
-        }
-
-        inviteTrumpAccepted = false
-        inviteMuskUnlocked = false
-        inviteMuskAccepted = false
-        inviteMuskIgnored = false
-        inviteZuckerbergUnlocked = false
-        inviteZuckerbergAccepted = false
-        inviteZuckerbergIgnored = false
-        inviteTrumpIgnored = false
-        inviteFlowInitialized = true
-        try? modelContext.save()
-    }
-
-    private func restoreInviteFlowIfNeeded() {
-        let hasDecidedAnyInvitation =
-            inviteTrumpAccepted || inviteTrumpIgnored
-            || inviteMuskUnlocked || inviteMuskAccepted || inviteMuskIgnored
-            || inviteZuckerbergUnlocked || inviteZuckerbergAccepted || inviteZuckerbergIgnored
-
-        guard contacts.isEmpty, pendingInvitations.isEmpty, !hasDecidedAnyInvitation else { return }
-
-        inviteTrumpAccepted = false
-        inviteMuskUnlocked = false
-        inviteMuskAccepted = false
-        inviteMuskIgnored = false
-        inviteZuckerbergUnlocked = false
-        inviteZuckerbergAccepted = false
-        inviteZuckerbergIgnored = false
-        inviteTrumpIgnored = false
-    }
-
-    private func ensureInvitationProgressConsistency() {
-        if (inviteTrumpAccepted || inviteTrumpIgnored) && !inviteMuskAccepted && !inviteMuskIgnored {
-            inviteMuskUnlocked = true
-        }
-
-        if (inviteMuskAccepted || inviteMuskIgnored) && !inviteZuckerbergAccepted && !inviteZuckerbergIgnored {
-            inviteZuckerbergUnlocked = true
+        if modelContext.hasChanges {
+            try? modelContext.save()
         }
     }
 
-    private func recoverPendingInvitationsIfNeeded() {
-        guard pendingInvitations.isEmpty else { return }
-
-        if !inviteTrumpAccepted {
-            inviteTrumpIgnored = false
-            inviteMuskUnlocked = false
-            inviteMuskIgnored = false
-            inviteZuckerbergUnlocked = false
-            inviteZuckerbergIgnored = false
-            return
-        }
-
-        if !inviteMuskAccepted {
-            inviteMuskUnlocked = true
-            inviteMuskIgnored = false
-            return
-        }
-
-        if !inviteZuckerbergAccepted {
-            inviteZuckerbergUnlocked = true
-            inviteZuckerbergIgnored = false
-        }
+    private func contact(for personaId: String) -> Contact? {
+        contacts.first(where: { $0.linkedPersonaId == personaId })
     }
 
-    private func forceRestartInvitationFlow() {
-        inviteTrumpAccepted = false
-        inviteTrumpIgnored = false
-        inviteMuskUnlocked = false
-        inviteMuskAccepted = false
-        inviteMuskIgnored = false
-        inviteZuckerbergUnlocked = false
-        inviteZuckerbergAccepted = false
-        inviteZuckerbergIgnored = false
-    }
-
-    private func addContactIfNeeded(for invitation: BruhInvitation) {
-        let alreadyExists = contacts.contains { contact in
-            contact.linkedPersonaId == invitation.personaId
-                || contact.name.localizedCaseInsensitiveCompare(invitation.displayName) == .orderedSame
-        }
-        guard !alreadyExists else { return }
-
-        let contact = Contact(
-            linkedPersonaId: invitation.personaId,
-            name: invitation.displayName,
-            phoneNumber: invitation.phoneNumber,
-            email: invitation.email,
-            avatarName: invitation.avatarName,
-            themeColorHex: invitation.themeHex,
-            locationLabel: invitation.location,
-            isFavorite: false
-        )
-        modelContext.insert(contact)
+    private func lockedCandidateNames(excluding personaId: String) -> [String] {
+        contacts
+            .filter { $0.linkedPersonaId != nil && $0.relationshipStatusValue == .locked }
+            .filter { $0.linkedPersonaId != personaId }
+            .sorted { ($0.inviteOrder ?? 999) < ($1.inviteOrder ?? 999) }
+            .map(\.name)
     }
 
     private func scheduleTrumpFollowUps() {
@@ -891,12 +842,6 @@ private struct ContactsView: View {
                 text: "https://www.reuters.com/world/asia-pacific/trump-agrees-two-week-ceasefire-iran-says-safe-passage-through-hormuz-possible-2026-04-08/",
                 sourcePostIds: ["trump-news-1"]
             )
-
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
-            inviteMuskUnlocked = true
-
-            try? await Task.sleep(nanoseconds: 4_000_000_000)
-            inviteZuckerbergUnlocked = true
         }
     }
 
@@ -915,6 +860,7 @@ private struct ContactsView: View {
             isSeedMessage: false
         )
         modelContext.insert(message)
+        ContentGraphStore.syncIncomingMessage(message, in: modelContext)
         thread.lastMessagePreview = text
         thread.lastMessageAt = now
         thread.unreadCount = max(thread.unreadCount, 0) + 1
@@ -998,11 +944,14 @@ private struct ContactFormView: View {
                 Persona.self,
                 PersonaPost.self,
                 SourceItem.self,
+                ContentEvent.self,
+                ContentDelivery.self,
                 MessageThread.self,
                 PersonaMessage.self,
                 FeedComment.self,
                 FeedLike.self,
                 Contact.self,
+                UserProfile.self,
             ],
             inMemory: true
         )

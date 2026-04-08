@@ -24,56 +24,41 @@ struct BruhInvitation: Identifiable, Hashable {
         hasher.combine(personaId)
     }
 
-    static let trump = BruhInvitation(
-        personaId: "trump",
-        displayName: "Donald Trump",
-        handle: "@realdonaldtrump",
-        subtitle: "45th & 47th POTUS",
-        inviteMessage: "Hey bruh! I heard you're interested in politics. GREAT choice. Nobody knows politics better than me. Accept this and I'll keep you updated on everything. Believe me. ☝️🇺🇸",
-        avatarEmoji: "🧑‍💼",
-        avatarColor: Color(red: 0.84, green: 0.15, blue: 0.24),
-        themeHex: "#D62839",
-        avatarName: "avatar_trump",
-        phoneNumber: "+1 561 555 0145",
-        email: "donald@truthsocial.com",
-        location: "United States"
-    )
+    init(persona: Persona, contact: Contact) {
+        let fallbackColor = AppTheme.color(from: persona.themeColorHex, fallback: .gray)
+        self.personaId = persona.id
+        self.displayName = persona.displayName
+        self.handle = persona.handle
+        self.subtitle = persona.subtitle
+        self.inviteMessage = persona.inviteMessage
+        self.avatarEmoji = Self.avatarEmoji(for: persona.id)
+        self.avatarColor = fallbackColor
+        self.themeHex = persona.themeColorHex
+        self.avatarName = persona.avatarName
+        self.phoneNumber = contact.phoneNumber
+        self.email = contact.email
+        self.location = contact.locationLabel
+    }
 
-    static let musk = BruhInvitation(
-        personaId: "musk",
-        displayName: "Elon Musk",
-        handle: "@elonmusk",
-        subtitle: "CEO · SpaceX · xAI",
-        inviteMessage: "You seem sharp. Want first access to what matters in AI, rockets, and product launches? Let’s talk. 🚀",
-        avatarEmoji: "👨‍🚀",
-        avatarColor: Color(red: 0.20, green: 0.35, blue: 0.74),
-        themeHex: "#1F2A8A",
-        avatarName: "avatar_musk",
-        phoneNumber: "+1 310 555 0142",
-        email: "elon@x.ai",
-        location: "X HQ"
-    )
-
-    static let zuckerberg = BruhInvitation(
-        personaId: "zuckerberg",
-        displayName: "Mark Zuckerberg",
-        handle: "@finkd",
-        subtitle: "Meta · AI & Social",
-        inviteMessage: "I can send you concise updates on social platforms, AI releases, and what creators are reacting to in real time. 🤝",
-        avatarEmoji: "🧑‍💻",
-        avatarColor: Color(red: 0.42, green: 0.35, blue: 0.88),
-        themeHex: "#6A5AE0",
-        avatarName: "avatar_zuckerberg",
-        phoneNumber: "+1 650 555 0108",
-        email: "mark@meta.com",
-        location: "Meta Park"
-    )
+    private static func avatarEmoji(for personaId: String) -> String {
+        switch personaId {
+        case "trump":
+            return "🧑‍💼"
+        case "musk":
+            return "👨‍🚀"
+        case "zuckerberg":
+            return "🧑‍💻"
+        default:
+            return "👤"
+        }
+    }
 }
 
 struct NewBruhView: View {
     @Environment(\.dismiss) private var dismiss
 
     let invitation: BruhInvitation
+    let lockedCandidateNames: [String]
     let onAccept: (BruhInvitation) -> Void
     let onIgnore: (BruhInvitation) -> Void
     private var invitationThemeColor: Color {
@@ -171,21 +156,21 @@ struct NewBruhView: View {
                 .background(Color.white.opacity(0.76))
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("MORE BRUHS WANT TO CONNECT")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.black.opacity(0.35))
-                        .tracking(2)
+                if !lockedCandidateNames.isEmpty {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("MORE BRUHS WANT TO CONNECT")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Color.black.opacity(0.35))
+                            .tracking(2)
 
-                    HStack(spacing: 14) {
-                        lockedCandidate(name: "Elon Musk", color: Color(red: 0.46, green: 0.45, blue: 0.61))
-                        lockedCandidate(name: "Sam Altmar", color: Color(red: 0.43, green: 0.70, blue: 0.62))
-                        lockedCandidate(name: "Xi Jinping", color: Color(red: 0.72, green: 0.62, blue: 0.36))
-                        lockedCandidate(name: "雷军", color: Color(red: 0.78, green: 0.54, blue: 0.41))
-                        lockedCandidate(name: "Taylor Swift", color: Color(red: 0.74, green: 0.44, blue: 0.57))
+                        HStack(spacing: 14) {
+                            ForEach(Array(lockedCandidateNames.prefix(5)), id: \.self) { name in
+                                lockedCandidate(name: name, color: Color.black.opacity(0.12))
+                            }
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Spacer(minLength: 18)
 
@@ -234,6 +219,24 @@ struct NewBruhView: View {
 
 #Preview {
     NavigationStack {
-        NewBruhView(invitation: .trump, onAccept: { _ in }, onIgnore: { _ in })
+        NewBruhView(
+            invitation: BruhInvitation(
+                persona: PersonaCatalog.trump.makePersona(),
+                contact: Contact(
+                    linkedPersonaId: "trump",
+                    name: "Donald Trump",
+                    phoneNumber: "+1 561 555 0145",
+                    email: "donald@truthsocial.com",
+                    avatarName: "avatar_trump",
+                    themeColorHex: "#D62839",
+                    locationLabel: "United States",
+                    relationshipStatus: ContactRelationshipStatus.pending.rawValue,
+                    inviteOrder: 0
+                )
+            ),
+            lockedCandidateNames: ["Elon Musk", "Mark Zuckerberg"],
+            onAccept: { _ in },
+            onIgnore: { _ in }
+        )
     }
 }

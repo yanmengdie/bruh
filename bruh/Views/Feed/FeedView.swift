@@ -16,13 +16,25 @@ struct FeedView: View {
 
     private var feedService = FeedService()
 
+    private var acceptedPersonaIds: Set<String> {
+        Set(
+            contacts
+                .filter { $0.relationshipStatusValue == .accepted }
+                .compactMap(\.linkedPersonaId)
+        )
+    }
+
+    private var visiblePosts: [PersonaPost] {
+        posts.filter { acceptedPersonaIds.contains($0.personaId) }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
                 momentsHeader
 
                 LazyVStack(spacing: 0) {
-                    if posts.isEmpty, !isRefreshing {
+                    if visiblePosts.isEmpty, !isRefreshing {
                         VStack(spacing: 12) {
                             Image(systemName: "bubble.left.and.exclamationmark.bubble.right")
                                 .font(.system(size: 28))
@@ -37,7 +49,7 @@ struct FeedView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 40)
                     } else {
-                        ForEach(posts) { post in
+                        ForEach(visiblePosts) { post in
                             FeedCard(
                                 post: post,
                                 contact: contacts.first(where: { $0.linkedPersonaId == post.personaId })

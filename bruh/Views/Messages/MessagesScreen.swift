@@ -11,11 +11,20 @@ struct MessagesScreen: View {
     let backgroundColor: Color
     @State private var searchText = ""
 
+    private var visibleThreads: [MessageThread] {
+        let acceptedPersonaIds = Set(
+            contacts
+                .filter { $0.relationshipStatusValue == .accepted }
+                .compactMap(\.linkedPersonaId)
+        )
+        return threads.filter { acceptedPersonaIds.contains($0.personaId) }
+    }
+
     private var filteredThreads: [MessageThread] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return threads }
+        guard !query.isEmpty else { return visibleThreads }
 
-        return threads.filter { thread in
+        return visibleThreads.filter { thread in
             let personaName = persona(for: thread.personaId).name
             return personaName.localizedCaseInsensitiveContains(query)
                 || thread.lastMessagePreview.localizedCaseInsensitiveContains(query)
@@ -28,7 +37,7 @@ struct MessagesScreen: View {
 
             ScrollView {
                 VStack(spacing: 14) {
-                    if !threads.isEmpty {
+                    if !filteredThreads.isEmpty {
                         VStack(spacing: 0) {
                             ForEach(Array(filteredThreads.enumerated()), id: \.element.id) { index, thread in
                                 NavigationLink {
@@ -416,7 +425,7 @@ private struct MessageDetailView: View {
                     personaId: thread.personaId,
                     text: text,
                     modelContext: modelContext,
-                    userInterests: InterestPreferences.selectedInterests(),
+                    userInterests: CurrentUserProfileStore.selectedInterests(in: modelContext),
                     requestImage: requestImage
                 )
             } catch {

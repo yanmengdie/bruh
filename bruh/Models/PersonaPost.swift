@@ -5,6 +5,7 @@ import SwiftData
 final class PersonaPost {
     @Attribute(.unique) var id: String
     var personaId: String
+    var contentEventId: String?
     var content: String
     var sourceType: String   // "x" | "news"
     var sourceUrl: String?
@@ -19,6 +20,7 @@ final class PersonaPost {
     init(
         id: String = UUID().uuidString,
         personaId: String,
+        contentEventId: String? = nil,
         content: String,
         sourceType: String,
         sourceUrl: String? = nil,
@@ -32,6 +34,7 @@ final class PersonaPost {
     ) {
         self.id = id
         self.personaId = personaId
+        self.contentEventId = contentEventId
         self.content = content
         self.sourceType = sourceType
         self.sourceUrl = sourceUrl
