@@ -117,13 +117,13 @@ struct MessagesScreen: View {
 
     private func persona(for personaId: String) -> (name: String, tint: Color) {
         if let contact = contacts.first(where: { $0.linkedPersonaId == personaId }) {
-            return (contact.name, tint(for: personaId))
+            return (contact.name, AppTheme.color(from: contact.themeColorHex, fallback: fallbackTint(for: personaId)))
         }
 
-        return (personaId.capitalized, tint(for: personaId))
+        return (personaId.capitalized, fallbackTint(for: personaId))
     }
 
-    private func tint(for personaId: String) -> Color {
+    private func fallbackTint(for personaId: String) -> Color {
         switch personaId {
         case "trump":
             return .orange
@@ -182,15 +182,7 @@ private struct MessageDetailView: View {
                     VStack(spacing: 14) {
                         LazyVStack(spacing: 10) {
                             ForEach(messages, id: \.id) { message in
-                                HStack {
-                                    if message.isIncoming {
-                                        bubble(text: message.text, isIncoming: true, deliveryState: message.deliveryState)
-                                        Spacer(minLength: 48)
-                                    } else {
-                                        Spacer(minLength: 48)
-                                        bubble(text: message.text, isIncoming: false, deliveryState: message.deliveryState)
-                                    }
-                                }
+                                messageRow(for: message)
                                 .id(message.id)
                             }
                         }
@@ -326,13 +318,13 @@ private struct MessageDetailView: View {
 
     private func persona(for personaId: String) -> (name: String, tint: Color) {
         if let contact = contacts.first(where: { $0.linkedPersonaId == personaId }) {
-            return (contact.name, tint(for: personaId))
+            return (contact.name, AppTheme.color(from: contact.themeColorHex, fallback: fallbackTint(for: personaId)))
         }
 
-        return (personaId.capitalized, tint(for: personaId))
+        return (personaId.capitalized, fallbackTint(for: personaId))
     }
 
-    private func tint(for personaId: String) -> Color {
+    private func fallbackTint(for personaId: String) -> Color {
         switch personaId {
         case "trump":
             return .orange
@@ -363,15 +355,89 @@ private struct MessageDetailView: View {
         }
     }
 
-    private func bubble(text: String, isIncoming: Bool, deliveryState: String) -> some View {
+    private func messageRow(for message: PersonaMessage) -> some View {
+        let content = parseContent(from: message)
+        let personaTheme = persona(for: thread.personaId).tint
+
+        return HStack(alignment: .bottom, spacing: 8) {
+            if message.isIncoming {
+                incomingAvatar
+                messageContentView(
+                    content: content,
+                    isIncoming: true,
+                    deliveryState: message.deliveryState,
+                    themeColor: personaTheme
+                )
+                Spacer(minLength: 40)
+            } else {
+                Spacer(minLength: 40)
+                messageContentView(
+                    content: content,
+                    isIncoming: false,
+                    deliveryState: message.deliveryState,
+                    themeColor: personaTheme
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func messageContentView(
+        content: MessageContent,
+        isIncoming: Bool,
+        deliveryState: String,
+        themeColor: Color
+    ) -> some View {
+        switch content {
+        case .text(let text):
+            bubble(text: text, isIncoming: isIncoming, deliveryState: deliveryState, themeColor: themeColor)
+        case .webPreview:
+            bubble(text: "[Web preview coming soon]", isIncoming: isIncoming, deliveryState: deliveryState, themeColor: themeColor)
+        case .audio:
+            bubble(text: "[Audio message coming soon]", isIncoming: isIncoming, deliveryState: deliveryState, themeColor: themeColor)
+        }
+    }
+
+    private func parseContent(from message: PersonaMessage) -> MessageContent {
+        // Extensible parser: currently all messages render as text.
+        .text(message.text)
+    }
+
+    private var incomingAvatar: some View {
+        let persona = persona(for: thread.personaId)
+
+        return Circle()
+            .fill(persona.tint.opacity(0.18))
+            .frame(width: 34, height: 34)
+            .overlay {
+                Text(String(persona.name.prefix(1)))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(persona.tint)
+            }
+    }
+
+    private func bubble(text: String, isIncoming: Bool, deliveryState: String, themeColor: Color) -> some View {
         VStack(alignment: isIncoming ? .leading : .trailing, spacing: 4) {
             Text(text)
                 .font(.system(size: 16))
-                .foregroundColor(isIncoming ? .primary : .white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(isIncoming ? Color(.systemGray5) : Color.blue)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .foregroundColor(.primary)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background {
+                    if isIncoming {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(themeColor)
+                                .offset(x: -3, y: 0)
+
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(AppTheme.messageBubbleBase)
+                        }
+                    } else {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(AppTheme.outgoingBubbleBase)
+                    }
+                }
 
             if !isIncoming && deliveryState == "failed" {
                 Text("Failed to send")
@@ -380,6 +446,12 @@ private struct MessageDetailView: View {
             }
         }
     }
+}
+
+private enum MessageContent {
+    case text(String)
+    case webPreview(url: URL?)
+    case audio(duration: TimeInterval?)
 }
 
 private enum MessagesScreenPreviewData {

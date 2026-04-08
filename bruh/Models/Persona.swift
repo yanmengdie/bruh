@@ -78,6 +78,7 @@ final class Contact {
     var phoneNumber: String
     var email: String
     var avatarName: String
+    var themeColorHex: String
     var locationLabel: String
     var isFavorite: Bool
     var createdAt: Date
@@ -90,6 +91,7 @@ final class Contact {
         phoneNumber: String,
         email: String = "",
         avatarName: String = "avatar_default",
+        themeColorHex: String = "#3B82F6",
         locationLabel: String = "",
         isFavorite: Bool = false,
         createdAt: Date = .now,
@@ -101,6 +103,7 @@ final class Contact {
         self.phoneNumber = phoneNumber
         self.email = email
         self.avatarName = avatarName
+        self.themeColorHex = themeColorHex
         self.locationLabel = locationLabel
         self.isFavorite = isFavorite
         self.createdAt = createdAt

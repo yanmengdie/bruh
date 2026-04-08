@@ -222,14 +222,16 @@ private struct ContactsView: View {
     }
 
     private func contactRow(_ contact: Contact) -> some View {
-        HStack(spacing: 12) {
+        let themeColor = AppTheme.color(from: contact.themeColorHex, fallback: .blue)
+
+        return HStack(spacing: 12) {
             Circle()
-                .fill(contact.isFavorite ? Color.orange.opacity(0.2) : Color.blue.opacity(0.15))
+                .fill(themeColor.opacity(contact.isFavorite ? 0.24 : 0.16))
                 .frame(width: 44, height: 44)
                 .overlay {
                     Text(String(contact.name.prefix(1)).uppercased())
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(contact.isFavorite ? .orange : .blue)
+                        .foregroundStyle(themeColor)
                 }
 
             VStack(alignment: .leading, spacing: 3) {
