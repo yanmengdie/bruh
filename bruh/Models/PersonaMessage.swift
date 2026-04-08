@@ -9,6 +9,10 @@ final class PersonaMessage {
     var contentEventId: String?
     var text: String
     var imageUrl: String?
+    var audioUrl: String?
+    var audioDuration: TimeInterval?
+    var voiceLabel: String?
+    var audioOnly: Bool
     var isIncoming: Bool
     var createdAt: Date
     var deliveryState: String
@@ -22,6 +26,10 @@ final class PersonaMessage {
         contentEventId: String? = nil,
         text: String,
         imageUrl: String? = nil,
+        audioUrl: String? = nil,
+        audioDuration: TimeInterval? = nil,
+        voiceLabel: String? = nil,
+        audioOnly: Bool = false,
         isIncoming: Bool,
         createdAt: Date = .now,
         deliveryState: String = "sent",
@@ -34,6 +42,10 @@ final class PersonaMessage {
         self.contentEventId = contentEventId
         self.text = text
         self.imageUrl = imageUrl
+        self.audioUrl = audioUrl
+        self.audioDuration = audioDuration
+        self.voiceLabel = voiceLabel
+        self.audioOnly = audioOnly
         self.isIncoming = isIncoming
         self.createdAt = createdAt
         self.deliveryState = deliveryState

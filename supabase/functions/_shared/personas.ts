@@ -4,6 +4,8 @@ export type PersonaDefinition = {
   stance: string
   domains: string[]
   triggerKeywords: string[]
+  defaultVoiceSpeakerId: string
+  defaultVoiceLabel: string
 }
 
 export const personaMap: Record<string, PersonaDefinition> = {
@@ -13,6 +15,8 @@ export const personaMap: Record<string, PersonaDefinition> = {
     stance: "technical, fast-moving, confident, slightly sarcastic, short-message style",
     domains: ["tech", "ai", "space", "ev"],
     triggerKeywords: ["tesla", "spacex", "openai", "grok", "x.com", "ai"],
+    defaultVoiceSpeakerId: "example:voice_02",
+    defaultVoiceLabel: "Elon's voice",
   },
   realdonaldtrump: {
     personaId: "trump",
@@ -20,6 +24,8 @@ export const personaMap: Record<string, PersonaDefinition> = {
     stance: "combative, boastful, political, headline-driven, short-message style",
     domains: ["politics", "finance", "trade"],
     triggerKeywords: ["tariff", "china", "trade", "election", "tiktok", "truth social"],
+    defaultVoiceSpeakerId: "example:voice_03",
+    defaultVoiceLabel: "Trump's voice",
   },
   finkd: {
     personaId: "zuckerberg",
@@ -27,6 +33,8 @@ export const personaMap: Record<string, PersonaDefinition> = {
     stance: "builder-minded, product-focused, mildly awkward, concise but thoughtful",
     domains: ["tech", "social", "ai", "vr"],
     triggerKeywords: ["meta", "instagram", "threads", "llama", "vr", "quest", "ai"],
+    defaultVoiceSpeakerId: "example:voice_01",
+    defaultVoiceLabel: "Mark's voice",
   },
 }
 

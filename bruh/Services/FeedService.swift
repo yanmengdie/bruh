@@ -16,7 +16,8 @@ final class FeedService {
     /// Returns the number of new posts fetched.
     func refreshFeed(modelContext: ModelContext) async throws -> Int {
         try demoteSeedPostsIfNeeded(modelContext: modelContext)
-        let dtos = try await api.fetchFeed(limit: 40)
+        let since = try latestRemotePublishedAt(modelContext: modelContext)?.addingTimeInterval(-1)
+        let dtos = try await api.fetchFeed(since: since, limit: 40)
         let fetchDate = Date()
         var newCount = 0
 
@@ -64,6 +65,15 @@ final class FeedService {
             try modelContext.save()
         }
         return newCount
+    }
+
+    private func latestRemotePublishedAt(modelContext: ModelContext) throws -> Date? {
+        var descriptor = FetchDescriptor<PersonaPost>(
+            predicate: #Predicate { $0.isDelivered },
+            sortBy: [SortDescriptor(\PersonaPost.publishedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first?.publishedAt
     }
 
     private func demoteSeedPostsIfNeeded(modelContext: ModelContext) throws {

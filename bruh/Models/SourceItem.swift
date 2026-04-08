@@ -260,7 +260,12 @@ enum ContentGraphStore {
 
         let eventKind = resolvedEventKind(for: message)
         let eventId = message.contentEventId ?? "event:message:\(message.id)"
-        let preview = previewText(text: message.text, imageUrl: message.imageUrl)
+        let preview = previewText(
+            text: message.text,
+            imageUrl: message.imageUrl,
+            audioUrl: message.audioUrl,
+            audioOnly: message.audioOnly
+        )
         let articleURL = firstURL(in: message.text)
 
         let event = fetchContentEvent(id: eventId, in: context) ?? {
@@ -467,7 +472,16 @@ enum ContentGraphStore {
         return .messageReply
     }
 
-    private static func previewText(text: String, imageUrl: String? = nil) -> String {
+    private static func previewText(
+        text: String,
+        imageUrl: String? = nil,
+        audioUrl: String? = nil,
+        audioOnly: Bool = false
+    ) -> String {
+        if audioOnly, normalizedValue(audioUrl) != nil {
+            return "[Voice]"
+        }
+
         let trimmed = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\n", with: " ")

@@ -137,10 +137,7 @@ struct ContentView: View {
         seedPersonas(into: modelContext)
         seedCurrentUserProfile(into: modelContext)
         seedSystemContacts(into: modelContext)
-        try? await messageService.ensureThreadsExist(
-            modelContext: modelContext,
-            userInterests: CurrentUserProfileStore.selectedInterests(in: modelContext)
-        )
+        try? messageService.prepareThreads(modelContext: modelContext)
         syncContentGraph(into: modelContext)
     }
 

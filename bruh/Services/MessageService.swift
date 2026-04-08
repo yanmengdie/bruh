@@ -9,7 +9,7 @@ final class MessageService {
         self.api = api
     }
 
-    func ensureThreadsExist(modelContext: ModelContext, userInterests: [String]) async throws {
+    func prepareThreads(modelContext: ModelContext) throws {
         for personaId in try acceptedPersonaIds(modelContext: modelContext) {
             let thread = try ensureThread(for: personaId, modelContext: modelContext)
             _ = thread
@@ -21,16 +21,23 @@ final class MessageService {
         if modelContext.hasChanges {
             try modelContext.save()
         }
+    }
 
+    func refreshStarterMessages(modelContext: ModelContext, userInterests: [String]) async {
         do {
-            try await syncStarterMessages(modelContext: modelContext, userInterests: userInterests)
+            try await syncStarterMessagesFromRemote(modelContext: modelContext, userInterests: userInterests)
         } catch {
             // Keep the locally seeded threads/messages as the fast-path when the starter API is slow or unavailable.
         }
 
         if modelContext.hasChanges {
-            try modelContext.save()
+            try? modelContext.save()
         }
+    }
+
+    func ensureThreadsExist(modelContext: ModelContext, userInterests: [String]) async throws {
+        try prepareThreads(modelContext: modelContext)
+        await refreshStarterMessages(modelContext: modelContext, userInterests: userInterests)
     }
 
     func sendMessage(
@@ -69,13 +76,22 @@ final class MessageService {
             )
 
             outgoing.deliveryState = "sent"
-            let replyPreview = messagePreview(text: reply.content, imageUrl: reply.imageUrl)
+            let replyPreview = messagePreview(
+                text: reply.content,
+                imageUrl: reply.imageUrl,
+                audioUrl: reply.audioUrl,
+                audioOnly: reply.audioOnly == true
+            )
             let incoming = PersonaMessage(
                 id: reply.id,
                 threadId: thread.id,
                 personaId: personaId,
                 text: reply.content,
                 imageUrl: reply.imageUrl,
+                audioUrl: reply.audioUrl,
+                audioDuration: reply.audioDuration,
+                voiceLabel: reply.voiceLabel,
+                audioOnly: reply.audioOnly == true,
                 isIncoming: true,
                 createdAt: reply.generatedAt,
                 deliveryState: "sent",
@@ -130,7 +146,7 @@ final class MessageService {
         return thread
     }
 
-    private func syncStarterMessages(modelContext: ModelContext, userInterests: [String]) async throws {
+    private func syncStarterMessagesFromRemote(modelContext: ModelContext, userInterests: [String]) async throws {
         let reply = try await api.fetchMessageStarters(userInterests: userInterests)
         let acceptedPersonaIds = Set(try acceptedPersonaIds(modelContext: modelContext))
 
@@ -253,7 +269,16 @@ final class MessageService {
         thread.unreadCount = unreadCount
     }
 
-    private func messagePreview(text: String, imageUrl: String?) -> String {
+    private func messagePreview(
+        text: String,
+        imageUrl: String?,
+        audioUrl: String? = nil,
+        audioOnly: Bool = false
+    ) -> String {
+        if audioOnly, let audioUrl, !audioUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "[Voice]"
+        }
+
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard imageUrl != nil else { return trimmed }
         return trimmed.isEmpty ? "[图片]" : "[图片] \(trimmed)"

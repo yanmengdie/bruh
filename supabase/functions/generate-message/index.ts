@@ -43,8 +43,36 @@ type OpenAIMessage = {
   content: string
 }
 
+type VoiceMood = "fired_up" | "angry" | "smug" | "urgent"
+
+type VoicePlan = {
+  shouldGenerate: boolean
+  speakerId: string
+  voiceLabel: string
+  emoText: string
+  emoVector: number[]
+  emoAlpha: number
+}
+
+type TTSResponse = {
+  task_id?: string
+  status?: string
+  message?: string
+  output_path?: string | null
+  audio_url?: string | null
+  duration?: number | null
+}
+
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
+}
+
+function countRegexMatches(text: string, pattern: RegExp) {
+  return text.match(pattern)?.length ?? 0
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
 }
 
 function normalizeConversation(value: unknown): ConversationTurn[] {
@@ -373,6 +401,225 @@ function normalizeBoolean(value: unknown) {
   return false
 }
 
+function resolveVoiceSpeakerId(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+) {
+  const overrideKey = `VOICE_SPEAKER_${persona.personaId.toUpperCase()}`
+  return asString(Deno.env.get(overrideKey)) || persona.defaultVoiceSpeakerId
+}
+
+function classifyVoiceMood(content: string): VoiceMood {
+  const lower = content.toLowerCase()
+  const angerSignals = [
+    "fake news",
+    "lie",
+    "liar",
+    "disaster",
+    "ridiculous",
+    "离谱",
+    "假的",
+    "胡扯",
+    "扯淡",
+    "weak",
+    "loser",
+    "losers",
+    "wrong",
+    "stupid",
+    "terrible",
+  ]
+  const smugSignals = [
+    "believe me",
+    "everyone knows",
+    "obviously",
+    "of course",
+    "keep up",
+    "i told you",
+  ]
+  const urgentSignals = [
+    "now",
+    "right now",
+    "asap",
+    "immediately",
+    "today",
+    "马上",
+    "现在",
+    "立刻",
+    "move fast",
+    "ship it",
+    "accelerate",
+  ]
+
+  if (angerSignals.some((signal) => lower.includes(signal))) return "angry"
+  if (smugSignals.some((signal) => lower.includes(signal))) return "smug"
+  if (urgentSignals.some((signal) => lower.includes(signal))) return "urgent"
+  return "fired_up"
+}
+
+function voiceMoodVector(mood: VoiceMood) {
+  switch (mood) {
+    case "angry":
+      return [0.04, 0.58, 0.03, 0.06, 0.12, 0.02, 0.05, 0.1]
+    case "smug":
+      return [0.24, 0.03, 0.02, 0.01, 0.01, 0.01, 0.12, 0.56]
+    case "urgent":
+      return [0.08, 0.18, 0.03, 0.15, 0.02, 0.02, 0.2, 0.32]
+    case "fired_up":
+    default:
+      return [0.34, 0.14, 0.02, 0.02, 0.02, 0.01, 0.3, 0.15]
+  }
+}
+
+function voiceMoodText(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+  mood: VoiceMood,
+) {
+  switch (mood) {
+    case "angry":
+      return `${persona.displayName}, sharp and emotionally charged, slightly angry, clipped delivery, high conviction`
+    case "smug":
+      return `${persona.displayName}, smug and self-assured, playful swagger, relaxed control, confident emphasis`
+    case "urgent":
+      return `${persona.displayName}, urgent and activated, speaking faster than normal, focused pressure, emotionally elevated`
+    case "fired_up":
+    default:
+      return `${persona.displayName}, energized and animated, speaking with momentum, confident, fired up, emotionally elevated`
+  }
+}
+
+function shouldReplyWithVoice(
+  personaId: string,
+  content: string,
+  requestImage: boolean,
+) {
+  if (requestImage || !content) return false
+
+  const words = content.split(/\s+/).filter((word) => word.length > 0)
+  if (words.length < 5 || words.length > 36) return false
+
+  const lower = content.toLowerCase()
+  const exclamationCount = countRegexMatches(content, /!/g)
+  const uppercaseWordCount = countRegexMatches(content, /\b[A-Z]{3,}\b/g)
+  const emojiCount = countRegexMatches(content, /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu)
+  const intenseSignalCount = [
+    "huge",
+    "massive",
+    "crazy",
+    "wild",
+    "insane",
+    "ridiculous",
+    "离谱",
+    "假的",
+    "马上",
+    "立刻",
+    "fake news",
+    "lie",
+    "wrong",
+    "winning",
+    "believe me",
+    "brutal",
+    "disaster",
+    "everyone knows",
+    "move fast",
+    "accelerate",
+    "ship it",
+    "absolutely",
+  ].reduce((score, signal) => score + (lower.includes(signal) ? 1 : 0), 0)
+
+  let score = 0
+  score += clamp(exclamationCount, 0, 2)
+  score += clamp(uppercaseWordCount, 0, 2)
+  score += clamp(emojiCount, 0, 1)
+  score += clamp(intenseSignalCount, 0, 3)
+
+  if (personaId === "trump") score += 1
+  if (/[?？]$/.test(content) && exclamationCount === 0 && uppercaseWordCount === 0) score -= 1
+
+  return score >= 2
+}
+
+function buildVoicePlan(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+  content: string,
+  requestImage: boolean,
+): VoicePlan {
+  if (!shouldReplyWithVoice(persona.personaId, content, requestImage)) {
+    return {
+      shouldGenerate: false,
+      speakerId: "",
+      voiceLabel: "",
+      emoText: "",
+      emoVector: [],
+      emoAlpha: 0,
+    }
+  }
+
+  const mood = classifyVoiceMood(content)
+  return {
+    shouldGenerate: true,
+    speakerId: resolveVoiceSpeakerId(persona),
+    voiceLabel: persona.defaultVoiceLabel,
+    emoText: voiceMoodText(persona, mood),
+    emoVector: voiceMoodVector(mood),
+    emoAlpha: 0.92,
+  }
+}
+
+function buildAbsoluteVoiceUrl(baseUrl: string, relativeOrAbsoluteUrl: string, taskId: string) {
+  const sanitizedBaseUrl = baseUrl.replace(/\/$/, "")
+  if (/^https?:\/\//i.test(relativeOrAbsoluteUrl)) return relativeOrAbsoluteUrl
+  const normalizedPath = relativeOrAbsoluteUrl
+    ? relativeOrAbsoluteUrl.replace(/^\//, "")
+    : `audio/${taskId}`
+  return new URL(normalizedPath, `${sanitizedBaseUrl}/`).toString()
+}
+
+async function synthesizeVoiceReply(
+  voiceApiBaseUrl: string,
+  voiceApiKey: string | null,
+  plan: VoicePlan,
+  content: string,
+) {
+  const response = await fetch(`${voiceApiBaseUrl}/tts/sync`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(voiceApiKey ? { Authorization: `Bearer ${voiceApiKey}` } : {}),
+    },
+    body: JSON.stringify({
+      text: content,
+      speaker_id: plan.speakerId,
+      use_emo_text: true,
+      emo_text: plan.emoText,
+      emo_vector: plan.emoVector,
+      emo_alpha: plan.emoAlpha,
+      max_text_tokens_per_segment: 120,
+      top_p: 0.78,
+      top_k: 30,
+      temperature: 0.72,
+      repetition_penalty: 6,
+    }),
+    signal: AbortSignal.timeout(20_000),
+  })
+
+  if (!response.ok) {
+    throw new Error(`TTS request failed: ${await response.text()}`)
+  }
+
+  const payload = await response.json() as TTSResponse
+  const taskId = asString(payload.task_id)
+  const audioUrl = buildAbsoluteVoiceUrl(voiceApiBaseUrl, asString(payload.audio_url), taskId)
+
+  if (!taskId || !audioUrl) {
+    throw new Error("TTS response missing audio URL")
+  }
+
+  return {
+    audioUrl,
+    duration: typeof payload.duration === "number" ? payload.duration : null,
+    voiceLabel: plan.voiceLabel,
+  }
+}
+
 function buildImagePrompt(
   persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
   userMessage: string,
@@ -465,6 +712,11 @@ Deno.serve(async (request) => {
     const nanoBananaApiKey = Deno.env.get("NANO_BANANA_API_KEY")
     const nanoBananaBaseUrl = (Deno.env.get("NANO_BANANA_BASE_URL") ?? "https://ccodezh.com/v1").replace(/\/$/, "")
     const nanoBananaModel = Deno.env.get("NANO_BANANA_MODEL") ?? "nano-banana"
+    const voiceApiKey = asString(Deno.env.get("VOICE_API_KEY")) || null
+    const voiceApiBaseUrl = (
+      Deno.env.get("VOICE_API_BASE_URL") ??
+      "https://uu36540-775678b2e148.bjb2.seetacloud.com:8443/api"
+    ).replace(/\/$/, "")
 
     if (!url || !serviceRoleKey || (!anthropicApiKey && !openaiApiKey)) {
       return Response.json(
@@ -641,6 +893,28 @@ Deno.serve(async (request) => {
         imageUrl = null
       }
     }
+    let audioUrl: string | null = null
+    let audioDuration: number | null = null
+    let voiceLabel: string | null = null
+    let audioOnly = false
+
+    const voicePlan = buildVoicePlan(persona, content, requestImage)
+    if (voicePlan.shouldGenerate) {
+      try {
+        const voiceReply = await synthesizeVoiceReply(
+          voiceApiBaseUrl,
+          voiceApiKey,
+          voicePlan,
+          content,
+        )
+        audioUrl = voiceReply.audioUrl
+        audioDuration = voiceReply.duration
+        voiceLabel = voiceReply.voiceLabel
+        audioOnly = true
+      } catch (error) {
+        console.error("Voice synthesis failed", error)
+      }
+    }
     const generatedAt = new Date().toISOString()
 
     return Response.json(
@@ -649,6 +923,10 @@ Deno.serve(async (request) => {
         personaId,
         content,
         imageUrl,
+        audioUrl,
+        audioDuration,
+        voiceLabel,
+        audioOnly,
         sourcePostIds: [...selected.map((row) => row.id), ...relevantNews.map((row) => row.id)],
         generatedAt,
       },

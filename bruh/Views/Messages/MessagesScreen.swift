@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import AVKit
 import SafariServices
 import SwiftUI
@@ -6,6 +7,7 @@ import SwiftData
 import UIKit
 
 struct MessagesScreen: View {
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     @Query(sort: [SortDescriptor(\PersonaMessage.createdAt, order: .reverse)]) private var recentMessages: [PersonaMessage]
     let threads: [MessageThread]
@@ -13,6 +15,7 @@ struct MessagesScreen: View {
     let service: MessageService
     let backgroundColor: Color
     @State private var searchText = ""
+    @State private var hasRequestedStarterRefresh = false
 
     private var visibleThreads: [MessageThread] {
         threads
@@ -69,6 +72,9 @@ struct MessagesScreen: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Image(systemName: "plus")
             }
+        }
+        .task {
+            await refreshStartersIfNeeded()
         }
     }
 
@@ -235,9 +241,25 @@ struct MessagesScreen: View {
     }
 
     private func messagePreview(for message: PersonaMessage) -> String {
+        if message.audioOnly,
+           let audioUrl = message.audioUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !audioUrl.isEmpty {
+            return "[Voice]"
+        }
+
         let trimmed = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard message.imageUrl != nil else { return trimmed }
         return trimmed.isEmpty ? "[图片]" : "[图片] \(trimmed)"
+    }
+
+    private func refreshStartersIfNeeded() async {
+        guard !hasRequestedStarterRefresh else { return }
+        guard !acceptedPersonaIds.isEmpty else { return }
+        hasRequestedStarterRefresh = true
+        await service.refreshStarterMessages(
+            modelContext: modelContext,
+            userInterests: CurrentUserProfileStore.selectedInterests(in: modelContext)
+        )
     }
 }
 
@@ -256,6 +278,7 @@ private struct MessageDetailView: View {
     @State private var errorMessage: String?
     @State private var selectedQuickReactions: [String: String] = [:]
     @StateObject private var webPreviewStore = OpenGraphPreviewStore()
+    @StateObject private var audioPlayback = MessageAudioPlaybackController()
     @State private var presentedSourceURL: URL?
     @State private var isPresentingSafari = false
     @State private var effectPlayer: AVPlayer?
@@ -304,6 +327,11 @@ private struct MessageDetailView: View {
                                 messageRow(for: message)
                                 .id(message.id)
                             }
+
+                            if isSending {
+                                waitingMessageRow
+                                    .id("pending-reply-indicator")
+                            }
                         }
                     }
                     .padding(.horizontal, 12)
@@ -316,11 +344,17 @@ private struct MessageDetailView: View {
                         }
                     }
                 }
+                .onChange(of: isSending) { _, sending in
+                    guard sending else { return }
+                    withAnimation {
+                        proxy.scrollTo("pending-reply-indicator", anchor: .bottom)
+                    }
+                }
             }
 
             VStack(spacing: 8) {
-                if let errorMessage {
-                    Text(errorMessage)
+                if let inlineErrorMessage {
+                    Text(inlineErrorMessage)
                         .font(.system(size: 12))
                         .foregroundStyle(.red)
                         .padding(.horizontal, 12)
@@ -400,20 +434,22 @@ private struct MessageDetailView: View {
             maybePlayEntryExcitedEffect()
         }
         .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { note in
-            guard let currentItem = effectPlayer?.currentItem,
-                  let endedItem = note.object as? AVPlayerItem,
-                  endedItem == currentItem else {
+            guard let endedItem = note.object as? AVPlayerItem else {
                 return
             }
 
-            isShowingExcitedEffect = false
-            effectPlayer?.pause()
-            effectPlayer = nil
+            if let currentItem = effectPlayer?.currentItem, endedItem == currentItem {
+                isShowingExcitedEffect = false
+                effectPlayer?.pause()
+                effectPlayer = nil
+                return
+            }
         }
         .onDisappear {
             effectPlayer?.pause()
             effectPlayer = nil
             isShowingExcitedEffect = false
+            cleanupAudioPlayer()
         }
     }
 
@@ -546,6 +582,52 @@ private struct MessageDetailView: View {
         }
     }
 
+    private var waitingMessageRow: some View {
+        HStack(alignment: .bottom, spacing: AppTheme.messageIncomingAvatarBubbleSpacing) {
+            incomingAvatar
+            TypingIndicatorBubble(themeColor: persona(for: thread.personaId).tint)
+            Spacer(minLength: 40)
+        }
+    }
+
+    private var inlineErrorMessage: String? {
+        if let errorMessage, !errorMessage.isEmpty {
+            return errorMessage
+        }
+        return audioPlayback.lastErrorMessage
+    }
+
+    private func resolvedVoiceLabel(for message: PersonaMessage) -> String {
+        let trimmed = message.voiceLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmed.isEmpty {
+            return trimmed
+        }
+
+        let name = persona(for: message.personaId).name
+        return name.hasSuffix("s") ? "\(name)' voice" : "\(name)'s voice"
+    }
+
+    private func resolveAudioDurationIfNeeded(
+        for messageId: String,
+        from url: URL,
+        existingDuration: TimeInterval?
+    ) async {
+        await audioPlayback.resolveDurationIfNeeded(
+            for: messageId,
+            from: url,
+            existingDuration: existingDuration
+        )
+    }
+
+    private func cleanupAudioPlayer(resetState: Bool = true) {
+        audioPlayback.cleanup(resetState: resetState)
+    }
+
+    private func toggleAudioPlayback(for messageId: String, url: URL) {
+        errorMessage = nil
+        audioPlayback.togglePlayback(for: messageId, url: url)
+    }
+
     private func messageRow(for message: PersonaMessage) -> some View {
         let content = parseContent(from: message)
         let personaTheme = persona(for: thread.personaId).tint
@@ -614,10 +696,12 @@ private struct MessageDetailView: View {
                 deliveryState: deliveryState,
                 themeColor: themeColor
             )
-        case .audio:
-            bubble(
-                text: "[Audio message coming soon]",
-                imageURL: nil,
+        case .audio(let url, let duration, let label, let messageId):
+            voiceMessageCard(
+                url: url,
+                duration: duration,
+                label: label,
+                messageId: messageId,
                 isIncoming: isIncoming,
                 deliveryState: deliveryState,
                 themeColor: themeColor
@@ -626,6 +710,17 @@ private struct MessageDetailView: View {
     }
 
     private func parseContent(from message: PersonaMessage) -> MessageContent {
+        if message.audioOnly,
+           let audioUrl = message.audioUrl.flatMap(URL.init(string:)) {
+            let resolvedDuration = audioPlayback.resolvedDurations[message.id] ?? message.audioDuration
+            return .audio(
+                audioUrl,
+                duration: resolvedDuration,
+                label: resolvedVoiceLabel(for: message),
+                messageId: message.id
+            )
+        }
+
         if let imageUrl = message.imageUrl.flatMap(URL.init(string:)) {
             return .text(message.text, imageUrl: imageUrl)
         }
@@ -718,6 +813,50 @@ private struct MessageDetailView: View {
                             .fill(AppTheme.outgoingBubbleBase)
                     }
                 }
+
+            if !isIncoming && deliveryState == "failed" {
+                Text("Failed to send")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private func voiceMessageCard(
+        url: URL,
+        duration: TimeInterval?,
+        label: String,
+        messageId: String,
+        isIncoming: Bool,
+        deliveryState: String,
+        themeColor: Color
+    ) -> some View {
+        let effectiveDuration = audioPlayback.resolvedDurations[messageId] ?? duration
+        let isActive = audioPlayback.activeMessageId == messageId
+        let progress = isActive ? audioPlayback.progress : 0
+        let isLoading = audioPlayback.loadingMessageId == messageId
+
+        return VStack(alignment: isIncoming ? .leading : .trailing, spacing: 4) {
+            Button {
+                toggleAudioPlayback(for: messageId, url: url)
+            } label: {
+                VoiceMessageBubbleView(
+                    themeColor: themeColor,
+                    isPlaying: isActive && audioPlayback.isPlaying,
+                    isLoading: isLoading,
+                    progress: progress,
+                    duration: effectiveDuration,
+                    label: label
+                )
+            }
+            .buttonStyle(.plain)
+            .task(id: messageId) {
+                await resolveAudioDurationIfNeeded(
+                    for: messageId,
+                    from: url,
+                    existingDuration: effectiveDuration
+                )
+            }
 
             if !isIncoming && deliveryState == "failed" {
                 Text("Failed to send")
@@ -911,7 +1050,467 @@ private struct MessageDetailView: View {
 private enum MessageContent {
     case text(String, imageUrl: URL?)
     case webPreview(URL)
-    case audio(duration: TimeInterval?)
+    case audio(URL, duration: TimeInterval?, label: String, messageId: String)
+}
+
+private struct TypingIndicatorBubble: View {
+    let themeColor: Color
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 0.34)) { context in
+            let phase = Int(context.date.timeIntervalSinceReferenceDate / 0.34) % 3
+
+            HStack(spacing: 7) {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .fill(Color.black.opacity(phase == index ? 0.34 : 0.16))
+                        .frame(width: 8, height: 8)
+                        .scaleEffect(phase == index ? 1.08 : 0.92)
+                        .animation(.easeInOut(duration: 0.22), value: phase)
+                }
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .background {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(themeColor)
+                    .offset(x: -3, y: 0)
+
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(AppTheme.messageBubbleBase)
+            }
+        }
+    }
+}
+
+private struct VoiceMessageBubbleView: View {
+    let themeColor: Color
+    let isPlaying: Bool
+    let isLoading: Bool
+    let progress: Double
+    let duration: TimeInterval?
+    let label: String
+
+    private let waveformHeights: [CGFloat] = [10, 15, 21, 13, 19, 25, 15, 11, 18, 24, 16, 12, 20, 27, 17, 12, 18]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(themeColor.opacity(0.18))
+                        .frame(width: 42, height: 42)
+
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .tint(themeColor)
+                            .scaleEffect(0.75)
+                    } else {
+                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(themeColor)
+                            .offset(x: isPlaying ? 0 : 1)
+                    }
+                }
+
+                HStack(alignment: .center, spacing: 4) {
+                    ForEach(Array(waveformHeights.enumerated()), id: \.offset) { index, height in
+                        Capsule()
+                            .fill(barColor(for: index))
+                            .frame(width: 4, height: height)
+                    }
+                }
+
+                Text(durationText)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.black.opacity(0.42))
+                    .monospacedDigit()
+            }
+
+            HStack(spacing: 4) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(themeColor.opacity(0.82))
+
+                Text("voice · \(label)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.94))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(themeColor.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: themeColor.opacity(0.08), radius: 8, y: 4)
+    }
+
+    private func barColor(for index: Int) -> Color {
+        let activeBars = max(Int(round(progress * Double(waveformHeights.count))), isPlaying || isLoading ? 1 : 6)
+        if index < activeBars {
+            return themeColor.opacity(isPlaying ? 0.92 : (isLoading ? 0.74 : 0.62))
+        }
+        return Color.black.opacity(0.14)
+    }
+
+    private var durationText: String {
+        guard let duration, duration > 0, duration.isFinite else { return "0:00" }
+        let totalSeconds = Int(duration.rounded())
+        return String(format: "%d:%02d", totalSeconds / 60, totalSeconds % 60)
+    }
+}
+
+@MainActor
+private final class MessageAudioPlaybackController: NSObject, ObservableObject, @preconcurrency AVAudioPlayerDelegate {
+    @Published private(set) var activeMessageId: String?
+    @Published private(set) var progress = 0.0
+    @Published private(set) var isPlaying = false
+    @Published private(set) var loadingMessageId: String?
+    @Published private(set) var lastErrorMessage: String?
+    @Published private(set) var resolvedDurations: [String: TimeInterval] = [:]
+
+    private var player: AVAudioPlayer?
+    private var prepareTask: Task<Void, Never>?
+    private var progressTimer: Timer?
+
+    func resolveDurationIfNeeded(
+        for messageId: String,
+        from url: URL,
+        existingDuration: TimeInterval?
+    ) async {
+        if let existingDuration, existingDuration > 0 {
+            resolvedDurations[messageId] = existingDuration
+            return
+        }
+
+        if let cachedDuration = resolvedDurations[messageId], cachedDuration > 0 {
+            return
+        }
+
+        do {
+            let payload = try await playbackPayload(for: messageId, remoteURL: url)
+            let duration = try playableDuration(from: payload)
+            guard duration.isFinite, duration > 0 else { return }
+            resolvedDurations[messageId] = duration
+        } catch {
+            return
+        }
+    }
+
+    func togglePlayback(for messageId: String, url: URL) {
+        if loadingMessageId == messageId {
+            prepareTask?.cancel()
+            cleanup()
+            return
+        }
+
+        if activeMessageId == messageId, let player {
+            if isPlaying {
+                player.pause()
+                stopProgressTimer()
+                isPlaying = false
+            } else {
+                if player.play() {
+                    startProgressTimer()
+                    isPlaying = true
+                } else {
+                    failPlayback("Voice playback failed to start.")
+                }
+            }
+            return
+        }
+
+        cleanup(resetState: false)
+        activeMessageId = messageId
+        loadingMessageId = messageId
+        progress = 0
+        isPlaying = false
+        lastErrorMessage = nil
+
+        prepareTask = Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                try configureAudioSession()
+                print("[Voice] Preparing playback for \(messageId)")
+                let player = try await preparePlayer(for: messageId, remoteURL: url)
+                guard !Task.isCancelled else { return }
+
+                self.player = player
+                self.loadingMessageId = nil
+                self.resolvedDurations[messageId] = player.duration
+
+                if player.play() {
+                    print("[Voice] Started playback for \(messageId) (\(player.duration)s)")
+                    self.isPlaying = true
+                    self.startProgressTimer()
+                } else {
+                    self.failPlayback("Voice playback failed to start.")
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                print("[Voice] Playback failed for \(messageId): \(error.localizedDescription)")
+                self.failPlayback(userFacingErrorMessage(for: error))
+            }
+        }
+    }
+
+    func cleanup(resetState: Bool = true) {
+        prepareTask?.cancel()
+        prepareTask = nil
+
+        stopProgressTimer()
+        player?.pause()
+        player = nil
+
+        if resetState {
+            activeMessageId = nil
+            progress = 0
+            isPlaying = false
+            loadingMessageId = nil
+            lastErrorMessage = nil
+        } else {
+            isPlaying = false
+            loadingMessageId = nil
+        }
+    }
+
+    deinit {
+        prepareTask?.cancel()
+    }
+
+    private func configureAudioSession() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playback, mode: .default, options: [])
+        try session.setActive(true)
+    }
+
+    private func preparePlayer(for messageId: String, remoteURL: URL) async throws -> AVAudioPlayer {
+        do {
+            let payload = try await playbackPayload(for: messageId, remoteURL: remoteURL)
+            return try makePlayer(from: payload)
+        } catch {
+            print("[Voice] Retrying fresh download for \(messageId)")
+            let payload = try await playbackPayload(for: messageId, remoteURL: remoteURL, forceRedownload: true)
+            return try makePlayer(from: payload)
+        }
+    }
+
+    private func makePlayer(from payload: CachedVoicePayload) throws -> AVAudioPlayer {
+        let player = try AVAudioPlayer(data: payload.data, fileTypeHint: payload.fileTypeHint)
+        player.delegate = self
+        player.volume = 1
+        player.prepareToPlay()
+
+        guard player.duration.isFinite, player.duration > 0.05 else {
+            throw VoicePlaybackError.invalidAudioData
+        }
+
+        return player
+    }
+
+    private func playableDuration(from payload: CachedVoicePayload) throws -> TimeInterval {
+        let player = try AVAudioPlayer(data: payload.data, fileTypeHint: payload.fileTypeHint)
+        let duration = player.duration
+        guard duration.isFinite, duration > 0.05 else {
+            throw VoicePlaybackError.invalidAudioData
+        }
+        return duration
+    }
+
+    private func playbackPayload(
+        for messageId: String,
+        remoteURL: URL,
+        forceRedownload: Bool = false
+    ) async throws -> CachedVoicePayload {
+        let cacheDirectory = try voiceCacheDirectory()
+        let fileExtension = remoteURL.pathExtension.isEmpty ? "wav" : remoteURL.pathExtension.lowercased()
+        let localURL = cacheDirectory.appendingPathComponent("\(messageId).\(fileExtension)")
+        let fileManager = FileManager.default
+
+        if forceRedownload, fileManager.fileExists(atPath: localURL.path) {
+            try? fileManager.removeItem(at: localURL)
+        }
+
+        if !forceRedownload,
+           fileManager.fileExists(atPath: localURL.path) {
+            let cachedData = try Data(contentsOf: localURL)
+            let cachedPayload = CachedVoicePayload(
+                data: cachedData,
+                fileTypeHint: audioFileTypeHint(mimeType: nil, remoteURL: remoteURL, data: cachedData),
+                localURL: localURL
+            )
+
+            if isLikelyPlayableAudio(cachedPayload.data, mimeType: nil) {
+                return cachedPayload
+            }
+
+            try? fileManager.removeItem(at: localURL)
+        }
+
+        var request = URLRequest(url: remoteURL)
+        request.timeoutInterval = 30
+        request.setValue("audio/*", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw VoicePlaybackError.invalidResponse
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw VoicePlaybackError.httpStatus(httpResponse.statusCode)
+        }
+
+        let mimeType = httpResponse.mimeType?.lowercased()
+        guard isLikelyPlayableAudio(data, mimeType: mimeType) else {
+            throw VoicePlaybackError.invalidAudioData
+        }
+
+        try data.write(to: localURL, options: .atomic)
+        return CachedVoicePayload(
+            data: data,
+            fileTypeHint: audioFileTypeHint(mimeType: mimeType, remoteURL: remoteURL, data: data),
+            localURL: localURL
+        )
+    }
+
+    private func voiceCacheDirectory() throws -> URL {
+        let baseDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let directory = baseDirectory.appendingPathComponent("VoiceMessages", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    private func startProgressTimer() {
+        stopProgressTimer()
+
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, let player = self.player else { return }
+                let duration = player.duration
+                guard duration.isFinite, duration > 0 else { return }
+                self.progress = min(max(player.currentTime / duration, 0), 1)
+            }
+        }
+    }
+
+    private func stopProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = nil
+    }
+
+    private func failPlayback(_ message: String) {
+        cleanup(resetState: false)
+        lastErrorMessage = message
+    }
+
+    private func userFacingErrorMessage(for error: Error) -> String {
+        if let voiceError = error as? VoicePlaybackError {
+            return voiceError.message
+        }
+        return "Voice playback failed. Try tapping again."
+    }
+
+    private func isLikelyPlayableAudio(_ data: Data, mimeType: String?) -> Bool {
+        guard data.count > 256 else { return false }
+
+        if let mimeType, mimeType.hasPrefix("audio/") {
+            return true
+        }
+
+        if data.starts(with: [0x52, 0x49, 0x46, 0x46]), data.count > 12 {
+            let waveHeader = Data([0x57, 0x41, 0x56, 0x45])
+            return data.subdata(in: 8..<12) == waveHeader
+        }
+
+        if data.starts(with: [0x49, 0x44, 0x33]) {
+            return true
+        }
+
+        if let firstByte = data.first, firstByte == 0xFF {
+            return true
+        }
+
+        return false
+    }
+
+    private func audioFileTypeHint(mimeType: String?, remoteURL: URL, data: Data) -> String? {
+        if let mimeType {
+            switch mimeType {
+            case "audio/wav", "audio/wave", "audio/x-wav":
+                return AVFileType.wav.rawValue
+            case "audio/mpeg", "audio/mp3":
+                return AVFileType.mp3.rawValue
+            case "audio/mp4", "audio/x-m4a", "audio/m4a":
+                return AVFileType.m4a.rawValue
+            default:
+                break
+            }
+        }
+
+        let fileExtension = remoteURL.pathExtension.lowercased()
+        switch fileExtension {
+        case "wav":
+            return AVFileType.wav.rawValue
+        case "mp3":
+            return AVFileType.mp3.rawValue
+        case "m4a", "mp4":
+            return AVFileType.m4a.rawValue
+        default:
+            break
+        }
+
+        if data.starts(with: [0x52, 0x49, 0x46, 0x46]), data.count > 12 {
+            return AVFileType.wav.rawValue
+        }
+        if data.starts(with: [0x49, 0x44, 0x33]) || data.first == 0xFF {
+            return AVFileType.mp3.rawValue
+        }
+
+        return nil
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        stopProgressTimer()
+        self.player = nil
+        progress = 0
+        isPlaying = false
+        loadingMessageId = nil
+    }
+
+    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        failPlayback(error?.localizedDescription ?? "Voice playback failed to decode.")
+    }
+}
+
+private struct CachedVoicePayload {
+    let data: Data
+    let fileTypeHint: String?
+    let localURL: URL
+}
+
+private enum VoicePlaybackError: Error {
+    case invalidResponse
+    case httpStatus(Int)
+    case invalidAudioData
+
+    var message: String {
+        switch self {
+        case .invalidResponse:
+            return "Voice service returned an invalid response."
+        case .httpStatus(let statusCode):
+            return "Voice file request failed (\(statusCode))."
+        case .invalidAudioData:
+            return "Voice file is invalid or empty."
+        }
+    }
 }
 
 private struct WebPreviewCardData {

@@ -71,8 +71,52 @@ type ToolPayload = {
   }>
 }
 
+type SanitizedInteractionResult = {
+  postId: string
+  likes: Array<{
+    id: string
+    postId: string
+    authorId: string
+    authorDisplayName: string
+    reasonCode: string
+    createdAt: string
+  }>
+  comments: Array<{
+    id: string
+    postId: string
+    authorId: string
+    authorDisplayName: string
+    content: string
+    reasonCode: string
+    inReplyToCommentId: string | null
+    isViewer: boolean
+    createdAt: string
+  }>
+  generatedAt: string
+  metadata: {
+    usedAuthorFallback: boolean
+    generatedCommentCount: number
+    generatedLikeCount: number
+  }
+}
+
+const MAX_GENERATION_RETRIES = 3
+
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
+}
+
+function logGenerationEvent(event: string, details: Record<string, unknown>) {
+  console.log(JSON.stringify({
+    scope: "generate-post-interactions",
+    event,
+    ...details,
+    loggedAt: new Date().toISOString(),
+  }))
+}
+
+async function delay(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function keywordOverlapScore(text: string, keywords: string[]): number {
@@ -270,18 +314,91 @@ function cleanGeneratedText(text: string): string {
     .trim()
 }
 
+function isLowSignalViewerComment(viewerComment: string): boolean {
+  const normalized = viewerComment.trim().toLowerCase()
+  if (normalized.length <= 4) {
+    return true
+  }
+
+  return [
+    /^h+i+$/i,
+    /^hello$/i,
+    /^hey$/i,
+    /^yo$/i,
+    /^ok(ay)?$/i,
+    /^cool$/i,
+    /^nice$/i,
+    /^wow$/i,
+    /^lol$/i,
+    /^哈+$/i,
+    /^哈哈+$/i,
+    /^嗯+$/i,
+    /^哦+$/i,
+    /^在吗$/i,
+  ].some((pattern) => pattern.test(normalized))
+}
+
+function isLikelyEnglishText(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  if (/[\u4e00-\u9fff]/.test(trimmed)) return false
+  return /[a-z]/i.test(trimmed)
+}
+
+function modernReplyFallback(targetId: string, viewerComment: string): string {
+  const lowSignal = isLowSignalViewerComment(viewerComment)
+  const english = isLikelyEnglishText(viewerComment)
+
+  switch (targetId) {
+    case "musk":
+      if (english) {
+        return lowSignal ? "Just say what you want to say." : "I saw it. Say what you actually want to ask."
+      }
+      return lowSignal ? "直接说重点。" : "我看到了，直接说你想追问哪一点。"
+    case "trump":
+      if (english) {
+        return lowSignal ? "Say it clearly." : "I saw it. Say what you actually think."
+      }
+      return lowSignal ? "直接说重点。" : "我看到了，直接说你的看法。"
+    case "zuckerberg":
+      if (english) {
+        return lowSignal ? "Be a little more specific." : "I saw it. Be a little more specific."
+      }
+      return lowSignal ? "说具体一点，我更容易接住。" : "我看到了，讲具体一点会更有讨论价值。"
+    default:
+      if (english) {
+        return lowSignal ? "Say a little more." : "I saw it. Say what you want to discuss."
+      }
+      return lowSignal ? "说具体一点，我直接回你。" : "我看到了，直接说你想讨论哪一点。"
+  }
+}
+
+function normalizeLegacyFallbackComment(authorId: string, content: string): string {
+  const trimmed = content.trim()
+  switch (authorId) {
+    case "musk":
+      if (trimmed === "政治也是现实的一部分。看现场就知道，大家会自己判断。") {
+        return modernReplyFallback(authorId, "hi")
+      }
+      return trimmed
+    case "trump":
+      if (trimmed === "当然是真心的。现场的能量非常强，很多人都看到了。") {
+        return modernReplyFallback(authorId, "hi")
+      }
+      return trimmed
+    case "zuckerberg":
+      if (trimmed === "这确实会被政治化，但现场反馈本身也是很真实的信号。") {
+        return modernReplyFallback(authorId, "hi")
+      }
+      return trimmed
+    default:
+      return trimmed
+  }
+}
+
 function templatedFallbackComment(targetId: string, authorDisplayName: string, viewerComment: string): string {
   if (viewerComment) {
-    switch (targetId) {
-      case "musk":
-        return "政治也是现实的一部分。看现场就知道，大家会自己判断。"
-      case "trump":
-        return "当然是真心的。现场的能量非常强，很多人都看到了。"
-      case "zuckerberg":
-        return "这确实会被政治化，但现场反馈本身也是很真实的信号。"
-      default:
-        return "我会直接回应这条评论，不绕弯子。"
-    }
+    return modernReplyFallback(targetId, viewerComment)
   }
 
   switch (targetId) {
@@ -379,7 +496,7 @@ async function generateInteractionsWithFallback(
   viewerComment: string,
   allowedLikes: RankedContact[],
   allowedCommenters: RankedContact[],
-) {
+): Promise<SanitizedInteractionResult> {
   const author = resolvePersonaProfile(authorId)
 
   const generatedAt = new Date().toISOString()
@@ -423,6 +540,8 @@ async function generateInteractionsWithFallback(
       "Maximum: 2 short sentences.",
       "No bullet points. No hashtags. No explanations about being an AI.",
       "Mirror the language of the post thread.",
+      "Do not pivot to politics or any new topic unless the viewer comment or post clearly brings it up.",
+      "If the viewer comment is only a greeting or very short, reply with a brief natural nudge in character.",
     ].join(" ")
 
     const prompt = viewerComment
@@ -432,6 +551,7 @@ async function generateInteractionsWithFallback(
           `Your original post: ${postContent}`,
           `Viewer comment: ${viewerComment}`,
           `Thread so far: ${existingComments.map((comment) => `${comment.authorDisplayName}: ${comment.content}`).join(" | ") || "none"}`,
+          "Keep the reply anchored to the viewer comment. Do not invent a new subject.",
           `React directly and stay in character. Why you care: ${reason}.`,
         ].join("\n")
         : [
@@ -449,10 +569,47 @@ async function generateInteractionsWithFallback(
       ].join("\n")
 
     let content = ""
-    try {
-      content = await generateTextWithOpenAICompatible(apiKey, baseUrl, model, system, prompt)
-    } catch {
+    let lastError: string | null = null
+    for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES; attempt += 1) {
+      try {
+        content = await generateTextWithOpenAICompatible(apiKey, baseUrl, model, system, prompt)
+        logGenerationEvent("openai_comment_success", {
+          postId,
+          authorId,
+          targetId,
+          mode: viewerComment ? "reply" : "seed",
+          attempt,
+          provider: "openai_compatible",
+        })
+        break
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error)
+        logGenerationEvent("openai_comment_failure", {
+          postId,
+          authorId,
+          targetId,
+          mode: viewerComment ? "reply" : "seed",
+          attempt,
+          provider: "openai_compatible",
+          error: lastError,
+        })
+        if (attempt < MAX_GENERATION_RETRIES) {
+          await delay(200 * attempt)
+        }
+      }
+    }
+
+    if (!content) {
       content = templatedFallbackComment(targetId, author.displayName, viewerComment)
+      logGenerationEvent("openai_comment_fallback", {
+        postId,
+        authorId,
+        targetId,
+        mode: viewerComment ? "reply" : "seed",
+        provider: "openai_compatible",
+        retries: MAX_GENERATION_RETRIES,
+        error: lastError,
+      })
     }
 
     comments.push({
@@ -473,6 +630,11 @@ async function generateInteractionsWithFallback(
     likes,
     comments,
     generatedAt,
+    metadata: {
+      usedAuthorFallback: false,
+      generatedCommentCount: comments.length,
+      generatedLikeCount: likes.length,
+    },
   }
 }
 
@@ -539,6 +701,8 @@ async function generateInteractionsWithClaude(
         "Keep comments concise and social: usually 1 sentence, max 2 short sentences.",
         "Stay faithful to each persona's speaking style and worldview.",
         "If mode is reply, the post author must reply directly to the viewer comment.",
+        "If mode is reply, keep the reply anchored to the viewer comment and do not invent a new topic.",
+        "If the viewer comment is just a greeting or very short, answer with a short nudge in character.",
         "If mode is seed, only non-author contacts can comment.",
         "Return the result only through the tool call.",
       ].join(" "),
@@ -633,7 +797,7 @@ function sanitizeGeneratedPayload(
   allowedLikes: RankedContact[],
   allowedCommenters: RankedContact[],
   existingComments: ExistingComment[],
-) {
+): SanitizedInteractionResult {
   const mode = viewerComment ? "reply" : "seed"
   const allowedLikeIds = new Set(allowedLikes.map((contact) => contact.id))
   const allowedCommentIds = new Set(allowedCommenters.map((contact) => contact.id))
@@ -681,7 +845,8 @@ function sanitizeGeneratedPayload(
     }))
 
   if (mode === "reply") {
-    const authorReply = comments.find((item) => item.authorId === authorId) ?? {
+    const generatedAuthorReply = comments.find((item) => item.authorId === authorId) ?? null
+    const authorReply = generatedAuthorReply ?? {
       id: `comment-${postId}-${authorId}-${crypto.randomUUID()}`,
       postId,
       authorId,
@@ -699,6 +864,11 @@ function sanitizeGeneratedPayload(
       likes: [],
       comments: followUp ? [authorReply, followUp] : [authorReply],
       generatedAt,
+      metadata: {
+        usedAuthorFallback: generatedAuthorReply === null,
+        generatedCommentCount: comments.length,
+        generatedLikeCount: likes.length,
+      },
     }
   }
 
@@ -707,7 +877,30 @@ function sanitizeGeneratedPayload(
     likes: mode === "seed" ? likes : [],
     comments,
     generatedAt,
+    metadata: {
+      usedAuthorFallback: false,
+      generatedCommentCount: comments.length,
+      generatedLikeCount: likes.length,
+    },
   }
+}
+
+function shouldAcceptSanitizedResult(
+  result: SanitizedInteractionResult,
+  authorId: string,
+  viewerComment: string,
+  allowedCommenters: RankedContact[],
+): boolean {
+  if (viewerComment) {
+    const hasAuthorReply = result.comments.some((item) => item.authorId === authorId)
+    return hasAuthorReply && !result.metadata.usedAuthorFallback
+  }
+
+  if (allowedCommenters.length === 0) {
+    return true
+  }
+
+  return result.comments.length > 0 || result.likes.length > 0
 }
 
 function mapStoredState(postId: string, likes: StoredLikeRow[], comments: StoredCommentRow[]) {
@@ -726,7 +919,7 @@ function mapStoredState(postId: string, likes: StoredLikeRow[], comments: Stored
       postId: item.post_id,
       authorId: item.author_id,
       authorDisplayName: item.author_display_name,
-      content: item.content,
+      content: normalizeLegacyFallbackComment(item.author_id, item.content),
       reasonCode: item.reason_code,
       inReplyToCommentId: item.in_reply_to_comment_id,
       isViewer: item.author_type === "viewer",
@@ -741,7 +934,7 @@ function normalizeStoredComments(rows: StoredCommentRow[]): ExistingComment[] {
     id: row.id,
     authorId: row.author_id,
     authorDisplayName: row.author_display_name,
-    content: row.content,
+    content: normalizeLegacyFallbackComment(row.author_id, row.content),
     isViewer: row.author_type === "viewer",
     inReplyToCommentId: row.in_reply_to_comment_id,
   }))
@@ -928,31 +1121,66 @@ Deno.serve(async (request) => {
         return Response.json(mapStoredState(postId, stored.likes, stored.comments), { headers: corsHeaders })
       }
 
-      let generated
+      let generated: SanitizedInteractionResult | null = null
       if (anthropicApiKey) {
-        try {
-          generated = sanitizeGeneratedPayload(
-            await generateInteractionsWithClaude(
-              anthropicApiKey,
-              anthropicBaseUrl,
-              anthropicModel,
+        for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES; attempt += 1) {
+          try {
+            const candidate = sanitizeGeneratedPayload(
+              await generateInteractionsWithClaude(
+                anthropicApiKey,
+                anthropicBaseUrl,
+                anthropicModel,
+                personaId,
+                postContent,
+                topic,
+                [],
+                "",
+                allowedLikes,
+                allowedCommenters,
+              ),
+              postId,
               personaId,
-              postContent,
-              topic,
-              [],
               "",
               allowedLikes,
               allowedCommenters,
-            ),
-            postId,
-            personaId,
-            "",
-            allowedLikes,
-            allowedCommenters,
-            [],
-          )
-        } catch {
-          generated = null
+              [],
+            )
+
+            if (shouldAcceptSanitizedResult(candidate, personaId, "", allowedCommenters)) {
+              generated = candidate
+              logGenerationEvent("anthropic_seed_success", {
+                postId,
+                personaId,
+                attempt,
+                provider: "anthropic",
+                generatedCommentCount: candidate.metadata.generatedCommentCount,
+                generatedLikeCount: candidate.metadata.generatedLikeCount,
+              })
+              break
+            }
+
+            logGenerationEvent("anthropic_seed_rejected", {
+              postId,
+              personaId,
+              attempt,
+              provider: "anthropic",
+              generatedCommentCount: candidate.metadata.generatedCommentCount,
+              generatedLikeCount: candidate.metadata.generatedLikeCount,
+              usedAuthorFallback: candidate.metadata.usedAuthorFallback,
+            })
+          } catch (error) {
+            logGenerationEvent("anthropic_seed_failure", {
+              postId,
+              personaId,
+              attempt,
+              provider: "anthropic",
+              error: error instanceof Error ? error.message : String(error),
+            })
+          }
+
+          if (attempt < MAX_GENERATION_RETRIES) {
+            await delay(200 * attempt)
+          }
         }
       }
 
@@ -973,6 +1201,12 @@ Deno.serve(async (request) => {
           allowedLikes,
           allowedCommenters,
         )
+        logGenerationEvent("seed_provider_fallback", {
+          postId,
+          personaId,
+          provider: "openai_compatible",
+          reason: "anthropic_unavailable_or_rejected",
+        })
       }
 
       await persistLikes(supabase, generated.likes)
@@ -1014,31 +1248,65 @@ Deno.serve(async (request) => {
     const ranked = rankContacts(personaId, postContent, topic, existingComments, viewerComment)
     const allowedCommenters = pickReplyParticipants(personaId, ranked, viewerComment)
 
-    let replyResult
+    let replyResult: SanitizedInteractionResult | null = null
     if (anthropicApiKey) {
-      try {
-        replyResult = sanitizeGeneratedPayload(
-          await generateInteractionsWithClaude(
-            anthropicApiKey,
-            anthropicBaseUrl,
-            anthropicModel,
+      for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES; attempt += 1) {
+        try {
+          const candidate = sanitizeGeneratedPayload(
+            await generateInteractionsWithClaude(
+              anthropicApiKey,
+              anthropicBaseUrl,
+              anthropicModel,
+              personaId,
+              postContent,
+              topic,
+              existingComments,
+              viewerComment,
+              [],
+              allowedCommenters,
+            ),
+            postId,
             personaId,
-            postContent,
-            topic,
-            existingComments,
             viewerComment,
             [],
             allowedCommenters,
-          ),
-          postId,
-          personaId,
-          viewerComment,
-          [],
-          allowedCommenters,
-          existingComments,
-        )
-      } catch {
-        replyResult = null
+            existingComments,
+          )
+
+          if (shouldAcceptSanitizedResult(candidate, personaId, viewerComment, allowedCommenters)) {
+            replyResult = candidate
+            logGenerationEvent("anthropic_reply_success", {
+              postId,
+              personaId,
+              attempt,
+              provider: "anthropic",
+              generatedCommentCount: candidate.metadata.generatedCommentCount,
+              usedAuthorFallback: candidate.metadata.usedAuthorFallback,
+            })
+            break
+          }
+
+          logGenerationEvent("anthropic_reply_rejected", {
+            postId,
+            personaId,
+            attempt,
+            provider: "anthropic",
+            generatedCommentCount: candidate.metadata.generatedCommentCount,
+            usedAuthorFallback: candidate.metadata.usedAuthorFallback,
+          })
+        } catch (error) {
+          logGenerationEvent("anthropic_reply_failure", {
+            postId,
+            personaId,
+            attempt,
+            provider: "anthropic",
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+
+        if (attempt < MAX_GENERATION_RETRIES) {
+          await delay(200 * attempt)
+        }
       }
     }
 
@@ -1059,6 +1327,12 @@ Deno.serve(async (request) => {
         [],
         allowedCommenters,
       )
+      logGenerationEvent("reply_provider_fallback", {
+        postId,
+        personaId,
+        provider: "openai_compatible",
+        reason: "anthropic_unavailable_or_rejected",
+      })
     }
 
     await persistComments(

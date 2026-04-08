@@ -27,14 +27,19 @@ actor APIClient {
     ) {
         self.baseURL = baseURL
         self.anonKey = anonKey
-        self.session = URLSession(configuration: .default)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        self.session = URLSession(configuration: configuration)
     }
 
     /// Fetch posts newer than `since` (ISO8601).
     func fetchFeed(since: Date? = nil, limit: Int = 20) async throws -> [PostDTO] {
         var components = URLComponents(string: "\(baseURL)/feed")!
         var queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "limit", value: "\(limit)")
+            URLQueryItem(name: "limit", value: "\(limit)"),
+            // Avoid stale timeline payloads from URLSession/HTTP caches for feed refresh.
+            URLQueryItem(name: "_ts", value: "\(Int(Date().timeIntervalSince1970))")
         ]
         if let since {
             let iso = ISO8601DateFormatter()
@@ -45,8 +50,11 @@ actor APIClient {
         guard let url = components.url else { throw NetworkError.invalidURL }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("no-cache", forHTTPHeaderField: "Pragma")
 
         let (data, response) = try await session.data(for: request)
 
@@ -209,6 +217,10 @@ struct MessageReplyDTO: Codable, Identifiable {
     let personaId: String
     let content: String
     let imageUrl: String?
+    let audioUrl: String?
+    let audioDuration: TimeInterval?
+    let voiceLabel: String?
+    let audioOnly: Bool?
     let sourcePostIds: [String]
     let generatedAt: Date
 }

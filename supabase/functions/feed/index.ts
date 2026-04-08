@@ -1,6 +1,13 @@
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 
+const feedResponseHeaders = {
+  ...corsHeaders,
+  "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+  Pragma: "no-cache",
+  Expires: "0",
+}
+
 type FeedRow = {
   id: string
   persona_id: string
@@ -62,7 +69,7 @@ function mapFeed(rows: FeedRow[]) {
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
+    return new Response("ok", { headers: feedResponseHeaders })
   }
 
   try {
@@ -72,7 +79,7 @@ Deno.serve(async (request) => {
     if (!url || !serviceRoleKey) {
       return Response.json(
         { error: "Missing Supabase environment variables" },
-        { status: 500, headers: corsHeaders },
+        { status: 500, headers: feedResponseHeaders },
       )
     }
 
@@ -87,7 +94,7 @@ Deno.serve(async (request) => {
       if (Number.isNaN(sinceDate.getTime())) {
         return Response.json(
           { error: "Invalid since parameter" },
-          { status: 400, headers: corsHeaders },
+          { status: 400, headers: feedResponseHeaders },
         )
       }
     }
@@ -107,12 +114,12 @@ Deno.serve(async (request) => {
     if (feedError && !feedError.message.includes("feed_items")) {
       return Response.json(
         { error: feedError.message },
-        { status: 500, headers: corsHeaders },
+        { status: 500, headers: feedResponseHeaders },
       )
     }
 
     if ((feedItems?.length ?? 0) > 0) {
-      return Response.json(mapFeed((feedItems ?? []) as FeedRow[]), { headers: corsHeaders })
+      return Response.json(mapFeed((feedItems ?? []) as FeedRow[]), { headers: feedResponseHeaders })
     }
 
     let sourceQuery = supabase
@@ -130,15 +137,15 @@ Deno.serve(async (request) => {
     if (sourceError) {
       return Response.json(
         { error: sourceError.message },
-        { status: 500, headers: corsHeaders },
+        { status: 500, headers: feedResponseHeaders },
       )
     }
 
-    return Response.json(mapFeed((sourcePosts ?? []) as FeedRow[]), { headers: corsHeaders })
+    return Response.json(mapFeed((sourcePosts ?? []) as FeedRow[]), { headers: feedResponseHeaders })
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: feedResponseHeaders },
     )
   }
 })
