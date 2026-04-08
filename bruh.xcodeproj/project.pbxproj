@@ -33,6 +33,9 @@
 		A10000180000000000000018 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000180000000000000018 /* AppTheme.swift */; };
 		A10000190000000000000019 /* AppBackIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000190000000000000019 /* AppBackIcon.swift */; };
 		A100001A000000000000001A /* SwipeBackGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001A000000000000001A /* SwipeBackGesture.swift */; };
+		A100001B000000000000001B /* NewBruhView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001B000000000000001B /* NewBruhView.swift */; };
+		A100001C000000000000001C /* Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001C000000000000001C /* Onboarding.swift */; };
+		A100001D000000000000001D /* trump_joy.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = B100001D000000000000001D /* trump_joy.mp4 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -62,6 +65,9 @@
 		B10000180000000000000018 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		B10000190000000000000019 /* AppBackIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackIcon.swift; sourceTree = "<group>"; };
 		B100001A000000000000001A /* SwipeBackGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeBackGesture.swift; sourceTree = "<group>"; };
+		B100001B000000000000001B /* NewBruhView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewBruhView.swift; sourceTree = "<group>"; };
+		B100001C000000000000001C /* Onboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Onboarding.swift; sourceTree = "<group>"; };
+		B100001D000000000000001D /* trump_joy.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = trump_joy.mp4; sourceTree = SOURCE_ROOT; };
 		C1000001000000000000001 /* bruh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bruh.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -95,6 +101,7 @@
 				E1000006000000000000006 /* Networking */,
 				B100000C00000000000000C /* Assets.xcassets */,
 				B100000F00000000000000F /* LaunchScreen.storyboard */,
+				B100001D000000000000001D /* trump_joy.mp4 */,
 			);
 			path = bruh;
 			sourceTree = "<group>";
@@ -118,10 +125,12 @@
 		E1000004000000000000004 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				E100000C00000000000000C /* Contacts */,
 				E1000007000000000000007 /* Feed */,
 				E1000008000000000000008 /* Components */,
 				E1000009000000000000009 /* Home */,
 				E100000B00000000000000B /* Messages */,
+				E100000D00000000000000D /* Onboarding */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -189,6 +198,22 @@
 			path = Messages;
 			sourceTree = "<group>";
 		};
+		E100000C00000000000000C /* Contacts */ = {
+			isa = PBXGroup;
+			children = (
+				B100001B000000000000001B /* NewBruhView.swift */,
+			);
+			path = Contacts;
+			sourceTree = "<group>";
+		};
+		E100000D00000000000000D /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				B100001C000000000000001C /* Onboarding.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -249,6 +274,7 @@
 			files = (
 				A100000C00000000000000C /* Assets.xcassets in Resources */,
 				A100000F00000000000000F /* LaunchScreen.storyboard in Resources */,
+				A100001D000000000000001D /* trump_joy.mp4 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -273,6 +299,8 @@
 				A1000007000000000000007 /* FeedView.swift in Sources */,
 				A1000008000000000000008 /* FeedCard.swift in Sources */,
 				A10000170000000000000017 /* MessagesScreen.swift in Sources */,
+				A100001B000000000000001B /* NewBruhView.swift in Sources */,
+				A100001C000000000000001C /* Onboarding.swift in Sources */,
 				A10000180000000000000018 /* AppTheme.swift in Sources */,
 				A10000190000000000000019 /* AppBackIcon.swift in Sources */,
 				A1000009000000000000009 /* PersonaAvatar.swift in Sources */,

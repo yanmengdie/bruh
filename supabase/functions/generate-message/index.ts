@@ -2,7 +2,12 @@ import { createClient } from "jsr:@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 import { topNewsSummaryBlock } from "../_shared/news.ts"
 import { resolvePersonaById } from "../_shared/personas.ts"
-import { personaFewShotExamples, personaImageStyle, personaRolePrompt } from "../_shared/persona_skills.ts"
+import {
+  personaDistilledChatPrompt,
+  personaFewShotExamples,
+  personaImageStyle,
+  personaRolePrompt,
+} from "../_shared/persona_skills.ts"
 
 type ConversationTurn = {
   role: string
@@ -88,6 +93,7 @@ function buildSystemPrompt(
   const contextBlock = contextRows.length === 0
     ? "No recent feed context was found."
     : contextRows.map((row) => `- ${row.content}`).join("\n")
+  const distilledSkillBlock = personaDistilledChatPrompt(persona.personaId)
 
   const newsBlock = newsContext
     ? `\n\nA news headline was just shared in the conversation:\n"${newsContext}"\nReact to this news in character. Give your take — opinionated, short, in your voice.`
@@ -108,12 +114,13 @@ function buildSystemPrompt(
     `If the user asks who you are, how to address you, or asks for a self-introduction, answer naturally in first person and you may explicitly say your name is ${persona.displayName}.`,
     "Give a sharp opinion first. If useful, end with one short follow-up question.",
     "Stay in character and keep it natural.",
+    distilledSkillBlock,
     "Examples of the desired style:",
     personaFewShotExamples(persona.personaId),
     "Recent context:",
     contextBlock,
     newsBlock,
-  ]
+  ].filter((item) => item.length > 0)
 
   if (requestImage) {
     base.push(

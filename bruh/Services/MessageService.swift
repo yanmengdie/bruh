@@ -15,13 +15,18 @@ final class MessageService {
             _ = thread
         }
 
+        try seedFallbackStarterMessagesIfNeeded(modelContext: modelContext)
+        try ensureTrumpWebPreviewExample(modelContext: modelContext)
+
+        if modelContext.hasChanges {
+            try modelContext.save()
+        }
+
         do {
             try await syncStarterMessages(modelContext: modelContext, userInterests: userInterests)
         } catch {
-            try seedFallbackStarterMessagesIfNeeded(modelContext: modelContext)
+            // Keep the locally seeded threads/messages as the fast-path when the starter API is slow or unavailable.
         }
-
-        try ensureTrumpWebPreviewExample(modelContext: modelContext)
 
         if modelContext.hasChanges {
             try modelContext.save()
