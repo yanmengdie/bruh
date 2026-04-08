@@ -117,19 +117,24 @@ struct NewBruhView: View {
                         Spacer(minLength: 0)
                     }
 
-                    HStack(spacing: 0) {
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(invitationThemeColor)
-                            .frame(width: 5)
-
+                    ZStack {
                         Text(invitation.inviteMessage)
                             .font(.system(size: 15, weight: .regular))
                             .foregroundStyle(Color.black.opacity(0.86))
                             .padding(15)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(invitationThemeColor.opacity(0.18))
+                            .background {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(invitationThemeColor)
+                                        .offset(x: -3, y: 0)
+
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(AppTheme.messageBubbleBase)
+                                }
+                            }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     HStack(spacing: 12) {
                         Button {
