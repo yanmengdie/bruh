@@ -257,8 +257,11 @@ private struct ContactsView: View {
     @AppStorage("invite_trump_accepted") private var inviteTrumpAccepted = false
     @AppStorage("invite_musk_unlocked") private var inviteMuskUnlocked = false
     @AppStorage("invite_musk_accepted") private var inviteMuskAccepted = false
+    @AppStorage("invite_musk_ignored") private var inviteMuskIgnored = false
     @AppStorage("invite_zuckerberg_unlocked") private var inviteZuckerbergUnlocked = false
     @AppStorage("invite_zuckerberg_accepted") private var inviteZuckerbergAccepted = false
+    @AppStorage("invite_zuckerberg_ignored") private var inviteZuckerbergIgnored = false
+    @AppStorage("invite_trump_ignored") private var inviteTrumpIgnored = false
     private static let alphabet: [String] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map(String.init) + ["#"]
 
     private var filteredContacts: [Contact] {
@@ -291,9 +294,9 @@ private struct ContactsView: View {
 
     private var pendingInvitations: [BruhInvitation] {
         var items: [BruhInvitation] = []
-        if !inviteTrumpAccepted { items.append(.trump) }
-        if inviteMuskUnlocked, !inviteMuskAccepted { items.append(.musk) }
-        if inviteZuckerbergUnlocked, !inviteZuckerbergAccepted { items.append(.zuckerberg) }
+        if !inviteTrumpAccepted, !inviteTrumpIgnored { items.append(.trump) }
+        if inviteMuskUnlocked, !inviteMuskAccepted, !inviteMuskIgnored { items.append(.musk) }
+        if inviteZuckerbergUnlocked, !inviteZuckerbergAccepted, !inviteZuckerbergIgnored { items.append(.zuckerberg) }
         return items
     }
 
@@ -370,12 +373,14 @@ private struct ContactsView: View {
         .navigationDestination(item: $presentedInvitation) { invitation in
             NewBruhView(
                 invitation: invitation,
-                onAccept: acceptInvitation
+                onAccept: acceptInvitation,
+                onIgnore: ignoreInvitation
             )
         }
         .task {
             bootstrapInviteFlowIfNeeded()
             restoreInviteFlowIfNeeded()
+            ensureInvitationProgressConsistency()
         }
     }
 
@@ -645,24 +650,53 @@ private struct ContactsView: View {
     }
 
     private func openNewBruh() {
+        ensureInvitationProgressConsistency()
+        recoverPendingInvitationsIfNeeded()
+        if pendingInvitations.isEmpty {
+            forceRestartInvitationFlow()
+        }
         guard let invitation = pendingInvitations.first else { return }
         presentedInvitation = invitation
     }
 
     private func acceptInvitation(_ invitation: BruhInvitation) {
         addContactIfNeeded(for: invitation)
+        presentedInvitation = nil
 
         switch invitation.personaId {
         case "trump":
             inviteTrumpAccepted = true
+            inviteTrumpIgnored = false
             scheduleTrumpFollowUps()
         case "musk":
             inviteMuskAccepted = true
+            inviteMuskIgnored = false
+            inviteZuckerbergUnlocked = true
         case "zuckerberg":
             inviteZuckerbergAccepted = true
+            inviteZuckerbergIgnored = false
         default:
             break
         }
+        ensureInvitationProgressConsistency()
+        try? modelContext.save()
+    }
+
+    private func ignoreInvitation(_ invitation: BruhInvitation) {
+        presentedInvitation = nil
+        switch invitation.personaId {
+        case "trump":
+            inviteTrumpIgnored = true
+            inviteMuskUnlocked = true
+        case "musk":
+            inviteMuskIgnored = true
+            inviteZuckerbergUnlocked = true
+        case "zuckerberg":
+            inviteZuckerbergIgnored = true
+        default:
+            break
+        }
+        ensureInvitationProgressConsistency()
         try? modelContext.save()
     }
 
@@ -750,20 +784,76 @@ private struct ContactsView: View {
         inviteTrumpAccepted = false
         inviteMuskUnlocked = false
         inviteMuskAccepted = false
+        inviteMuskIgnored = false
         inviteZuckerbergUnlocked = false
         inviteZuckerbergAccepted = false
+        inviteZuckerbergIgnored = false
+        inviteTrumpIgnored = false
         inviteFlowInitialized = true
         try? modelContext.save()
     }
 
     private func restoreInviteFlowIfNeeded() {
-        guard contacts.isEmpty, pendingInvitations.isEmpty else { return }
+        let hasDecidedAnyInvitation =
+            inviteTrumpAccepted || inviteTrumpIgnored
+            || inviteMuskUnlocked || inviteMuskAccepted || inviteMuskIgnored
+            || inviteZuckerbergUnlocked || inviteZuckerbergAccepted || inviteZuckerbergIgnored
+
+        guard contacts.isEmpty, pendingInvitations.isEmpty, !hasDecidedAnyInvitation else { return }
 
         inviteTrumpAccepted = false
         inviteMuskUnlocked = false
         inviteMuskAccepted = false
+        inviteMuskIgnored = false
         inviteZuckerbergUnlocked = false
         inviteZuckerbergAccepted = false
+        inviteZuckerbergIgnored = false
+        inviteTrumpIgnored = false
+    }
+
+    private func ensureInvitationProgressConsistency() {
+        if (inviteTrumpAccepted || inviteTrumpIgnored) && !inviteMuskAccepted && !inviteMuskIgnored {
+            inviteMuskUnlocked = true
+        }
+
+        if (inviteMuskAccepted || inviteMuskIgnored) && !inviteZuckerbergAccepted && !inviteZuckerbergIgnored {
+            inviteZuckerbergUnlocked = true
+        }
+    }
+
+    private func recoverPendingInvitationsIfNeeded() {
+        guard pendingInvitations.isEmpty else { return }
+
+        if !inviteTrumpAccepted {
+            inviteTrumpIgnored = false
+            inviteMuskUnlocked = false
+            inviteMuskIgnored = false
+            inviteZuckerbergUnlocked = false
+            inviteZuckerbergIgnored = false
+            return
+        }
+
+        if !inviteMuskAccepted {
+            inviteMuskUnlocked = true
+            inviteMuskIgnored = false
+            return
+        }
+
+        if !inviteZuckerbergAccepted {
+            inviteZuckerbergUnlocked = true
+            inviteZuckerbergIgnored = false
+        }
+    }
+
+    private func forceRestartInvitationFlow() {
+        inviteTrumpAccepted = false
+        inviteTrumpIgnored = false
+        inviteMuskUnlocked = false
+        inviteMuskAccepted = false
+        inviteMuskIgnored = false
+        inviteZuckerbergUnlocked = false
+        inviteZuckerbergAccepted = false
+        inviteZuckerbergIgnored = false
     }
 
     private func addContactIfNeeded(for invitation: BruhInvitation) {

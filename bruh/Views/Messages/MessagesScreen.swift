@@ -172,6 +172,7 @@ private struct MessageDetailView: View {
     @State private var isShowingExcitedEffect = false
     @State private var hasCheckedEntryEffect = false
     private let quickReactionOptions = ["👍", "🖤", "😂", "🔥"]
+    private let isExcitedEntryEffectEnabled = false
 
     init(
         thread: MessageThread,
@@ -766,6 +767,7 @@ private struct MessageDetailView: View {
     }
 
     private func maybePlayEntryExcitedEffect() {
+        guard isExcitedEntryEffectEnabled else { return }
         guard !hasCheckedEntryEffect else { return }
         guard !messages.isEmpty else { return }
         hasCheckedEntryEffect = true
