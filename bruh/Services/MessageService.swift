@@ -270,13 +270,13 @@ final class MessageService {
     private func starterMessage(for personaId: String) -> String {
         switch personaId {
         case "musk":
-            return "Saw a few interesting AI and space signals today. What caught your eye?"
+            return "今天有几条很有意思的 AI 和航天动态。你最关注哪条？"
         case "trump":
-            return "Big stories today. Trade, politics, the usual chaos. What do you want to talk about?"
+            return "今天有不少大新闻，贸易和政治都很热闹。你想先聊哪一个？"
         case "zuckerberg":
-            return "A lot happening across AI and social. Want the short version or the spicy version?"
+            return "AI 和社交平台这边今天信息很多。你要简版还是深挖版？"
         default:
-            return "What do you want to talk about today?"
+            return "今天你想聊什么？"
         }
     }
 

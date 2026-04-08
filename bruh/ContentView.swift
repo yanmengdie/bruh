@@ -1,84 +1,67 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\MessageThread.lastMessageAt, order: .reverse)]) private var threads: [MessageThread]
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
     @AppStorage("lastViewedAlbumAt") private var lastViewedAlbumAtInterval: Double = 0
 
-    @State private var selectedTab: MainTab = .contacts
+    @State private var homePath: [AppDestination] = []
     @State private var messageService = MessageService()
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack {
-                ContactsView()
-            }
-            .enableUnifiedSwipeBack()
-            .tabItem {
-                Label("Contacts", systemImage: "person.crop.circle.fill")
-            }
-            .tag(MainTab.contacts)
-
-            NavigationStack {
-                MessagesScreen(
-                    threads: threads,
-                    contacts: contacts,
-                    service: messageService,
-                    backgroundColor: messagesScreenBackground
-                )
-            }
-            .enableUnifiedSwipeBack()
-            .tabItem {
-                Label("message", systemImage: "message.fill")
-            }
-            .badge(totalUnreadMessages > 0 ? Text("\(totalUnreadMessages)") : nil)
-            .tag(MainTab.messages)
-
-            NavigationStack {
-                FeedView()
-            }
-            .enableUnifiedSwipeBack()
-            .tabItem {
-                Label("朋友圈", systemImage: "globe")
-            }
-            .badge(totalUnreadMoments > 0 ? Text("\(totalUnreadMoments)") : nil)
-            .tag(MainTab.feed)
-
-            NavigationStack {
-                AlbumView()
-            }
-            .enableUnifiedSwipeBack()
-            .tabItem {
-                Label("album", systemImage: "photo.on.rectangle.angled")
-            }
-            .badge(unseenAlbumCount > 0 ? Text("NEW") : nil)
-            .tag(MainTab.album)
-        }
-        .onChange(of: selectedTab) { _, newValue in
-            if newValue == .feed {
-                lastViewedFeedAtInterval = Date().timeIntervalSince1970
-            }
-            if newValue == .album {
-                lastViewedAlbumAtInterval = Date().timeIntervalSince1970
+        Group {
+            if hasCompletedOnboarding {
+                NavigationStack(path: $homePath) {
+                    HomeScreen(
+                        onNavigate: handleHomeNavigation,
+                        messageUnreadCount: totalUnreadMessages,
+                        momentsUnreadCount: totalUnreadMoments,
+                        hasNewAlbumBadge: unseenAlbumCount > 0
+                    )
+                    .navigationBarHidden(true)
+                    .navigationDestination(for: AppDestination.self) { destination in
+                        switch destination {
+                        case .contacts:
+                            ContactsView()
+                        case .imessage:
+                            MessagesScreen(
+                                threads: threads,
+                                contacts: contacts,
+                                service: messageService,
+                                backgroundColor: messagesScreenBackground
+                            )
+                        case .feed:
+                            FeedView()
+                                .onAppear {
+                                    lastViewedFeedAtInterval = Date().timeIntervalSince1970
+                                }
+                        case .album:
+                            AlbumView()
+                                .onAppear {
+                                    lastViewedAlbumAtInterval = Date().timeIntervalSince1970
+                                }
+                        case .settings:
+                            SettingsScreen()
+                        }
+                    }
+                }
+                .enableUnifiedSwipeBack()
+                .task {
+                    await bootstrapApp()
+                }
+                .onAppear(perform: configureNavigationAppearance)
+            } else {
+                Onboarding {
+                    hasCompletedOnboarding = true
+                }
             }
         }
-        .task {
-            seedPersonas(into: modelContext)
-            seedCurrentUserProfile(into: modelContext)
-            seedSystemContacts(into: modelContext)
-            try? await messageService.ensureThreadsExist(
-                modelContext: modelContext,
-                userInterests: CurrentUserProfileStore.selectedInterests(in: modelContext)
-            )
-            syncContentGraph(into: modelContext)
-        }
-        .toolbarBackground(AppTheme.messagesBackground, for: .tabBar)
-        .toolbarBackground(.visible, for: .tabBar)
-        .onAppear(perform: configureTabBarAppearance)
     }
 
     private var totalUnreadMessages: Int {
@@ -145,21 +128,26 @@ struct ContentView: View {
         }
     }
 
-    private func configureTabBarAppearance() {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(AppTheme.messagesBackground)
-        appearance.shadowColor = UIColor.black.withAlphaComponent(0.05)
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
+    private func handleHomeNavigation(_ destination: AppDestination) {
+        homePath.append(destination)
     }
-}
 
-private enum MainTab: Hashable {
-    case contacts
-    case messages
-    case feed
-    case album
+    @MainActor
+    private func bootstrapApp() async {
+        seedPersonas(into: modelContext)
+        seedCurrentUserProfile(into: modelContext)
+        seedSystemContacts(into: modelContext)
+        try? await messageService.ensureThreadsExist(
+            modelContext: modelContext,
+            userInterests: CurrentUserProfileStore.selectedInterests(in: modelContext)
+        )
+        syncContentGraph(into: modelContext)
+    }
+
+    private func configureNavigationAppearance() {
+        let backColor = UIColor(red: 0.52, green: 0.54, blue: 0.57, alpha: 1.0)
+        UINavigationBar.appearance().tintColor = backColor
+    }
 }
 
 private struct AlbumView: View {
@@ -494,6 +482,7 @@ private struct ContactsView: View {
     @State private var searchText = ""
     @State private var isPresentingForm = false
     @State private var presentedInvitation: BruhInvitation?
+    @State private var isPresentingAddBruh = false
     @State private var editingContact: Contact?
     @State private var draft = ContactDraft()
     @State private var validationError: String?
@@ -510,7 +499,7 @@ private struct ContactsView: View {
             .filter(\.isVisibleInContactsList)
             .sorted {
             if $0.isFavorite != $1.isFavorite { return $0.isFavorite && !$1.isFavorite }
-            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            return sortKey(for: $0.name).localizedCaseInsensitiveCompare(sortKey(for: $1.name)) == .orderedAscending
         }
 
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -565,9 +554,9 @@ private struct ContactsView: View {
 
                     if filteredContacts.isEmpty {
                         ContentUnavailableView(
-                            searchText.isEmpty ? "No Contacts" : "No Results",
+                            searchText.isEmpty ? "暂无联系人" : "无搜索结果",
                             systemImage: searchText.isEmpty ? "person.crop.circle.badge.plus" : "magnifyingglass",
-                            description: Text(searchText.isEmpty ? "Tap New Bruhs to add your first contact." : "Try another name, phone number, or email.")
+                            description: Text(searchText.isEmpty ? "点进“新鸽们”接收新的好友请求。" : "试试其他姓名、手机号或邮箱。")
                         )
                         .frame(maxWidth: .infinity, alignment: .center)
                         .listRowBackground(Color.clear)
@@ -608,7 +597,7 @@ private struct ContactsView: View {
         .sheet(isPresented: $isPresentingForm) {
             NavigationStack {
                 ContactFormView(
-                    title: editingContact == nil ? "New Contact" : "Edit Contact",
+                    title: editingContact == nil ? "新建联系人" : "编辑联系人",
                     draft: $draft,
                     validationError: validationError,
                     onCancel: {
@@ -626,6 +615,21 @@ private struct ContactsView: View {
                 onIgnore: ignoreInvitation
             )
         }
+        .navigationDestination(isPresented: $isPresentingAddBruh) {
+            AddBruhView()
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isPresentingAddBruh = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .regular))
+                        .foregroundStyle(Color(red: 0.56, green: 0.57, blue: 0.58))
+                }
+                .buttonStyle(.plain)
+            }
+        }
         .task {
             seedPersonas(into: modelContext)
             seedCurrentUserProfile(into: modelContext)
@@ -642,7 +646,8 @@ private struct ContactsView: View {
     }
 
     private var profileCard: some View {
-        let profileName = currentProfile?.displayName ?? "You"
+        let rawProfileName = currentProfile?.displayName ?? "我"
+        let profileName = rawProfileName == "You" ? "我" : rawProfileName
         let profileHandle = currentProfile?.bruhHandle ?? "@yourboi"
 
         return HStack(spacing: 14) {
@@ -658,7 +663,7 @@ private struct ContactsView: View {
                 Text(profileName)
                     .font(.system(size: 21, weight: .bold))
                     .foregroundStyle(Color.black.opacity(0.86))
-                Text("bruh ID: \(profileHandle)")
+                Text("鸽们账号：\(profileHandle)")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color.black.opacity(0.3))
             }
@@ -680,7 +685,7 @@ private struct ContactsView: View {
             quickActionRow(
                 icon: "🤝",
                 iconBackground: Color(red: 0.94, green: 0.84, blue: 0.84),
-                title: "New Bruhs",
+                title: "新鸽们",
                 trailing: pendingInvitationCount > 0 ? AnyView(
                     Text("\(pendingInvitationCount)")
                         .font(.system(size: 14, weight: .bold))
@@ -697,7 +702,7 @@ private struct ContactsView: View {
             quickActionRow(
                 icon: "👥",
                 iconBackground: Color(red: 0.86, green: 0.87, blue: 0.88),
-                title: "Group Chats",
+                title: "群聊",
                 action: {}
             )
 
@@ -706,7 +711,7 @@ private struct ContactsView: View {
             quickActionRow(
                 icon: "🏷️",
                 iconBackground: Color(red: 0.84, green: 0.89, blue: 0.82),
-                title: "Tags",
+                title: "标签",
                 action: {}
             )
         }
@@ -806,11 +811,21 @@ private struct ContactsView: View {
     }
 
     private func sectionKey(for contact: Contact) -> String {
-        guard let first = contact.name.trimmingCharacters(in: .whitespacesAndNewlines).uppercased().first else {
+        guard let first = sortKey(for: contact.name).trimmingCharacters(in: .whitespacesAndNewlines).uppercased().first else {
             return "#"
         }
         let key = String(first)
         return Self.alphabet.contains(key) ? key : "#"
+    }
+
+    private func sortKey(for name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        let mutable = NSMutableString(string: trimmed) as CFMutableString
+        CFStringTransform(mutable, nil, kCFStringTransformToLatin, false)
+        CFStringTransform(mutable, nil, kCFStringTransformStripCombiningMarks, false)
+        return (mutable as String).uppercased()
     }
 
     private func jumpToIndexLetter(_ letter: String, proxy: ScrollViewProxy, animated: Bool) {
@@ -853,11 +868,11 @@ private struct ContactsView: View {
     private func contactListRow(_ contact: Contact) -> some View {
         contactRow(contact)
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                Button("Delete", role: .destructive) {
+                Button("删除", role: .destructive) {
                     delete(contact)
                 }
 
-                Button("Edit") {
+                Button("编辑") {
                     startEditing(contact)
                 }
                 .tint(.blue)
@@ -882,14 +897,28 @@ private struct ContactsView: View {
                 .fill(themeColor.opacity(contact.isFavorite ? 0.24 : 0.16))
                 .frame(width: 44, height: 44)
                 .overlay {
-                    Text(String(contact.name.prefix(1)).uppercased())
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(themeColor)
+                    if !contact.avatarName.isEmpty, UIImage(named: contact.avatarName) != nil {
+                        Image(contact.avatarName)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    } else {
+                        Text(String(contact.name.prefix(1)).uppercased())
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(themeColor)
+                    }
                 }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(contact.name)
                     .font(.system(size: 16, weight: .medium))
+
+                if !contact.locationLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(contact.locationLabel)
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(Color.black.opacity(0.34))
+                }
             }
         }
         .padding(.vertical, 4)

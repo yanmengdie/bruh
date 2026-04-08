@@ -3,6 +3,7 @@ import AVKit
 import SafariServices
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct MessagesScreen: View {
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
@@ -82,14 +83,7 @@ struct MessagesScreen: View {
         let persona = persona(for: thread.personaId)
 
         return HStack(spacing: 12) {
-            Circle()
-                .fill(persona.tint.opacity(0.18))
-                .frame(width: 50, height: 50)
-                .overlay {
-                    Text(String(persona.name.prefix(1)))
-                        .font(.headline)
-                        .foregroundStyle(persona.tint)
-                }
+            avatarCircle(for: thread.personaId, size: 50)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -138,6 +132,28 @@ struct MessagesScreen: View {
         return (personaId.capitalized, fallbackTint(for: personaId))
     }
 
+    private func avatarCircle(for personaId: String, size: CGFloat) -> some View {
+        let persona = persona(for: personaId)
+        let avatarName = contacts.first(where: { $0.linkedPersonaId == personaId })?.avatarName ?? ""
+
+        return Circle()
+            .fill(persona.tint.opacity(0.18))
+            .frame(width: size, height: size)
+            .overlay {
+                if !avatarName.isEmpty, UIImage(named: avatarName) != nil {
+                    Image(avatarName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: size, height: size)
+                        .clipShape(Circle())
+                } else {
+                    Text(String(persona.name.prefix(1)))
+                        .font(.system(size: max(12, size * 0.42), weight: .semibold))
+                        .foregroundStyle(persona.tint)
+                }
+            }
+    }
+
     private func fallbackTint(for personaId: String) -> Color {
         switch personaId {
         case "trump":
@@ -146,13 +162,15 @@ struct MessagesScreen: View {
             return .blue
         case "zuckerberg":
             return .purple
+        case "justin_sun":
+            return Color(red: 0.11, green: 0.74, blue: 0.63)
         default:
             return .gray
         }
     }
 
     private func relativeTime(_ date: Date) -> String {
-        guard date > Date.distantPast else { return "Now" }
+        guard date > Date.distantPast else { return "刚刚" }
 
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
@@ -199,7 +217,7 @@ struct MessagesScreen: View {
            !preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return preview
         }
-        return "Start the conversation"
+        return "开始聊天"
     }
 
     private func latestActivityDate(for thread: MessageThread) -> Date {
@@ -456,16 +474,7 @@ private struct MessageDetailView: View {
     }
 
     private var headerAvatar: some View {
-        let persona = persona(for: thread.personaId)
-
-        return Circle()
-            .fill(persona.tint.opacity(0.18))
-            .frame(width: 52, height: 52)
-            .overlay {
-                Text(String(persona.name.prefix(1)))
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(persona.tint)
-            }
+        avatarCircle(size: 52)
     }
 
     private func persona(for personaId: String) -> (name: String, tint: Color) {
@@ -484,9 +493,33 @@ private struct MessageDetailView: View {
             return .blue
         case "zuckerberg":
             return .purple
+        case "justin_sun":
+            return Color(red: 0.11, green: 0.74, blue: 0.63)
         default:
             return .gray
         }
+    }
+
+    private func avatarCircle(size: CGFloat) -> some View {
+        let persona = persona(for: thread.personaId)
+        let avatarName = matchedContact?.avatarName ?? ""
+
+        return Circle()
+            .fill(persona.tint.opacity(0.18))
+            .frame(width: size, height: size)
+            .overlay {
+                if !avatarName.isEmpty, UIImage(named: avatarName) != nil {
+                    Image(avatarName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: size, height: size)
+                        .clipShape(Circle())
+                } else {
+                    Text(String(persona.name.prefix(1)))
+                        .font(.system(size: max(12, size * 0.42), weight: .semibold))
+                        .foregroundStyle(persona.tint)
+                }
+            }
     }
 
     private func send(requestImage: Bool = false) {
@@ -619,16 +652,7 @@ private struct MessageDetailView: View {
     }
 
     private var incomingAvatar: some View {
-        let persona = persona(for: thread.personaId)
-
-        return Circle()
-            .fill(persona.tint.opacity(0.18))
-            .frame(width: AppTheme.messageIncomingAvatarSize, height: AppTheme.messageIncomingAvatarSize)
-            .overlay {
-                Text(String(persona.name.prefix(1)))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(persona.tint)
-            }
+        avatarCircle(size: AppTheme.messageIncomingAvatarSize)
     }
 
     private func bubble(

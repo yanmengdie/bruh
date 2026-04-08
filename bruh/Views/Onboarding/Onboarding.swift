@@ -1,9 +1,19 @@
 import SwiftUI
+import UIKit
 
 struct Onboarding: View {
+    let onComplete: () -> Void
+
     @State private var name = ""
     @State private var selectedInterests: Set<OnboardingInterest> = OnboardingInterestStore.load()
+    @State private var profileImage: UIImage?
+    @State private var isPresentingCamera = false
+    @State private var isShowingCameraAlert = false
     @FocusState private var isNameFieldFocused: Bool
+
+    init(onComplete: @escaping () -> Void = {}) {
+        self.onComplete = onComplete
+    }
 
     var body: some View {
         ZStack {
@@ -45,6 +55,15 @@ struct Onboarding: View {
         .onChange(of: selectedInterests) { _, newValue in
             OnboardingInterestStore.save(newValue)
         }
+        .sheet(isPresented: $isPresentingCamera) {
+            OnboardingCameraPicker(image: $profileImage)
+                .ignoresSafeArea()
+        }
+        .alert("当前设备无法打开相机", isPresented: $isShowingCameraAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("请在支持相机的设备上重试。")
+        }
     }
 
     private var header: some View {
@@ -55,7 +74,7 @@ struct Onboarding: View {
                 .foregroundStyle(Color(red: 0.10, green: 0.11, blue: 0.13))
                 .tracking(1)
 
-            Text("News from your bruh.")
+            Text("来自你鸽们的消息。")
                 .font(.system(size: 19, weight: .regular))
                 .foregroundStyle(Color(red: 0.57, green: 0.57, blue: 0.57))
         }
@@ -71,46 +90,90 @@ struct Onboarding: View {
                 avatar(color: Color(red: 0.95, green: 0.41, blue: 0.14), emoji: "👩🏽")
             }
 
-            bubble(text: "Fake news! 🗣️", textColor: Color(red: 0.85, green: 0.24, blue: 0.30))
+            bubble(text: "假新闻！🗣️", textColor: Color(red: 0.85, green: 0.24, blue: 0.30))
                 .offset(x: -74, y: -38)
 
-            bubble(text: "To Mars 🚀", textColor: Color(red: 0.35, green: 0.36, blue: 0.60))
+            bubble(text: "去火星 🚀", textColor: Color(red: 0.35, green: 0.36, blue: 0.60))
                 .offset(x: -38, y: 26)
 
-            bubble(text: "AGI soon 🧠", textColor: Color(red: 0.07, green: 0.64, blue: 0.52))
+            bubble(text: "AGI 快来了 🧠", textColor: Color(red: 0.07, green: 0.64, blue: 0.52))
                 .offset(x: 82, y: -34)
         }
     }
 
     private var nameSection: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text("WHAT'S YOUR NAME, BRUH?")
+            Text("你叫什么，鸽们？")
                 .font(.system(size: 18, weight: .heavy))
                 .tracking(1)
                 .foregroundStyle(Color(red: 0.12, green: 0.13, blue: 0.15))
 
-            TextField("Bruh", text: $name)
-                .font(.system(size: 19, weight: .regular))
-                .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.17))
-                .textInputAutocapitalization(.words)
-                .submitLabel(.done)
-                .focused($isNameFieldFocused)
-                .textFieldStyle(.plain)
-            .padding(.horizontal, 20)
-            .frame(height: 76)
+            HStack(spacing: 16) {
+                avatarPickerButton
+
+                TextField("请输入昵称", text: $name)
+                    .font(.system(size: 28, weight: .regular))
+                    .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.17))
+                    .textInputAutocapitalization(.words)
+                    .submitLabel(.done)
+                    .focused($isNameFieldFocused)
+                    .textFieldStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 18)
+            .frame(minHeight: 132)
             .background(Color.white.opacity(0.55))
             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
     }
 
+    private var avatarPickerButton: some View {
+        Button {
+            openCamera()
+        } label: {
+            ZStack(alignment: .bottomTrailing) {
+                Circle()
+                    .fill(Color(red: 0.90, green: 0.88, blue: 0.84))
+                    .frame(width: 108, height: 108)
+                    .overlay {
+                        Circle()
+                            .stroke(Color.black.opacity(0.12), style: StrokeStyle(lineWidth: 5, dash: [10, 5]))
+                    }
+                    .overlay {
+                        if let profileImage {
+                            Image(uiImage: profileImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 96, height: 96)
+                                .clipShape(Circle())
+                        } else {
+                            Text("📸")
+                                .font(.system(size: 50))
+                        }
+                    }
+
+                Circle()
+                    .fill(Color(red: 0.10, green: 0.11, blue: 0.13))
+                    .frame(width: 40, height: 40)
+                    .overlay {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .offset(x: 4, y: 2)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("拍摄头像")
+    }
+
     private var interestsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("WHAT ARE YOU INTO?")
+            Text("你感兴趣什么？")
                 .font(.system(size: 18, weight: .heavy))
                 .tracking(1)
                 .foregroundStyle(Color(red: 0.12, green: 0.13, blue: 0.15))
-
-            interestChip(.politics)
 
             HStack(spacing: 16) {
                 interestChip(.entertainment)
@@ -126,8 +189,8 @@ struct Onboarding: View {
 
     private var ctaSection: some View {
         VStack(spacing: 16) {
-            Button(action: {}) {
-                Text("Meet your bruhs ➔")
+            Button(action: completeOnboarding) {
+                Text("去认识你的鸽们 ➔")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -142,8 +205,10 @@ struct Onboarding: View {
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)
+            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .opacity(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.55 : 1)
 
-            Text("By continuing you agree to bruh's Terms of Service")
+            Text("继续即表示你同意 bruh 的服务条款")
                 .font(.system(size: 10, weight: .regular))
                 .foregroundStyle(Color(red: 0.74, green: 0.74, blue: 0.74))
                 .multilineTextAlignment(.center)
@@ -187,7 +252,7 @@ struct Onboarding: View {
                     .lineLimit(1)
 
                 if interest.isHot {
-                    Text("HOT")
+                    Text("热门")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(Color(red: 0.86, green: 0.23, blue: 0.28))
                         .padding(.horizontal, 10)
@@ -212,7 +277,7 @@ struct Onboarding: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(interest.title)
-        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityValue(isSelected ? "已选中" : "未选中")
     }
 
     private func toggleInterest(_ interest: OnboardingInterest) {
@@ -221,6 +286,21 @@ struct Onboarding: View {
         } else {
             selectedInterests.insert(interest)
         }
+    }
+
+    private func openCamera() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            isShowingCameraAlert = true
+            return
+        }
+
+        isPresentingCamera = true
+    }
+
+    private func completeOnboarding() {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+        onComplete()
     }
 }
 
@@ -237,11 +317,11 @@ enum OnboardingInterest: String, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .politics: return "Politics"
-        case .entertainment: return "Entertainment"
-        case .sports: return "Sports"
-        case .finance: return "Finance"
-        case .tech: return "Tech"
+        case .politics: return "政治"
+        case .entertainment: return "娱乐"
+        case .sports: return "体育"
+        case .finance: return "财经"
+        case .tech: return "科技"
         }
     }
 
@@ -256,13 +336,13 @@ enum OnboardingInterest: String, CaseIterable, Hashable {
     }
 
     var isHot: Bool {
-        self == .politics || self == .tech
+        self == .tech
     }
 }
 
 enum OnboardingInterestStore {
     static let userDefaultsKey = "onboarding.selectedInterestTopics"
-    private static let defaultSelection: Set<OnboardingInterest> = [.politics, .sports, .tech]
+    private static let defaultSelection: Set<OnboardingInterest> = [.sports, .tech]
 
     static func load(userDefaults: UserDefaults = .standard) -> Set<OnboardingInterest> {
         guard let raw = userDefaults.string(forKey: userDefaultsKey), !raw.isEmpty else {
@@ -283,5 +363,50 @@ enum OnboardingInterestStore {
             .joined(separator: ",")
 
         userDefaults.set(serialized, forKey: userDefaultsKey)
+    }
+}
+
+private struct OnboardingCameraPicker: UIViewControllerRepresentable {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var image: UIImage?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(image: $image, dismiss: dismiss)
+    }
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let controller = UIImagePickerController()
+        controller.sourceType = .camera
+        controller.allowsEditing = true
+        controller.delegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        @Binding private var image: UIImage?
+        private let dismiss: DismissAction
+
+        init(image: Binding<UIImage?>, dismiss: DismissAction) {
+            _image = image
+            self.dismiss = dismiss
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            dismiss()
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            if let editedImage = info[.editedImage] as? UIImage {
+                image = editedImage
+            } else if let originalImage = info[.originalImage] as? UIImage {
+                image = originalImage
+            }
+            dismiss()
+        }
     }
 }

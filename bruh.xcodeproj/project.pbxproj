@@ -36,6 +36,7 @@
 		A100001B000000000000001B /* NewBruhView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001B000000000000001B /* NewBruhView.swift */; };
 		A100001C000000000000001C /* Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001C000000000000001C /* Onboarding.swift */; };
 		A100001D000000000000001D /* trump_joy.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = B100001D000000000000001D /* trump_joy.mp4 */; };
+		A100001E000000000000001E /* AddBruhView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001E000000000000001E /* AddBruhView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +69,7 @@
 		B100001B000000000000001B /* NewBruhView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewBruhView.swift; sourceTree = "<group>"; };
 		B100001C000000000000001C /* Onboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Onboarding.swift; sourceTree = "<group>"; };
 		B100001D000000000000001D /* trump_joy.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = trump_joy.mp4; sourceTree = SOURCE_ROOT; };
+		B100001E000000000000001E /* AddBruhView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBruhView.swift; sourceTree = "<group>"; };
 		C1000001000000000000001 /* bruh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bruh.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -201,6 +203,7 @@
 		E100000C00000000000000C /* Contacts */ = {
 			isa = PBXGroup;
 			children = (
+				B100001E000000000000001E /* AddBruhView.swift */,
 				B100001B000000000000001B /* NewBruhView.swift */,
 			);
 			path = Contacts;
@@ -299,6 +302,7 @@
 				A1000007000000000000007 /* FeedView.swift in Sources */,
 				A1000008000000000000008 /* FeedCard.swift in Sources */,
 				A10000170000000000000017 /* MessagesScreen.swift in Sources */,
+				A100001E000000000000001E /* AddBruhView.swift in Sources */,
 				A100001B000000000000001B /* NewBruhView.swift in Sources */,
 				A100001C000000000000001C /* Onboarding.swift in Sources */,
 				A10000180000000000000018 /* AppTheme.swift in Sources */,

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct BruhInvitation: Identifiable, Hashable {
     let personaId: String
@@ -68,28 +69,31 @@ struct NewBruhView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                Text("🔔")
-                    .font(.system(size: 40))
+                Group {
+                    if UIImage(named: "Bell") != nil {
+                        Image("Bell")
+                            .resizable()
+                            .scaledToFit()
+                    } else {
+                        Text("🔔")
+                            .font(.system(size: 40))
+                    }
+                }
+                .frame(width: 60, height: 60)
                     .padding(.top, 10)
 
                 VStack(spacing: 6) {
-                    Text("You got a bruh request!")
+                    Text("你收到一个鸽们请求！")
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(Color.black.opacity(0.9))
-                    Text("Someone important wants to talk to you.")
+                    Text("有位重要的人想和你聊聊。")
                         .font(.system(size: 18, weight: .regular))
                         .foregroundStyle(Color.black.opacity(0.40))
                 }
 
                 VStack(spacing: 14) {
                     HStack(spacing: 12) {
-                        Circle()
-                            .fill(invitation.avatarColor)
-                            .frame(width: 76, height: 76)
-                            .overlay {
-                                Text(invitation.avatarEmoji)
-                                    .font(.system(size: 36))
-                            }
+                        invitationAvatar
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(invitation.displayName)
@@ -127,7 +131,7 @@ struct NewBruhView: View {
                             onAccept(invitation)
                             dismiss()
                         } label: {
-                            Text("Accept bruh ✓")
+                            Text("接受请求 ✓")
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -141,7 +145,7 @@ struct NewBruhView: View {
                             onIgnore(invitation)
                             dismiss()
                         } label: {
-                            Text("Nah")
+                            Text("暂时不了")
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundStyle(Color.black.opacity(0.35))
                                 .frame(maxWidth: .infinity)
@@ -158,7 +162,7 @@ struct NewBruhView: View {
 
                 if !lockedCandidateNames.isEmpty {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("MORE BRUHS WANT TO CONNECT")
+                        Text("还有更多鸽们想认识你")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Color.black.opacity(0.35))
                             .tracking(2)
@@ -175,9 +179,9 @@ struct NewBruhView: View {
                 Spacer(minLength: 18)
 
                 (
-                    Text("Accept ").foregroundStyle(Color.black.opacity(0.26))
+                    Text("接受 ").foregroundStyle(Color.black.opacity(0.26))
                     + Text(invitation.displayName.components(separatedBy: " ").first ?? invitation.displayName).fontWeight(.bold)
-                    + Text(" to unlock more bruhs").foregroundStyle(Color.black.opacity(0.26))
+                    + Text(" 后会解锁更多联系人").foregroundStyle(Color.black.opacity(0.26))
                 )
                 .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(Color.black.opacity(0.9))
@@ -197,6 +201,24 @@ struct NewBruhView: View {
             }
         }
         .enableUnifiedSwipeBack()
+    }
+
+    private var invitationAvatar: some View {
+        Circle()
+            .fill(invitation.avatarColor)
+            .frame(width: 76, height: 76)
+            .overlay {
+                if !invitation.avatarName.isEmpty, UIImage(named: invitation.avatarName) != nil {
+                    Image(invitation.avatarName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 76, height: 76)
+                        .clipShape(Circle())
+                } else {
+                    Text(invitation.avatarEmoji)
+                        .font(.system(size: 36))
+                }
+            }
     }
 
     private func lockedCandidate(name: String, color: Color) -> some View {

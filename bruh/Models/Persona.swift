@@ -63,7 +63,7 @@ enum PersonaCatalog {
     static let musk = PersonaCatalogEntry(
         id: "musk",
         displayName: "Elon Musk",
-        avatarName: "avatar_musk",
+        avatarName: "Avatar_ Elon",
         handle: "@elonmusk",
         domains: ["tech", "ai", "space", "ev"],
         stance: "技术乐观派, 嘲讽竞争对手, 语气随意",
@@ -213,7 +213,7 @@ final class Contact {
         name: String,
         phoneNumber: String,
         email: String = "",
-        avatarName: String = "avatar_default",
+        avatarName: String = "Avatar",
         themeColorHex: String = "#3B82F6",
         locationLabel: String = "",
         isFavorite: Bool = false,
