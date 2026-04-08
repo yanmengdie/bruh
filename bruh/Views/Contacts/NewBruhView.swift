@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct BruhInvitation: Identifiable, Hashable {
     let personaId: String
@@ -68,6 +69,21 @@ struct BruhInvitation: Identifiable, Hashable {
         email: "mark@meta.com",
         location: "Meta Park"
     )
+
+    static let justinSun = BruhInvitation(
+        personaId: "justin_sun",
+        displayName: "孙割",
+        handle: "@justinsuntron",
+        subtitle: "孙宇晨 · 波场 TRON 创始人",
+        inviteMessage: "bro，来一起冲。链上机会转瞬即逝，我会第一时间把最有价值的信号同步给你，别错过。🚀",
+        avatarEmoji: "🧑‍💼",
+        avatarColor: Color(red: 0.11, green: 0.74, blue: 0.63),
+        themeHex: "#19BCA0",
+        avatarName: "Justin Sun",
+        phoneNumber: "+86 138 0000 8888",
+        email: "justin@tron.network",
+        location: "新加坡"
+    )
 }
 
 struct NewBruhView: View {
@@ -83,8 +99,10 @@ struct NewBruhView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                Text("🔔")
-                    .font(.system(size: 40))
+                Image("Bell")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 60, height: 60)
                     .padding(.top, 10)
 
                 VStack(spacing: 6) {
@@ -98,13 +116,7 @@ struct NewBruhView: View {
 
                 VStack(spacing: 14) {
                     HStack(spacing: 12) {
-                        Circle()
-                            .fill(invitation.avatarColor)
-                            .frame(width: 76, height: 76)
-                            .overlay {
-                                Text(invitation.avatarEmoji)
-                                    .font(.system(size: 36))
-                            }
+                        invitationAvatar
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(invitation.displayName)
@@ -229,6 +241,24 @@ struct NewBruhView: View {
                 .foregroundStyle(Color.black.opacity(0.24))
                 .lineLimit(1)
         }
+    }
+
+    private var invitationAvatar: some View {
+        Circle()
+            .fill(invitation.avatarColor)
+            .frame(width: 76, height: 76)
+            .overlay {
+                if UIImage(named: invitation.avatarName) != nil {
+                    Image(invitation.avatarName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 76, height: 76)
+                        .clipShape(Circle())
+                } else {
+                    Text(invitation.avatarEmoji)
+                        .font(.system(size: 36))
+                }
+            }
     }
 }
 

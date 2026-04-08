@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -263,12 +264,15 @@ private struct ContactsView: View {
     @AppStorage("invite_zuckerberg_accepted") private var inviteZuckerbergAccepted = false
     @AppStorage("invite_zuckerberg_ignored") private var inviteZuckerbergIgnored = false
     @AppStorage("invite_trump_ignored") private var inviteTrumpIgnored = false
+    @AppStorage("invite_justin_sun_unlocked") private var inviteJustinSunUnlocked = false
+    @AppStorage("invite_justin_sun_accepted") private var inviteJustinSunAccepted = false
+    @AppStorage("invite_justin_sun_ignored") private var inviteJustinSunIgnored = false
     private static let alphabet: [String] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map(String.init) + ["#"]
 
     private var filteredContacts: [Contact] {
         let sorted = contacts.sorted {
             if $0.isFavorite != $1.isFavorite { return $0.isFavorite && !$1.isFavorite }
-            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            return sortKey(for: $0.name).localizedCaseInsensitiveCompare(sortKey(for: $1.name)) == .orderedAscending
         }
 
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -298,6 +302,7 @@ private struct ContactsView: View {
         if !inviteTrumpAccepted, !inviteTrumpIgnored { items.append(.trump) }
         if inviteMuskUnlocked, !inviteMuskAccepted, !inviteMuskIgnored { items.append(.musk) }
         if inviteZuckerbergUnlocked, !inviteZuckerbergAccepted, !inviteZuckerbergIgnored { items.append(.zuckerberg) }
+        if inviteJustinSunUnlocked, !inviteJustinSunAccepted, !inviteJustinSunIgnored { items.append(.justinSun) }
         return items
     }
 
@@ -569,11 +574,28 @@ private struct ContactsView: View {
     }
 
     private func sectionKey(for contact: Contact) -> String {
-        guard let first = contact.name.trimmingCharacters(in: .whitespacesAndNewlines).uppercased().first else {
+        let key = sectionKey(for: contact.name)
+        return Self.alphabet.contains(key) ? key : "#"
+    }
+
+    private func sectionKey(for name: String) -> String {
+        guard let first = sortKey(for: name).trimmingCharacters(in: .whitespacesAndNewlines).uppercased().first else {
             return "#"
         }
-        let key = String(first)
-        return Self.alphabet.contains(key) ? key : "#"
+
+        let letter = String(first)
+        return Self.alphabet.contains(letter) ? letter : "#"
+    }
+
+    private func sortKey(for name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        // Convert Chinese to pinyin (and keep Latin as-is) for consistent A-Z sectioning.
+        let mutable = NSMutableString(string: trimmed) as CFMutableString
+        CFStringTransform(mutable, nil, kCFStringTransformToLatin, false)
+        CFStringTransform(mutable, nil, kCFStringTransformStripCombiningMarks, false)
+        return (mutable as String).uppercased()
     }
 
     private func jumpToIndexLetter(_ letter: String, proxy: ScrollViewProxy, animated: Bool) {
@@ -645,9 +667,17 @@ private struct ContactsView: View {
                 .fill(themeColor.opacity(contact.isFavorite ? 0.24 : 0.16))
                 .frame(width: 44, height: 44)
                 .overlay {
-                    Text(String(contact.name.prefix(1)).uppercased())
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(themeColor)
+                    if UIImage(named: contact.avatarName) != nil {
+                        Image(contact.avatarName)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    } else {
+                        Text(String(contact.name.prefix(1)).uppercased())
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(themeColor)
+                    }
                 }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -691,6 +721,11 @@ private struct ContactsView: View {
         case "zuckerberg":
             inviteZuckerbergAccepted = true
             inviteZuckerbergIgnored = false
+            inviteJustinSunUnlocked = true
+        case "justin_sun":
+            inviteJustinSunAccepted = true
+            inviteJustinSunIgnored = false
+            scheduleJustinSunFollowUps()
         default:
             break
         }
@@ -709,6 +744,9 @@ private struct ContactsView: View {
             inviteZuckerbergUnlocked = true
         case "zuckerberg":
             inviteZuckerbergIgnored = true
+            inviteJustinSunUnlocked = true
+        case "justin_sun":
+            inviteJustinSunIgnored = true
         default:
             break
         }
@@ -804,6 +842,9 @@ private struct ContactsView: View {
         inviteZuckerbergUnlocked = false
         inviteZuckerbergAccepted = false
         inviteZuckerbergIgnored = false
+        inviteJustinSunUnlocked = false
+        inviteJustinSunAccepted = false
+        inviteJustinSunIgnored = false
         inviteTrumpIgnored = false
         inviteFlowInitialized = true
         try? modelContext.save()
@@ -814,6 +855,7 @@ private struct ContactsView: View {
             inviteTrumpAccepted || inviteTrumpIgnored
             || inviteMuskUnlocked || inviteMuskAccepted || inviteMuskIgnored
             || inviteZuckerbergUnlocked || inviteZuckerbergAccepted || inviteZuckerbergIgnored
+            || inviteJustinSunUnlocked || inviteJustinSunAccepted || inviteJustinSunIgnored
 
         guard contacts.isEmpty, pendingInvitations.isEmpty, !hasDecidedAnyInvitation else { return }
 
@@ -824,6 +866,9 @@ private struct ContactsView: View {
         inviteZuckerbergUnlocked = false
         inviteZuckerbergAccepted = false
         inviteZuckerbergIgnored = false
+        inviteJustinSunUnlocked = false
+        inviteJustinSunAccepted = false
+        inviteJustinSunIgnored = false
         inviteTrumpIgnored = false
     }
 
@@ -834,6 +879,10 @@ private struct ContactsView: View {
 
         if (inviteMuskAccepted || inviteMuskIgnored) && !inviteZuckerbergAccepted && !inviteZuckerbergIgnored {
             inviteZuckerbergUnlocked = true
+        }
+
+        if (inviteZuckerbergAccepted || inviteZuckerbergIgnored) && !inviteJustinSunAccepted && !inviteJustinSunIgnored {
+            inviteJustinSunUnlocked = true
         }
     }
 
@@ -846,6 +895,8 @@ private struct ContactsView: View {
             inviteMuskIgnored = false
             inviteZuckerbergUnlocked = false
             inviteZuckerbergIgnored = false
+            inviteJustinSunUnlocked = false
+            inviteJustinSunIgnored = false
             return
         }
 
@@ -858,6 +909,14 @@ private struct ContactsView: View {
         if !inviteZuckerbergAccepted {
             inviteZuckerbergUnlocked = true
             inviteZuckerbergIgnored = false
+            inviteJustinSunUnlocked = false
+            inviteJustinSunIgnored = false
+            return
+        }
+
+        if !inviteJustinSunAccepted {
+            inviteJustinSunUnlocked = true
+            inviteJustinSunIgnored = false
         }
     }
 
@@ -870,6 +929,9 @@ private struct ContactsView: View {
         inviteZuckerbergUnlocked = false
         inviteZuckerbergAccepted = false
         inviteZuckerbergIgnored = false
+        inviteJustinSunUnlocked = false
+        inviteJustinSunAccepted = false
+        inviteJustinSunIgnored = false
     }
 
     private func addContactIfNeeded(for invitation: BruhInvitation) {
@@ -913,6 +975,24 @@ private struct ContactsView: View {
 
             try? await Task.sleep(nanoseconds: 4_000_000_000)
             inviteZuckerbergUnlocked = true
+        }
+    }
+
+    private func scheduleJustinSunFollowUps() {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            insertIncomingMessage(
+                personaId: "justin_sun",
+                text: "兄弟，链上现在节奏很快，机会只给准备好的人。先盯住资金流向。",
+                sourcePostIds: []
+            )
+
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            insertIncomingMessage(
+                personaId: "justin_sun",
+                text: "今晚我会继续同步几条重点信号，别掉线，冲就完了。🚀",
+                sourcePostIds: []
+            )
         }
     }
 
