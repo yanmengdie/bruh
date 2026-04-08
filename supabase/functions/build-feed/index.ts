@@ -1,6 +1,27 @@
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 
+function extractVideoUrl(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null
+
+  const record = value as Record<string, unknown>
+  const direct = typeof record.video_url === "string" && record.video_url ? record.video_url : null
+  if (direct) return direct
+
+  const rawPayload = record.raw_payload
+  if (!rawPayload || typeof rawPayload !== "object") return null
+
+  const payloadRecord = rawPayload as Record<string, unknown>
+  const payloadDirect = typeof payloadRecord.videoUrl === "string" && payloadRecord.videoUrl ? payloadRecord.videoUrl : null
+  if (payloadDirect) return payloadDirect
+
+  const note = payloadRecord.note
+  if (!note || typeof note !== "object") return null
+
+  const noteVideo = (note as Record<string, unknown>).videoUrl
+  return typeof noteVideo === "string" && noteVideo ? noteVideo : null
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
@@ -24,7 +45,7 @@ Deno.serve(async (request) => {
     const supabase = createClient(url, serviceRoleKey)
     const { data: sourcePosts, error: sourceError } = await supabase
       .from("source_posts")
-      .select("id, persona_id, content, source_type, source_url, topic, importance_score, published_at")
+      .select("id, persona_id, content, source_type, source_url, topic, importance_score, published_at, media_urls, video_url, raw_payload")
       .order("published_at", { ascending: false })
       .limit(limit)
 
@@ -42,6 +63,8 @@ Deno.serve(async (request) => {
       topic: post.topic,
       importance_score: post.importance_score,
       published_at: post.published_at,
+      media_urls: Array.isArray(post.media_urls) ? post.media_urls : [],
+      video_url: extractVideoUrl(post),
       delivered_at: new Date().toISOString(),
     }))
 

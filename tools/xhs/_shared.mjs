@@ -275,6 +275,36 @@ export async function collectProfileNotes(page, limit = 5) {
       return value.replace(/\s+/g, " ").trim()
     }
 
+    function normalizeUrl(value) {
+      if (!value) return ""
+      const trimmed = String(value).trim()
+      if (!trimmed) return ""
+      if (trimmed.startsWith("//")) return `${location.protocol}${trimmed}`
+      return trimmed
+    }
+
+    function collectImageUrls(section) {
+      const coverRoot =
+        section.querySelector("a.cover") ??
+        section.querySelector('[class*="cover"]') ??
+        section
+
+      const urls = Array.from(coverRoot.querySelectorAll("img"))
+        .flatMap((image) => {
+          const srcset = image.getAttribute("srcset") ?? ""
+          return [
+            image.currentSrc,
+            image.getAttribute("src"),
+            image.getAttribute("data-src"),
+            srcset.split(",").map((item) => item.trim().split(" ")[0] ?? ""),
+          ].flat()
+        })
+        .map(normalizeUrl)
+        .filter((value) => /^https?:\/\//i.test(value))
+
+      return [...new Set(urls)].slice(0, 9)
+    }
+
     const items = Array.from(document.querySelectorAll("section.note-item"))
       .map((section, index) => {
         const hiddenExploreLink = section.querySelector('a[href*="/explore/"]')
@@ -283,6 +313,8 @@ export async function collectProfileNotes(page, limit = 5) {
         const authorNode = section.querySelector(".author .name, .name")
         const likeNode = section.querySelector(".like-wrapper .count, .like-wrapper")
         const topNode = section.querySelector(".top-wrapper")
+
+        const imageUrls = collectImageUrls(section)
 
         return {
           index,
@@ -296,6 +328,8 @@ export async function collectProfileNotes(page, limit = 5) {
             "",
           noteUrl: coverLink ? new URL(coverLink.getAttribute("href"), location.origin).href : "",
           exploreUrl: hiddenExploreLink ? new URL(hiddenExploreLink.getAttribute("href"), location.origin).href : "",
+          coverImageUrl: imageUrls[0] ?? "",
+          imageUrls,
           rawText: clean(section.textContent ?? ""),
         }
       })
@@ -315,13 +349,120 @@ export async function scrapeNotePage(context, url) {
         return value.replace(/\s+/g, " ").trim()
       }
 
+      function normalizeUrl(value) {
+        if (!value) return ""
+        const trimmed = String(value).trim()
+        if (!trimmed) return ""
+        if (trimmed.startsWith("//")) return `${location.protocol}${trimmed}`
+        return trimmed.replace(/^http:\/\//i, "https://")
+      }
+
+      function isoFromTimestamp(value) {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          const date = new Date(value)
+          if (!Number.isNaN(date.getTime())) {
+            return date.toISOString()
+          }
+        }
+
+        if (typeof value === "string" && value.trim()) {
+          const date = new Date(value)
+          if (!Number.isNaN(date.getTime())) {
+            return date.toISOString()
+          }
+        }
+
+        return null
+      }
+
+      function collectStateImageUrls(detailNote) {
+        if (!detailNote || !Array.isArray(detailNote.imageList)) return []
+
+        const urls = detailNote.imageList
+          .map((item) => {
+            const infoList = Array.isArray(item?.infoList) ? item.infoList : []
+            const preferredInfoUrl =
+              infoList.find((info) => info?.imageScene === "WB_DFT" && typeof info?.url === "string")?.url ??
+              infoList.find((info) => info?.imageScene === "WB_PRV" && typeof info?.url === "string")?.url
+
+            return preferredInfoUrl ?? item?.urlDefault ?? item?.urlPre ?? item?.url ?? ""
+          })
+          .map(normalizeUrl)
+          .filter((value) => /xhscdn\.com/i.test(value))
+          .filter((value) => !/avatar|user-avatar|default-avatar|fe-avatar/i.test(value))
+          .filter((value) => /webpic|spectrum|sns-img|sns-webpic/i.test(value))
+
+        return [...new Set(urls)].slice(0, 9)
+      }
+
+      function pickVideoUrl(detailNote) {
+        const stream = detailNote?.video?.media?.stream
+        if (!stream || typeof stream !== "object") return null
+
+        const h264List = Array.isArray(stream.h264) ? stream.h264 : []
+        const h265List = Array.isArray(stream.h265) ? stream.h265 : []
+        const av1List = Array.isArray(stream.av1) ? stream.av1 : []
+        const candidates = [...h264List, ...h265List, ...av1List]
+
+        for (const item of candidates) {
+          const direct = normalizeUrl(item?.masterUrl)
+          if (direct) return direct
+
+          const backup = Array.isArray(item?.backupUrls)
+            ? normalizeUrl(item.backupUrls.find((url) => typeof url === "string") ?? "")
+            : ""
+          if (backup) return backup
+        }
+
+        return null
+      }
+
+      const noteMap = window.__INITIAL_STATE__?.note?.noteDetailMap ?? {}
+      const noteEntry =
+        Object.values(noteMap).find((candidate) => candidate?.note?.noteId || candidate?.note?.title) ??
+        Object.values(noteMap)[0] ??
+        {}
+      const detailNote = noteEntry?.note ?? {}
+      const stateImageUrls = collectStateImageUrls(detailNote)
+      const videoUrl = pickVideoUrl(detailNote)
+
+      const imageUrls = Array.from(
+        document.querySelectorAll('img, source'),
+      )
+        .flatMap((node) => {
+          if (node instanceof HTMLImageElement) {
+            return [
+              node.currentSrc,
+              node.getAttribute("src"),
+              node.getAttribute("data-src"),
+              node.getAttribute("data-xhs-img"),
+            ]
+          }
+
+          if (node instanceof HTMLSourceElement) {
+            return (node.getAttribute("srcset") ?? "")
+              .split(",")
+              .map((item) => item.trim().split(" ")[0] ?? "")
+          }
+
+          return []
+        })
+        .map(normalizeUrl)
+        .filter((value) => /xhscdn\.com/i.test(value))
+        .filter((value) => !/avatar|user-avatar|default-avatar|fe-avatar/i.test(value))
+        .filter((value) => /webpic|spectrum|sns-img|sns-webpic/i.test(value))
+        .filter((value, index, values) => values.indexOf(value) === index)
+        .slice(0, 9)
+
       const title =
+        clean(detailNote.title ?? "") ||
         document.querySelector('meta[property="og:title"]')?.getAttribute("content")?.trim() ||
         document.title.trim()
 
-      const description =
-        document.querySelector('meta[name="description"]')?.getAttribute("content")?.trim() ??
-        ""
+      const metaDescription =
+        document.querySelector('meta[name="description"]')?.getAttribute("content")?.trim() ?? ""
+
+      const description = clean(detailNote.desc ?? "") || metaDescription
 
       const textCandidates = Array.from(
         document.querySelectorAll('article, main, section, [class*="desc"], [class*="content"], [class*="note"]'),
@@ -331,16 +472,22 @@ export async function scrapeNotePage(context, url) {
         .filter((value, index, values) => value.length > 20 && values.indexOf(value) === index)
         .sort((left, right) => right.length - left.length)
 
-      const author =
+      const domAuthor =
         Array.from(document.querySelectorAll('[class*="author"], [class*="user"], a[href*="/user/profile/"]'))
           .map((element) => clean(element.textContent ?? ""))
           .find(Boolean) ?? ""
+
+      const author = clean(detailNote.user?.nickname ?? "") || domAuthor
 
       return {
         title,
         description,
         author,
-        content: textCandidates[0] ?? description,
+        content: clean(detailNote.desc ?? "") || textCandidates[0] || description,
+        imageUrls: stateImageUrls.length > 0 ? stateImageUrls : imageUrls,
+        videoUrl,
+        publishedAt: isoFromTimestamp(detailNote.time) ?? isoFromTimestamp(detailNote.lastUpdateTime),
+        noteType: typeof detailNote.type === "string" ? detailNote.type : null,
         textCandidates: textCandidates.slice(0, 5),
       }
     })

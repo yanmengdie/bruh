@@ -7,6 +7,9 @@ type IncomingNote = {
   rawText?: string
   noteUrl?: string
   exploreUrl?: string
+  coverImageUrl?: string
+  imageUrls?: string[]
+  videoUrl?: string
   likeCount?: string | number
   isPinned?: boolean
   publishedAt?: string
@@ -57,23 +60,69 @@ function stripQuery(url: string): string {
   }
 }
 
-function preferredSourceUrl(note: IncomingNote, profileUrl: string | null): string | null {
-  const exploreUrl = stripQuery(asString(note.exploreUrl))
-  if (exploreUrl) return exploreUrl
+function normalizePreservingQuery(url: string): string {
+  const trimmed = asString(url)
+  if (!trimmed) return ""
+  return trimmed.replace(/^http:\/\//i, "https://")
+}
 
+function normalizeUrlList(values: unknown): string[] {
+  if (!Array.isArray(values)) return []
+
+  const unique = new Set<string>()
+  for (const value of values) {
+    const normalized = stripQuery(asString(value))
+    if (!normalized || !/^https?:\/\//i.test(normalized)) continue
+    unique.add(normalized)
+  }
+
+  return [...unique]
+}
+
+function extractMediaUrls(note: IncomingNote): string[] {
+  const directUrls = normalizeUrlList(note.imageUrls)
+  if (directUrls.length > 0) return directUrls.slice(0, 9)
+
+  const coverImageUrl = stripQuery(asString(note.coverImageUrl))
+  if (coverImageUrl && /^https?:\/\//i.test(coverImageUrl)) {
+    return [coverImageUrl]
+  }
+
+  const rawPayload = note.rawPayload ?? {}
+  const payloadUrls = normalizeUrlList((rawPayload as Record<string, unknown>).imageUrls)
+  if (payloadUrls.length > 0) return payloadUrls.slice(0, 9)
+
+  const payloadCover = stripQuery(asString((rawPayload as Record<string, unknown>).coverImageUrl))
+  if (payloadCover && /^https?:\/\//i.test(payloadCover)) {
+    return [payloadCover]
+  }
+
+  return []
+}
+
+function preferredSourceUrl(note: IncomingNote, profileUrl: string | null): string | null {
   const noteUrl = stripQuery(asString(note.noteUrl))
   if (noteUrl) return noteUrl
+
+  const exploreUrl = stripQuery(asString(note.exploreUrl))
+  if (exploreUrl) return exploreUrl
 
   return profileUrl ? stripQuery(profileUrl) : null
 }
 
 function sanitizeNote(note: IncomingNote): Record<string, unknown> {
+  const mediaUrls = extractMediaUrls(note)
+  const videoUrl = normalizePreservingQuery(asString(note.videoUrl))
+
   return {
     noteId: asString(note.noteId),
     title: asString(note.title),
     rawText: asString(note.rawText),
     noteUrl: stripQuery(asString(note.noteUrl)),
     exploreUrl: stripQuery(asString(note.exploreUrl)),
+    coverImageUrl: mediaUrls[0] ?? "",
+    imageUrls: mediaUrls,
+    videoUrl,
     likeCount: note.likeCount ?? null,
     isPinned: note.isPinned === true,
     publishedAt: asString(note.publishedAt),
@@ -170,6 +219,8 @@ Deno.serve(async (request) => {
 
     const rows = notes.map((note, index) => {
       const noteId = asString(note.noteId) || crypto.randomUUID()
+      const mediaUrls = extractMediaUrls(note)
+      const videoUrl = normalizePreservingQuery(asString(note.videoUrl)) || null
       return {
         id: `xhs-${slugify(personaId)}-${noteId}`,
         persona_id: personaId,
@@ -179,6 +230,8 @@ Deno.serve(async (request) => {
         topic: "小红书",
         importance_score: computeImportanceScore(note),
         published_at: resolvePublishedAt(note, index),
+        media_urls: mediaUrls,
+        video_url: videoUrl,
         raw_author_username: displayName,
         raw_payload: {
           platform: "xiaohongshu",
@@ -186,6 +239,8 @@ Deno.serve(async (request) => {
           personaId,
           userId,
           profileUrl: profileUrl ? stripQuery(profileUrl) : null,
+          mediaUrls,
+          videoUrl,
           note: sanitizeNote(note),
         },
       }

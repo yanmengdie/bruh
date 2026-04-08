@@ -1,3 +1,4 @@
+import AVKit
 import SwiftUI
 import SwiftData
 
@@ -8,7 +9,7 @@ struct FeedCard: View {
     let contact: Contact?
 
     @State private var isLiked = false
-    @State private var showComments = true
+    @State private var showComments = false
     @State private var likes: [FeedLike] = []
     @State private var comments: [FeedComment] = []
     @State private var commentDraft = ""
@@ -17,8 +18,55 @@ struct FeedCard: View {
     @State private var isUpdatingLike = false
     @State private var interactionError: String?
     @State private var hasLoadedInteractions = false
+    @State private var isPresentingImagePreview = false
+    @State private var isPresentingVideoPreview = false
+    @State private var selectedImageIndex = 0
 
     private let interactionService = FeedInteractionService()
+    private let imageSpacing: CGFloat = 6
+
+    private var previewImageURLs: [URL] {
+        Array(post.mediaUrls.prefix(9)).compactMap(URL.init(string:))
+    }
+
+    private var previewVideoURL: URL? {
+        guard let raw = post.videoUrl else { return nil }
+        return URL(string: raw)
+    }
+
+    private var imageColumnCount: Int {
+        switch previewImageURLs.count {
+        case 0, 1:
+            return 1
+        case 2, 4:
+            return 2
+        default:
+            return 3
+        }
+    }
+
+    private var imageThumbnailSide: CGFloat {
+        switch previewImageURLs.count {
+        case 0:
+            return 0
+        case 1:
+            return 220
+        case 2, 4:
+            return 106
+        default:
+            return 86
+        }
+    }
+
+    private var imageGridWidth: CGFloat {
+        let columns = CGFloat(imageColumnCount)
+        guard columns > 0 else { return 0 }
+        return columns * imageThumbnailSide + (columns - 1) * imageSpacing
+    }
+
+    private var shouldShowInteractionPanel: Bool {
+        showComments || isLiked || !likes.isEmpty || !comments.isEmpty || isSendingComment
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -53,6 +101,21 @@ struct FeedCard: View {
         .task {
             await loadInteractionsIfNeeded()
         }
+        .fullScreenCover(isPresented: $isPresentingImagePreview) {
+            FeedImagePreview(
+                urls: previewImageURLs,
+                selectedIndex: selectedImageIndex,
+                isPresented: $isPresentingImagePreview
+            )
+        }
+        .fullScreenCover(isPresented: $isPresentingVideoPreview) {
+            if let videoURL = previewVideoURL {
+                FeedVideoPreview(
+                    url: videoURL,
+                    isPresented: $isPresentingVideoPreview
+                )
+            }
+        }
     }
 
     private var avatar: some View {
@@ -75,30 +138,81 @@ struct FeedCard: View {
         }
     }
 
+    @ViewBuilder
     private var imageGrid: some View {
-        GeometryReader { proxy in
-            let totalSpacing: CGFloat = 12
-            let itemWidth = max((proxy.size.width - totalSpacing) / 3, 0)
-            let fills: [LinearGradient] = [
-                LinearGradient(colors: [Color(red: 0.41, green: 0.73, blue: 0.92), Color(red: 0.49, green: 0.79, blue: 0.95)], startPoint: .top, endPoint: .bottom),
-                LinearGradient(colors: [Color(red: 0.45, green: 0.82, blue: 0.42), Color(red: 0.52, green: 0.86, blue: 0.49)], startPoint: .top, endPoint: .bottom),
-                LinearGradient(colors: [Color(red: 0.98, green: 0.79, blue: 0.15), Color(red: 1.0, green: 0.7, blue: 0.18)], startPoint: .top, endPoint: .bottom)
-            ]
+        if !previewImageURLs.isEmpty {
+            realImageGrid(urls: previewImageURLs)
+        }
+    }
 
-            HStack(spacing: 6) {
-                ForEach(0..<3, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(fills[index])
-                        .frame(width: itemWidth, height: itemWidth)
-                        .overlay {
-                            Image(systemName: index == 0 ? "figure.golf" : index == 1 ? "flag.fill" : "photo")
-                                .font(.system(size: 22))
-                                .foregroundStyle(.white.opacity(0.95))
-                        }
+    private func realImageGrid(urls: [URL]) -> some View {
+        Group {
+            if urls.count == 1 {
+                imageThumbnail(url: urls[0], index: 0)
+                    .frame(width: imageThumbnailSide, height: imageThumbnailSide)
+            } else {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.fixed(imageThumbnailSide), spacing: imageSpacing), count: imageColumnCount),
+                    spacing: imageSpacing
+                ) {
+                    ForEach(Array(urls.enumerated()), id: \.offset) { index, url in
+                        imageThumbnail(url: url, index: index)
+                            .frame(width: imageThumbnailSide, height: imageThumbnailSide)
+                    }
                 }
+                .frame(width: imageGridWidth, alignment: .leading)
             }
         }
-        .frame(height: 110)
+    }
+
+    private func imageThumbnail(url: URL, index: Int) -> some View {
+        Button {
+            if previewVideoURL != nil {
+                isPresentingVideoPreview = true
+            } else {
+                selectedImageIndex = index
+                isPresentingImagePreview = true
+            }
+        } label: {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    ZStack {
+                        Color(.systemGray5)
+                        Image(systemName: "photo")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.secondary)
+                    }
+                case .empty:
+                    ZStack {
+                        Color(.systemGray6)
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                @unknown default:
+                    Color(.systemGray6)
+                }
+            }
+            .frame(width: imageThumbnailSide, height: imageThumbnailSide)
+            .overlay {
+                if previewVideoURL != nil {
+                    ZStack {
+                        Color.black.opacity(0.18)
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: imageThumbnailSide >= 200 ? 48 : 28))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+            .contentShape(Rectangle())
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private var interactionBar: some View {
@@ -132,72 +246,62 @@ struct FeedCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
 
-            if showComments || isLiked {
+            if shouldShowInteractionPanel {
                 VStack(alignment: .leading, spacing: 6) {
-                    if isLoadingInteractions && comments.isEmpty && likes.isEmpty {
-                        HStack(spacing: 8) {
+                    if !likeSummaryText.isEmpty {
+                        Text(likeSummaryText)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color(red: 0.24, green: 0.34, blue: 0.56))
+                    }
+
+                    if !likeSummaryText.isEmpty && !comments.isEmpty {
+                        Rectangle()
+                            .fill(Color.black.opacity(0.05))
+                            .frame(height: 0.5)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(comments, id: \.id) { comment in
+                            VStack(alignment: .leading, spacing: 2) {
+                                (
+                                    Text(commentPrefix(for: comment))
+                                        .fontWeight(.semibold)
+                                    + Text(comment.content)
+                                )
+                                .font(.system(size: 15))
+                                .foregroundStyle(.primary)
+
+                                if comment.deliveryState == "failed" {
+                                    Text("发送失败，请重试")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                        }
+                    }
+
+                    if let interactionError {
+                        Text(interactionError)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red)
+                    }
+
+                    HStack(spacing: 8) {
+                        TextField("评论一下...", text: $commentDraft, axis: .vertical)
+                            .lineLimit(1...3)
+
+                        if isSendingComment {
                             ProgressView()
                                 .controlSize(.small)
-                            Text("正在生成朋友圈互动...")
-                                .font(.system(size: 14))
-                                .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        if !likeSummaryText.isEmpty {
-                            Text(likeSummaryText)
-                                .font(.system(size: 14))
-                                .foregroundStyle(Color(red: 0.24, green: 0.34, blue: 0.56))
-                        }
-
-                        if !likeSummaryText.isEmpty && !comments.isEmpty {
-                            Rectangle()
-                                .fill(Color.black.opacity(0.05))
-                                .frame(height: 0.5)
-                        }
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(comments, id: \.id) { comment in
-                                VStack(alignment: .leading, spacing: 2) {
-                                    (
-                                        Text(commentPrefix(for: comment))
-                                            .fontWeight(.semibold)
-                                        + Text(comment.content)
-                                    )
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(.primary)
-
-                                    if comment.deliveryState == "failed" {
-                                        Text("发送失败，请重试")
-                                            .font(.system(size: 12))
-                                            .foregroundStyle(.red)
-                                    }
-                                }
+                        } else {
+                            Button("发送") {
+                                sendComment()
                             }
+                            .font(.system(size: 14, weight: .semibold))
+                            .disabled(commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
-
-                        if let interactionError {
-                            Text(interactionError)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.red)
-                        }
-
-                        HStack(spacing: 8) {
-                            TextField("评论一下...", text: $commentDraft, axis: .vertical)
-                                .lineLimit(1...3)
-
-                            if isSendingComment {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Button("发送") {
-                                    sendComment()
-                                }
-                                .font(.system(size: 14, weight: .semibold))
-                                .disabled(commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            }
-                        }
-                        .font(.system(size: 14))
                     }
+                    .font(.system(size: 14))
                 }
                 .padding(10)
                 .background(Color(.systemGray6))
@@ -207,6 +311,10 @@ struct FeedCard: View {
     }
 
     private var locationText: String {
+        if post.sourceType == "xiaohongshu" {
+            return "中国"
+        }
+
         if let location = contact?.locationLabel, !location.isEmpty {
             return location
         }
@@ -215,7 +323,7 @@ struct FeedCard: View {
         case "trump": return "海湖庄园"
         case "musk": return "X HQ"
         case "zuckerberg": return "Meta Park"
-        default: return "新闻现场"
+        default: return "中国"
         }
     }
 
@@ -262,7 +370,9 @@ struct FeedCard: View {
             comments = state.comments
             isLiked = state.likes.contains(where: { $0.authorId == "viewer" })
         } catch {
-            interactionError = error.localizedDescription
+            if !shouldIgnoreInteractionError(error) {
+                interactionError = error.localizedDescription
+            }
         }
 
         isLoadingInteractions = false
@@ -287,7 +397,9 @@ struct FeedCard: View {
                 comments = state.comments
                 isLiked = state.likes.contains(where: { $0.authorId == "viewer" })
             } catch {
-                interactionError = error.localizedDescription
+                if !shouldIgnoreInteractionError(error) {
+                    interactionError = error.localizedDescription
+                }
                 if let state = try? interactionService.interactionState(for: post.id, modelContext: modelContext) {
                     likes = state.likes
                     comments = state.comments
@@ -314,9 +426,126 @@ struct FeedCard: View {
                 comments = state.comments
                 isLiked = state.likes.contains(where: { $0.authorId == "viewer" })
             } catch {
-                interactionError = error.localizedDescription
+                if !shouldIgnoreInteractionError(error) {
+                    interactionError = error.localizedDescription
+                }
             }
             isUpdatingLike = false
+        }
+    }
+
+    private func shouldIgnoreInteractionError(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain, nsError.code == NSURLErrorCancelled {
+            return true
+        }
+
+        let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return message == "cancelled" || message == "canceled"
+    }
+}
+
+private struct FeedImagePreview: View {
+    let urls: [URL]
+    let selectedIndex: Int
+    @Binding var isPresented: Bool
+
+    @State private var currentIndex: Int = 0
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+
+            TabView(selection: $currentIndex) {
+                ForEach(Array(urls.enumerated()), id: \.offset) { index, url in
+                    ZoomablePreviewImage(url: url)
+                        .tag(index)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: urls.count > 1 ? .always : .never))
+
+            Button {
+                isPresented = false
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(20)
+            }
+        }
+        .onAppear {
+            currentIndex = min(max(selectedIndex, 0), max(urls.count - 1, 0))
+        }
+    }
+}
+
+private struct FeedVideoPreview: View {
+    let url: URL
+    @Binding var isPresented: Bool
+
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+
+            Group {
+                if let player {
+                    VideoPlayer(player: player)
+                        .ignoresSafeArea()
+                } else {
+                    ProgressView()
+                        .tint(.white)
+                }
+            }
+
+            Button {
+                isPresented = false
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(20)
+            }
+        }
+        .onAppear {
+            let player = AVPlayer(url: url)
+            self.player = player
+            player.play()
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+        }
+    }
+}
+
+private struct ZoomablePreviewImage: View {
+    let url: URL
+
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black)
+            case .failure:
+                ContentUnavailableView("图片加载失败", systemImage: "photo")
+                    .foregroundStyle(.white)
+            case .empty:
+                ProgressView()
+                    .tint(.white)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            @unknown default:
+                EmptyView()
+            }
         }
     }
 }

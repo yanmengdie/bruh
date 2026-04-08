@@ -5,12 +5,20 @@ import {
   getLoginState,
   getMainPage,
   parseArgs,
+  scrapeNotePage,
   searchUsers,
   writeOutputFile,
 } from "./_shared.mjs"
 
 const defaultFunctionsURL = "https://mrxctelezutprdeemqla.supabase.co/functions/v1"
 const defaultAnonKey = "sb_publishable_ry_i_qMeMDzxeE7qhSl1UA_XcAwgQL1"
+
+function isUsableNoteImage(url) {
+  return typeof url === "string" &&
+    /xhscdn\.com/i.test(url) &&
+    !/avatar|user-avatar|default-avatar|fe-avatar/i.test(url) &&
+    /webpic|spectrum|sns-img|sns-webpic/i.test(url)
+}
 
 async function invokeFunction(baseURL, anonKey, functionName, body) {
   const response = await fetch(`${baseURL}/${functionName}`, {
@@ -83,6 +91,37 @@ async function main() {
       throw new Error(`已进入资料页，但没有抓到笔记卡片：${picked.profileUrl}`)
     }
 
+    const enrichedNotes = []
+    for (const note of notes) {
+      const targetUrl = note.noteUrl || note.exploreUrl
+      if (!targetUrl) {
+        enrichedNotes.push(note)
+        continue
+      }
+
+      const detail = await scrapeNotePage(context, targetUrl).catch(() => null)
+      const detailImageUrls = Array.isArray(detail?.imageUrls)
+        ? detail.imageUrls.filter(isUsableNoteImage)
+        : []
+
+      enrichedNotes.push({
+        ...note,
+        rawText: String(detail?.content ?? note.rawText ?? "").trim() || note.rawText,
+        imageUrls: detailImageUrls.length > 0
+          ? detailImageUrls
+          : note.imageUrls,
+        coverImageUrl: detailImageUrls.length > 0
+          ? detailImageUrls[0]
+          : note.coverImageUrl,
+        videoUrl: typeof detail?.videoUrl === "string" && detail.videoUrl
+          ? detail.videoUrl
+          : note.videoUrl ?? null,
+        publishedAt: typeof detail?.publishedAt === "string" && detail.publishedAt
+          ? detail.publishedAt
+          : note.publishedAt ?? null,
+      })
+    }
+
     const payload = {
       query,
       syncedAt: new Date().toISOString(),
@@ -98,7 +137,7 @@ async function main() {
         userId: candidate.userId,
         profileUrl: candidate.profileUrl,
       })),
-      notes,
+      notes: enrichedNotes,
     }
 
     if (shouldIngest) {
@@ -108,12 +147,16 @@ async function main() {
         userId: picked.userId,
         sourceHandle: `xhs:${picked.userId ?? personaId}`,
         profileUrl: picked.profileUrl,
-        notes: notes.map((note) => ({
+        notes: enrichedNotes.map((note) => ({
           noteId: note.noteId,
           title: note.title,
           rawText: note.rawText,
           noteUrl: note.noteUrl,
           exploreUrl: note.exploreUrl,
+          coverImageUrl: note.coverImageUrl,
+          imageUrls: Array.isArray(note.imageUrls) ? note.imageUrls : [],
+          videoUrl: note.videoUrl ?? null,
+          publishedAt: note.publishedAt ?? null,
           likeCount: note.likeCount,
           isPinned: note.isPinned,
           rawPayload: note,
@@ -144,7 +187,7 @@ async function main() {
       }
     }
     console.log("")
-    for (const [index, note] of notes.entries()) {
+    for (const [index, note] of enrichedNotes.entries()) {
       console.log(`${index + 1}. ${note.title}`)
       console.log(`   ${note.noteUrl || note.exploreUrl || "no-url"}`)
       console.log(`   ${String(note.rawText ?? "").slice(0, 140)}`)

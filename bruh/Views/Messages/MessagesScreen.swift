@@ -323,7 +323,12 @@ private struct MessageDetailView: View {
 
         Task {
             do {
-                try await service.sendMessage(personaId: thread.personaId, text: text, modelContext: modelContext)
+                try await service.sendMessage(
+                    personaId: thread.personaId,
+                    text: text,
+                    modelContext: modelContext,
+                    userInterests: InterestPreferences.selectedInterests()
+                )
             } catch {
                 errorMessage = error.localizedDescription
             }

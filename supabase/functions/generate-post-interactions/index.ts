@@ -49,6 +49,14 @@ type RankedContact = ContactProfile & {
   reasonCodes: string[]
 }
 
+type PersonaProfile = {
+  personaId: string
+  displayName: string
+  stance: string
+  domains: string[]
+  triggerKeywords: string[]
+}
+
 type ToolPayload = {
   likes?: Array<{
     authorId?: unknown
@@ -90,7 +98,49 @@ function relationshipHint(authorId: string, contactId: string): string {
   return hints[authorId]?.[contactId] ?? "Knows the author and comments only when the topic clearly connects."
 }
 
+function resolvePersonaProfile(personaId: string): PersonaProfile {
+  const resolved = resolvePersonaById(personaId)
+  if (resolved) {
+    return {
+      personaId: resolved.personaId,
+      displayName: resolved.displayName,
+      stance: resolved.stance,
+      domains: resolved.domains,
+      triggerKeywords: resolved.triggerKeywords,
+    }
+  }
+
+  return {
+    personaId,
+    displayName: personaId,
+    stance: "grounded, concise, authentic, sounds like the real post author in a social app thread",
+    domains: [],
+    triggerKeywords: [],
+  }
+}
+
+function acquaintanceIdsFor(authorId: string): string[] {
+  return Object.keys(
+    ({
+      musk: {
+        zuckerberg: true,
+        trump: true,
+      },
+      trump: {
+        musk: true,
+        zuckerberg: true,
+      },
+      zuckerberg: {
+        musk: true,
+        trump: true,
+      },
+    } as Record<string, Record<string, boolean>>)[authorId] ?? {},
+  )
+}
+
 function allContactsFor(authorId: string): ContactProfile[] {
+  const knownIds = new Set(acquaintanceIdsFor(authorId))
+
   return Object.entries(personaMap)
     .map(([username, persona]) => ({
       id: persona.personaId,
@@ -101,7 +151,7 @@ function allContactsFor(authorId: string): ContactProfile[] {
       triggerKeywords: persona.triggerKeywords,
       relationshipHint: relationshipHint(authorId, persona.personaId),
     }))
-    .filter((contact) => contact.id !== authorId)
+    .filter((contact) => contact.id !== authorId && knownIds.has(contact.id))
 }
 
 function extractMentionedPersonaIds(texts: string[]): Set<string> {
@@ -179,9 +229,7 @@ function rankContacts(
 
 function pickSeedCommenters(ranked: RankedContact[]): RankedContact[] {
   const strongMatches = ranked.filter((contact) => contact.score >= 3)
-  if (strongMatches.length >= 2) return strongMatches.slice(0, 2)
-  if (strongMatches.length === 1) return strongMatches
-  return ranked.slice(0, 1)
+  return strongMatches.slice(0, 2)
 }
 
 function pickReplyParticipants(authorId: string, ranked: RankedContact[], viewerComment: string): RankedContact[] {
@@ -193,7 +241,7 @@ function pickReplyParticipants(authorId: string, ranked: RankedContact[], viewer
 
 function displayNameFor(authorId: string): string {
   if (authorId === "viewer") return "你"
-  return resolvePersonaById(authorId)?.displayName ?? authorId
+  return resolvePersonaProfile(authorId).displayName
 }
 
 function personaVoiceGuidance(personaId: string): string {
@@ -344,10 +392,7 @@ async function generateInteractionsWithFallback(
   allowedLikes: RankedContact[],
   allowedCommenters: RankedContact[],
 ) {
-  const author = resolvePersonaById(authorId)
-  if (!author) {
-    throw new Error("Unknown post author")
-  }
+  const author = resolvePersonaProfile(authorId)
 
   const generatedAt = new Date().toISOString()
   const likes = viewerComment
@@ -378,8 +423,7 @@ async function generateInteractionsWithFallback(
     : allowedCommenters.map((contact) => contact.id)
 
   for (const [index, targetId] of targets.entries()) {
-    const targetPersona = resolvePersonaById(targetId)
-    if (!targetPersona) continue
+    const targetPersona = resolvePersonaProfile(targetId)
 
     const matchedContact = allowedCommenters.find((contact) => contact.id === targetId)
     const reason = matchedContact?.reasonCodes.join(", ") || (targetId === authorId ? "author_reply" : "topic_match")
@@ -456,10 +500,7 @@ async function generateInteractionsWithClaude(
   allowedLikes: RankedContact[],
   allowedCommenters: RankedContact[],
 ) {
-  const author = resolvePersonaById(authorId)
-  if (!author) {
-    throw new Error("Unknown post author")
-  }
+  const author = resolvePersonaProfile(authorId)
 
   const mode = viewerComment ? "reply" : "seed"
   const allowedIds = new Set([
@@ -651,6 +692,28 @@ function sanitizeGeneratedPayload(
       createdAt: new Date(Date.parse(generatedAt) + index * 1000).toISOString(),
     }))
 
+  if (mode === "reply") {
+    const authorReply = comments.find((item) => item.authorId === authorId) ?? {
+      id: `comment-${postId}-${authorId}-${crypto.randomUUID()}`,
+      postId,
+      authorId,
+      authorDisplayName: displayNameFor(authorId),
+      content: templatedFallbackComment(authorId, displayNameFor(authorId), viewerComment),
+      reasonCode: "author_reply",
+      inReplyToCommentId: existingComments.at(-1)?.id ?? null,
+      isViewer: false,
+      createdAt: generatedAt,
+    }
+
+    const followUp = comments.find((item) => item.authorId !== authorId) ?? null
+    return {
+      postId,
+      likes: [],
+      comments: followUp ? [authorReply, followUp] : [authorReply],
+      generatedAt,
+    }
+  }
+
   return {
     postId,
     likes: mode === "seed" ? likes : [],
@@ -833,10 +896,6 @@ Deno.serve(async (request) => {
       )
     }
 
-    if (!resolvePersonaById(personaId)) {
-      return Response.json({ error: "Unknown personaId" }, { status: 400, headers: corsHeaders })
-    }
-
     const supabase = createClient(projectUrl, serviceRoleKey)
     let stored = await fetchStoredState(supabase, postId)
 
@@ -876,6 +935,10 @@ Deno.serve(async (request) => {
       const allowedLikes = ranked
         .filter((contact) => allowedCommenters.some((commenter) => commenter.id === contact.id) || contact.score >= 2)
         .slice(0, 4)
+
+      if (allowedCommenters.length === 0 && allowedLikes.length === 0) {
+        return Response.json(mapStoredState(postId, stored.likes, stored.comments), { headers: corsHeaders })
+      }
 
       let generated
       if (anthropicApiKey) {

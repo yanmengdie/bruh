@@ -16,14 +16,7 @@ final class FeedService {
     /// Returns the number of new posts fetched.
     func refreshFeed(modelContext: ModelContext) async throws -> Int {
         try demoteSeedPostsIfNeeded(modelContext: modelContext)
-
-        var descriptor = FetchDescriptor<PersonaPost>(
-            sortBy: [SortDescriptor(\PersonaPost.publishedAt, order: .reverse)]
-        )
-        descriptor.fetchLimit = 1
-        let latest = try modelContext.fetch(descriptor).first
-
-        let dtos = try await api.fetchFeed(since: latest?.publishedAt)
+        let dtos = try await api.fetchFeed(limit: 40)
         var newCount = 0
 
         for dto in dtos {
@@ -31,7 +24,20 @@ final class FeedService {
                 predicate: #Predicate { $0.id == dto.id }
             )
             check.fetchLimit = 1
-            if try modelContext.fetch(check).first != nil { continue }
+            if let existing = try modelContext.fetch(check).first {
+                existing.personaId = dto.personaId
+                existing.content = dto.content
+                existing.sourceType = dto.sourceType
+                existing.sourceUrl = dto.sourceUrl
+                existing.topic = dto.topic
+                existing.importanceScore = dto.importanceScore
+                existing.mediaUrls = dto.mediaUrls
+                existing.videoUrl = dto.videoUrl
+                existing.publishedAt = dto.publishedAt
+                existing.fetchedAt = .now
+                existing.isDelivered = true
+                continue
+            }
 
             modelContext.insert(
                 PersonaPost(
@@ -42,6 +48,8 @@ final class FeedService {
                     sourceUrl: dto.sourceUrl,
                     topic: dto.topic,
                     importanceScore: dto.importanceScore,
+                    mediaUrls: dto.mediaUrls,
+                    videoUrl: dto.videoUrl,
                     publishedAt: dto.publishedAt,
                     fetchedAt: .now,
                     isDelivered: true

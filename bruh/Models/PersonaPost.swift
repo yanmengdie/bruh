@@ -10,6 +10,8 @@ final class PersonaPost {
     var sourceUrl: String?
     var topic: String?
     var importanceScore: Double
+    var mediaUrls: [String]
+    var videoUrl: String?
     var publishedAt: Date
     var fetchedAt: Date
     var isDelivered: Bool
@@ -22,6 +24,8 @@ final class PersonaPost {
         sourceUrl: String? = nil,
         topic: String? = nil,
         importanceScore: Double = 0.5,
+        mediaUrls: [String] = [],
+        videoUrl: String? = nil,
         publishedAt: Date = .now,
         fetchedAt: Date = .now,
         isDelivered: Bool = false
@@ -33,6 +37,8 @@ final class PersonaPost {
         self.sourceUrl = sourceUrl
         self.topic = topic
         self.importanceScore = importanceScore
+        self.mediaUrls = mediaUrls
+        self.videoUrl = videoUrl
         self.publishedAt = publishedAt
         self.fetchedAt = fetchedAt
         self.isDelivered = isDelivered

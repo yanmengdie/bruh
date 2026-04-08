@@ -183,6 +183,8 @@ struct PostDTO: Codable, Identifiable {
     let sourceUrl: String?
     let topic: String?
     let importanceScore: Double
+    let mediaUrls: [String]
+    let videoUrl: String?
     let publishedAt: Date
 }
 

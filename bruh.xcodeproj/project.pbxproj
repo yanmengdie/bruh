@@ -29,6 +29,10 @@
 		A10000140000000000000014 /* FeedLike.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000140000000000000014 /* FeedLike.swift */; };
 		A10000150000000000000015 /* FeedInteractionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000150000000000000015 /* FeedInteractionService.swift */; };
 		A10000160000000000000016 /* NewsInterest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000160000000000000016 /* NewsInterest.swift */; };
+		A10000170000000000000017 /* MessagesScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000170000000000000017 /* MessagesScreen.swift */; };
+		A10000180000000000000018 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000180000000000000018 /* AppTheme.swift */; };
+		A10000190000000000000019 /* AppBackIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000190000000000000019 /* AppBackIcon.swift */; };
+		A100001A000000000000001A /* SwipeBackGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001A000000000000001A /* SwipeBackGesture.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -54,6 +58,10 @@
 		B10000140000000000000014 /* FeedLike.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedLike.swift; sourceTree = "<group>"; };
 		B10000150000000000000015 /* FeedInteractionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedInteractionService.swift; sourceTree = "<group>"; };
 		B10000160000000000000016 /* NewsInterest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsInterest.swift; sourceTree = "<group>"; };
+		B10000170000000000000017 /* MessagesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesScreen.swift; sourceTree = "<group>"; };
+		B10000180000000000000018 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
+		B10000190000000000000019 /* AppBackIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackIcon.swift; sourceTree = "<group>"; };
+		B100001A000000000000001A /* SwipeBackGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeBackGesture.swift; sourceTree = "<group>"; };
 		C1000001000000000000001 /* bruh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bruh.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -113,6 +121,7 @@
 				E1000007000000000000007 /* Feed */,
 				E1000008000000000000008 /* Components */,
 				E1000009000000000000009 /* Home */,
+				E100000B00000000000000B /* Messages */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -147,8 +156,11 @@
 		E1000008000000000000008 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				B10000190000000000000019 /* AppBackIcon.swift */,
+				B10000180000000000000018 /* AppTheme.swift */,
 				B1000009000000000000009 /* PersonaAvatar.swift */,
 				B100000D00000000000000D /* PhoneFrame.swift */,
+				B100001A000000000000001A /* SwipeBackGesture.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -159,6 +171,14 @@
 				B100000E00000000000000E /* HomeScreen.swift */,
 			);
 			path = Home;
+			sourceTree = "<group>";
+		};
+		E100000B00000000000000B /* Messages */ = {
+			isa = PBXGroup;
+			children = (
+				B10000170000000000000017 /* MessagesScreen.swift */,
+			);
+			path = Messages;
 			sourceTree = "<group>";
 		};
 		E100000A00000000000000A /* Products */ = {
@@ -252,6 +272,9 @@
 				A1000006000000000000006 /* SourceItem.swift in Sources */,
 				A1000007000000000000007 /* FeedView.swift in Sources */,
 				A1000008000000000000008 /* FeedCard.swift in Sources */,
+				A10000170000000000000017 /* MessagesScreen.swift in Sources */,
+				A10000180000000000000018 /* AppTheme.swift in Sources */,
+				A10000190000000000000019 /* AppBackIcon.swift in Sources */,
 				A1000009000000000000009 /* PersonaAvatar.swift in Sources */,
 				A100000A00000000000000A /* FeedService.swift in Sources */,
 				A10000150000000000000015 /* FeedInteractionService.swift in Sources */,
@@ -259,6 +282,7 @@
 				A100000B00000000000000B /* APIClient.swift in Sources */,
 				A100000D00000000000000D /* PhoneFrame.swift in Sources */,
 				A100000E00000000000000E /* HomeScreen.swift in Sources */,
+				A100001A000000000000001A /* SwipeBackGesture.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

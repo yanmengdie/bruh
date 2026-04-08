@@ -10,6 +10,39 @@ type FeedRow = {
   topic: string | null
   importance_score: number
   published_at: string
+  media_urls: string[] | null
+  video_url: string | null
+  raw_payload?: Record<string, unknown> | null
+  source_posts?: {
+    video_url?: string | null
+    raw_payload?: Record<string, unknown> | null
+  } | null
+}
+
+function resolveVideoUrl(item: FeedRow): string | null {
+  if (typeof item.video_url === "string" && item.video_url) {
+    return item.video_url
+  }
+
+  const mergedPayloadSource = item.source_posts?.raw_payload ?? item.raw_payload
+  const mergedVideoUrl = item.source_posts?.video_url
+  if (typeof mergedVideoUrl === "string" && mergedVideoUrl) {
+    return mergedVideoUrl
+  }
+
+  const rawPayload = mergedPayloadSource
+  if (!rawPayload || typeof rawPayload !== "object") return null
+
+  const payloadDirect = rawPayload.videoUrl
+  if (typeof payloadDirect === "string" && payloadDirect) {
+    return payloadDirect
+  }
+
+  const note = rawPayload.note
+  if (!note || typeof note !== "object") return null
+
+  const noteVideo = (note as Record<string, unknown>).videoUrl
+  return typeof noteVideo === "string" && noteVideo ? noteVideo : null
 }
 
 function mapFeed(rows: FeedRow[]) {
@@ -22,6 +55,8 @@ function mapFeed(rows: FeedRow[]) {
     topic: item.topic,
     importanceScore: item.importance_score,
     publishedAt: item.published_at,
+    mediaUrls: Array.isArray(item.media_urls) ? item.media_urls : [],
+    videoUrl: resolveVideoUrl(item),
   }))
 }
 
@@ -59,7 +94,7 @@ Deno.serve(async (request) => {
 
     let feedQuery = supabase
       .from("feed_items")
-      .select("id, persona_id, content, source_type, source_url, topic, importance_score, published_at")
+      .select("id, persona_id, content, source_type, source_url, topic, importance_score, published_at, media_urls, video_url, source_posts(video_url, raw_payload)")
       .order("published_at", { ascending: false })
       .limit(limit)
 
@@ -82,7 +117,7 @@ Deno.serve(async (request) => {
 
     let sourceQuery = supabase
       .from("source_posts")
-      .select("id, persona_id, content, source_type, source_url, topic, importance_score, published_at")
+      .select("id, persona_id, content, source_type, source_url, topic, importance_score, published_at, media_urls, video_url, raw_payload")
       .order("published_at", { ascending: false })
       .limit(limit)
 
