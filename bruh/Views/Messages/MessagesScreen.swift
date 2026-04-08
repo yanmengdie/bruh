@@ -1062,10 +1062,10 @@ private enum MessagesScreenPreviewData {
         ),
         Contact(
             linkedPersonaId: "musk",
-            name: "Elon Musk",
+            name: "马期克",
             phoneNumber: "+1 310 555 0142",
             email: "elon@x.ai",
-            avatarName: "avatar_musk",
+            avatarName: "Avatar_ Elon",
             locationLabel: "X HQ",
             isFavorite: true
         ),

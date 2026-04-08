@@ -267,6 +267,27 @@ private struct ContactsView: View {
     @AppStorage("invite_justin_sun_unlocked") private var inviteJustinSunUnlocked = false
     @AppStorage("invite_justin_sun_accepted") private var inviteJustinSunAccepted = false
     @AppStorage("invite_justin_sun_ignored") private var inviteJustinSunIgnored = false
+    @AppStorage("invite_papi_unlocked") private var invitePapiUnlocked = false
+    @AppStorage("invite_papi_accepted") private var invitePapiAccepted = false
+    @AppStorage("invite_papi_ignored") private var invitePapiIgnored = false
+    @AppStorage("invite_sam_altman_unlocked") private var inviteSamAltmanUnlocked = false
+    @AppStorage("invite_sam_altman_accepted") private var inviteSamAltmanAccepted = false
+    @AppStorage("invite_sam_altman_ignored") private var inviteSamAltmanIgnored = false
+    @AppStorage("invite_lei_jun_unlocked") private var inviteLeiJunUnlocked = false
+    @AppStorage("invite_lei_jun_accepted") private var inviteLeiJunAccepted = false
+    @AppStorage("invite_lei_jun_ignored") private var inviteLeiJunIgnored = false
+    @AppStorage("invite_sun_yuchen_unlocked") private var inviteSunYuchenUnlocked = false
+    @AppStorage("invite_sun_yuchen_accepted") private var inviteSunYuchenAccepted = false
+    @AppStorage("invite_sun_yuchen_ignored") private var inviteSunYuchenIgnored = false
+    @AppStorage("invite_liu_jingkang_unlocked") private var inviteLiuJingkangUnlocked = false
+    @AppStorage("invite_liu_jingkang_accepted") private var inviteLiuJingkangAccepted = false
+    @AppStorage("invite_liu_jingkang_ignored") private var inviteLiuJingkangIgnored = false
+    @AppStorage("invite_kim_kardashian_unlocked") private var inviteKimUnlocked = false
+    @AppStorage("invite_kim_kardashian_accepted") private var inviteKimAccepted = false
+    @AppStorage("invite_kim_kardashian_ignored") private var inviteKimIgnored = false
+    @AppStorage("invite_luo_yonghao_unlocked") private var inviteLuoYonghaoUnlocked = false
+    @AppStorage("invite_luo_yonghao_accepted") private var inviteLuoYonghaoAccepted = false
+    @AppStorage("invite_luo_yonghao_ignored") private var inviteLuoYonghaoIgnored = false
     private static let alphabet: [String] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map(String.init) + ["#"]
 
     private var filteredContacts: [Contact] {
@@ -301,8 +322,14 @@ private struct ContactsView: View {
         var items: [BruhInvitation] = []
         if !inviteTrumpAccepted, !inviteTrumpIgnored { items.append(.trump) }
         if inviteMuskUnlocked, !inviteMuskAccepted, !inviteMuskIgnored { items.append(.musk) }
-        if inviteZuckerbergUnlocked, !inviteZuckerbergAccepted, !inviteZuckerbergIgnored { items.append(.zuckerberg) }
         if inviteJustinSunUnlocked, !inviteJustinSunAccepted, !inviteJustinSunIgnored { items.append(.justinSun) }
+        if invitePapiUnlocked, !invitePapiAccepted, !invitePapiIgnored { items.append(.papi) }
+        if inviteSamAltmanUnlocked, !inviteSamAltmanAccepted, !inviteSamAltmanIgnored { items.append(.samAltman) }
+        if inviteLeiJunUnlocked, !inviteLeiJunAccepted, !inviteLeiJunIgnored { items.append(.leiJun) }
+        if inviteSunYuchenUnlocked, !inviteSunYuchenAccepted, !inviteSunYuchenIgnored { items.append(.sunYuchen) }
+        if inviteLiuJingkangUnlocked, !inviteLiuJingkangAccepted, !inviteLiuJingkangIgnored { items.append(.liuJingkang) }
+        if inviteKimUnlocked, !inviteKimAccepted, !inviteKimIgnored { items.append(.kimKardashian) }
+        if inviteLuoYonghaoUnlocked, !inviteLuoYonghaoAccepted, !inviteLuoYonghaoIgnored { items.append(.luoYonghao) }
         return items
     }
 
@@ -402,6 +429,7 @@ private struct ContactsView: View {
             bootstrapInviteFlowIfNeeded()
             restoreInviteFlowIfNeeded()
             ensureInvitationProgressConsistency()
+            normalizeInvitationContactsIfNeeded()
         }
     }
 
@@ -699,7 +727,27 @@ private struct ContactsView: View {
         ensureInvitationProgressConsistency()
         recoverPendingInvitationsIfNeeded()
         if pendingInvitations.isEmpty {
-            forceRestartInvitationFlow()
+            // Only restart the whole flow when nothing has been decided yet.
+            // Otherwise, an "empty pending list" usually means the user has ignored/accepted
+            // all currently available invitations.
+            let hasDecidedAnyInvitation =
+                inviteTrumpAccepted || inviteTrumpIgnored
+                || inviteMuskAccepted || inviteMuskIgnored
+                || inviteZuckerbergAccepted || inviteZuckerbergIgnored
+                || inviteJustinSunAccepted || inviteJustinSunIgnored
+                || invitePapiAccepted || invitePapiIgnored
+                || inviteSamAltmanAccepted || inviteSamAltmanIgnored
+                || inviteLeiJunAccepted || inviteLeiJunIgnored
+                || inviteSunYuchenAccepted || inviteSunYuchenIgnored
+                || inviteLiuJingkangAccepted || inviteLiuJingkangIgnored
+                || inviteKimAccepted || inviteKimIgnored
+                || inviteLuoYonghaoAccepted || inviteLuoYonghaoIgnored
+
+            if !hasDecidedAnyInvitation {
+                forceRestartInvitationFlow()
+            } else {
+                return
+            }
         }
         guard let invitation = pendingInvitations.first else { return }
         presentedInvitation = invitation
@@ -726,7 +774,9 @@ private struct ContactsView: View {
             inviteJustinSunAccepted = true
             inviteJustinSunIgnored = false
             scheduleJustinSunFollowUps()
+            unlockAdditionalInvitations()
         default:
+            acceptAdditionalInvitation(personaId: invitation.personaId)
             break
         }
         ensureInvitationProgressConsistency()
@@ -748,6 +798,7 @@ private struct ContactsView: View {
         case "justin_sun":
             inviteJustinSunIgnored = true
         default:
+            ignoreAdditionalInvitation(personaId: invitation.personaId)
             break
         }
         ensureInvitationProgressConsistency()
@@ -836,7 +887,7 @@ private struct ContactsView: View {
         }
 
         inviteTrumpAccepted = false
-        inviteMuskUnlocked = false
+        inviteMuskUnlocked = true
         inviteMuskAccepted = false
         inviteMuskIgnored = false
         inviteZuckerbergUnlocked = false
@@ -845,6 +896,27 @@ private struct ContactsView: View {
         inviteJustinSunUnlocked = false
         inviteJustinSunAccepted = false
         inviteJustinSunIgnored = false
+        invitePapiUnlocked = true
+        invitePapiAccepted = false
+        invitePapiIgnored = false
+        inviteSamAltmanUnlocked = true
+        inviteSamAltmanAccepted = false
+        inviteSamAltmanIgnored = false
+        inviteLeiJunUnlocked = true
+        inviteLeiJunAccepted = false
+        inviteLeiJunIgnored = false
+        inviteSunYuchenUnlocked = true
+        inviteSunYuchenAccepted = false
+        inviteSunYuchenIgnored = false
+        inviteLiuJingkangUnlocked = true
+        inviteLiuJingkangAccepted = false
+        inviteLiuJingkangIgnored = false
+        inviteKimUnlocked = true
+        inviteKimAccepted = false
+        inviteKimIgnored = false
+        inviteLuoYonghaoUnlocked = true
+        inviteLuoYonghaoAccepted = false
+        inviteLuoYonghaoIgnored = false
         inviteTrumpIgnored = false
         inviteFlowInitialized = true
         try? modelContext.save()
@@ -856,11 +928,18 @@ private struct ContactsView: View {
             || inviteMuskUnlocked || inviteMuskAccepted || inviteMuskIgnored
             || inviteZuckerbergUnlocked || inviteZuckerbergAccepted || inviteZuckerbergIgnored
             || inviteJustinSunUnlocked || inviteJustinSunAccepted || inviteJustinSunIgnored
+            || invitePapiUnlocked || invitePapiAccepted || invitePapiIgnored
+            || inviteSamAltmanUnlocked || inviteSamAltmanAccepted || inviteSamAltmanIgnored
+            || inviteLeiJunUnlocked || inviteLeiJunAccepted || inviteLeiJunIgnored
+            || inviteSunYuchenUnlocked || inviteSunYuchenAccepted || inviteSunYuchenIgnored
+            || inviteLiuJingkangUnlocked || inviteLiuJingkangAccepted || inviteLiuJingkangIgnored
+            || inviteKimUnlocked || inviteKimAccepted || inviteKimIgnored
+            || inviteLuoYonghaoUnlocked || inviteLuoYonghaoAccepted || inviteLuoYonghaoIgnored
 
         guard contacts.isEmpty, pendingInvitations.isEmpty, !hasDecidedAnyInvitation else { return }
 
         inviteTrumpAccepted = false
-        inviteMuskUnlocked = false
+        inviteMuskUnlocked = true
         inviteMuskAccepted = false
         inviteMuskIgnored = false
         inviteZuckerbergUnlocked = false
@@ -869,10 +948,40 @@ private struct ContactsView: View {
         inviteJustinSunUnlocked = false
         inviteJustinSunAccepted = false
         inviteJustinSunIgnored = false
+        invitePapiUnlocked = true
+        invitePapiAccepted = false
+        invitePapiIgnored = false
+        inviteSamAltmanUnlocked = true
+        inviteSamAltmanAccepted = false
+        inviteSamAltmanIgnored = false
+        inviteLeiJunUnlocked = true
+        inviteLeiJunAccepted = false
+        inviteLeiJunIgnored = false
+        inviteSunYuchenUnlocked = true
+        inviteSunYuchenAccepted = false
+        inviteSunYuchenIgnored = false
+        inviteLiuJingkangUnlocked = true
+        inviteLiuJingkangAccepted = false
+        inviteLiuJingkangIgnored = false
+        inviteKimUnlocked = true
+        inviteKimAccepted = false
+        inviteKimIgnored = false
+        inviteLuoYonghaoUnlocked = true
+        inviteLuoYonghaoAccepted = false
+        inviteLuoYonghaoIgnored = false
         inviteTrumpIgnored = false
     }
 
     private func ensureInvitationProgressConsistency() {
+        inviteMuskUnlocked = true
+        invitePapiUnlocked = true
+        inviteSamAltmanUnlocked = true
+        inviteLeiJunUnlocked = true
+        inviteSunYuchenUnlocked = true
+        inviteLiuJingkangUnlocked = true
+        inviteKimUnlocked = true
+        inviteLuoYonghaoUnlocked = true
+
         if (inviteTrumpAccepted || inviteTrumpIgnored) && !inviteMuskAccepted && !inviteMuskIgnored {
             inviteMuskUnlocked = true
         }
@@ -884,14 +993,18 @@ private struct ContactsView: View {
         if (inviteZuckerbergAccepted || inviteZuckerbergIgnored) && !inviteJustinSunAccepted && !inviteJustinSunIgnored {
             inviteJustinSunUnlocked = true
         }
+
+        if inviteJustinSunAccepted {
+            unlockAdditionalInvitations()
+        }
     }
 
     private func recoverPendingInvitationsIfNeeded() {
         guard pendingInvitations.isEmpty else { return }
 
-        if !inviteTrumpAccepted {
+        if !(inviteTrumpAccepted || inviteTrumpIgnored) {
             inviteTrumpIgnored = false
-            inviteMuskUnlocked = false
+            inviteMuskUnlocked = true
             inviteMuskIgnored = false
             inviteZuckerbergUnlocked = false
             inviteZuckerbergIgnored = false
@@ -900,13 +1013,13 @@ private struct ContactsView: View {
             return
         }
 
-        if !inviteMuskAccepted {
+        if !(inviteMuskAccepted || inviteMuskIgnored) {
             inviteMuskUnlocked = true
             inviteMuskIgnored = false
             return
         }
 
-        if !inviteZuckerbergAccepted {
+        if !(inviteZuckerbergAccepted || inviteZuckerbergIgnored) {
             inviteZuckerbergUnlocked = true
             inviteZuckerbergIgnored = false
             inviteJustinSunUnlocked = false
@@ -914,16 +1027,19 @@ private struct ContactsView: View {
             return
         }
 
-        if !inviteJustinSunAccepted {
+        if !(inviteJustinSunAccepted || inviteJustinSunIgnored) {
             inviteJustinSunUnlocked = true
             inviteJustinSunIgnored = false
+            return
         }
+
+        unlockAdditionalInvitations()
     }
 
     private func forceRestartInvitationFlow() {
         inviteTrumpAccepted = false
         inviteTrumpIgnored = false
-        inviteMuskUnlocked = false
+        inviteMuskUnlocked = true
         inviteMuskAccepted = false
         inviteMuskIgnored = false
         inviteZuckerbergUnlocked = false
@@ -932,14 +1048,47 @@ private struct ContactsView: View {
         inviteJustinSunUnlocked = false
         inviteJustinSunAccepted = false
         inviteJustinSunIgnored = false
+        invitePapiUnlocked = true
+        invitePapiAccepted = false
+        invitePapiIgnored = false
+        inviteSamAltmanUnlocked = true
+        inviteSamAltmanAccepted = false
+        inviteSamAltmanIgnored = false
+        inviteLeiJunUnlocked = true
+        inviteLeiJunAccepted = false
+        inviteLeiJunIgnored = false
+        inviteSunYuchenUnlocked = true
+        inviteSunYuchenAccepted = false
+        inviteSunYuchenIgnored = false
+        inviteLiuJingkangUnlocked = true
+        inviteLiuJingkangAccepted = false
+        inviteLiuJingkangIgnored = false
+        inviteKimUnlocked = true
+        inviteKimAccepted = false
+        inviteKimIgnored = false
+        inviteLuoYonghaoUnlocked = true
+        inviteLuoYonghaoAccepted = false
+        inviteLuoYonghaoIgnored = false
     }
 
     private func addContactIfNeeded(for invitation: BruhInvitation) {
-        let alreadyExists = contacts.contains { contact in
+        if let existing = contacts.first(where: { contact in
             contact.linkedPersonaId == invitation.personaId
                 || contact.name.localizedCaseInsensitiveCompare(invitation.displayName) == .orderedSame
+        }) {
+            if existing.linkedPersonaId == nil {
+                existing.linkedPersonaId = invitation.personaId
+            }
+            existing.name = invitation.displayName
+            existing.phoneNumber = invitation.phoneNumber
+            existing.email = invitation.email
+            existing.avatarName = invitation.avatarName
+            existing.themeColorHex = invitation.themeHex
+            existing.locationLabel = invitation.location
+            existing.updatedAt = .now
+            try? modelContext.save()
+            return
         }
-        guard !alreadyExists else { return }
 
         let contact = Contact(
             linkedPersonaId: invitation.personaId,
@@ -952,6 +1101,104 @@ private struct ContactsView: View {
             isFavorite: false
         )
         modelContext.insert(contact)
+    }
+
+    private func unlockAdditionalInvitations() {
+        invitePapiUnlocked = true
+        inviteSamAltmanUnlocked = true
+        inviteLeiJunUnlocked = true
+        inviteSunYuchenUnlocked = true
+        inviteLiuJingkangUnlocked = true
+        inviteKimUnlocked = true
+        inviteLuoYonghaoUnlocked = true
+    }
+
+    private func acceptAdditionalInvitation(personaId: String) {
+        switch personaId {
+        case "papi":
+            invitePapiAccepted = true
+            invitePapiIgnored = false
+            scheduleAdditionalPersonaFollowUps(personaId: "papi")
+        case "sam_altman":
+            inviteSamAltmanAccepted = true
+            inviteSamAltmanIgnored = false
+            scheduleAdditionalPersonaFollowUps(personaId: "sam_altman")
+        case "lei_jun":
+            inviteLeiJunAccepted = true
+            inviteLeiJunIgnored = false
+            scheduleAdditionalPersonaFollowUps(personaId: "lei_jun")
+        case "sun_yuchen":
+            inviteSunYuchenAccepted = true
+            inviteSunYuchenIgnored = false
+            scheduleAdditionalPersonaFollowUps(personaId: "sun_yuchen")
+        case "liu_jingkang":
+            inviteLiuJingkangAccepted = true
+            inviteLiuJingkangIgnored = false
+            scheduleAdditionalPersonaFollowUps(personaId: "liu_jingkang")
+        case "kim_kardashian":
+            inviteKimAccepted = true
+            inviteKimIgnored = false
+            scheduleAdditionalPersonaFollowUps(personaId: "kim_kardashian")
+        case "luo_yonghao":
+            inviteLuoYonghaoAccepted = true
+            inviteLuoYonghaoIgnored = false
+            scheduleAdditionalPersonaFollowUps(personaId: "luo_yonghao")
+        default:
+            break
+        }
+    }
+
+    private func ignoreAdditionalInvitation(personaId: String) {
+        switch personaId {
+        case "papi":
+            invitePapiIgnored = true
+        case "sam_altman":
+            inviteSamAltmanIgnored = true
+        case "lei_jun":
+            inviteLeiJunIgnored = true
+        case "sun_yuchen":
+            inviteSunYuchenIgnored = true
+        case "liu_jingkang":
+            inviteLiuJingkangIgnored = true
+        case "kim_kardashian":
+            inviteKimIgnored = true
+        case "luo_yonghao":
+            inviteLuoYonghaoIgnored = true
+        default:
+            break
+        }
+    }
+
+    private func scheduleAdditionalPersonaFollowUps(personaId: String) {
+        Task { @MainActor in
+            let script: [(delaySeconds: UInt64, text: String)] = {
+                switch personaId {
+                case "musk":
+                    return [(2, "Saw your add. X is a real-time sensor for the world now. I’ll forward the signals. ⚡️")]
+                case "papi":
+                    return [(2, "在吗 bro？今天有个热梗我看一眼就知道要爆。"), (6, "我只发你真正有梗的，其他都是噪音。")]
+                case "sam_altman":
+                    return [(2, "Hey — good to connect. The next few months will be weird, in a productive way."), (7, "If you want: I can summarize the important model/product moves in 2 lines.")]
+                case "lei_jun":
+                    return [(2, "兄弟，欢迎。做产品最重要的是把体验做扎实。"), (6, "最近行业变化挺快，我给你抓关键。")]
+                case "sun_yuchen":
+                    return [(2, "bro，链上节奏很快，别被情绪带跑。"), (6, "看到机会就要敢冲，但要有纪律。🚀")]
+                case "liu_jingkang":
+                    return [(2, "影像这块很多参数是‘看起来很美’，我给你讲真实体验。"), (7, "有空聊聊运动相机的下一代形态。")]
+                case "kim_kardashian":
+                    return [(2, "Hi love. Let’s keep it cute."), (6, "I’ll send you highlights that actually matter. 💅")]
+                case "luo_yonghao":
+                    return [(2, "我跟你说，很多东西就是——一眼假。"), (7, "以后我看到离谱的，我第一时间告诉你。")]
+                default:
+                    return [(2, "Hey.")]
+                }
+            }()
+
+            for item in script {
+                try? await Task.sleep(nanoseconds: item.delaySeconds * 1_000_000_000)
+                insertIncomingMessage(personaId: personaId, text: item.text, sourcePostIds: [])
+            }
+        }
     }
 
     private func scheduleTrumpFollowUps() {
@@ -993,6 +1240,134 @@ private struct ContactsView: View {
                 text: "今晚我会继续同步几条重点信号，别掉线，冲就完了。🚀",
                 sourcePostIds: []
             )
+        }
+    }
+
+    private func addAdditionalContactsAfterJustinSun() {
+        let candidates: [(personaId: String, name: String, avatarName: String, themeHex: String, phone: String, email: String, location: String)] = [
+            // Theme colors are chosen to match each person's brand vibe.
+            ("papi", "Hahi", "Avatar_Papi", "#111827", "+1 212 555 0199", "papi@bruh.app", "New York"),
+            ("sam_altman", "凹凸曼", "Avatar_ Sam Altman", "#1AA987", "+1 415 555 0124", "sam@openai.com", "San Francisco"),
+            ("lei_jun", "田车", "Avatar_ Leijun", "#FF6900", "+86 10 5555 0202", "leijun@xiaomi.com", "北京"),
+            ("sun_yuchen", "孙割", "Avatar_Justin Sun", "#19BCA0", "+86 10 5555 0303", "sun@tron.network", "新加坡"),
+            ("liu_jingkang", "刘瞬间", "Avatar_ LiuJingkang", "#F59E0B", "+86 755 5555 0404", "liu@insta360.com", "深圳"),
+            ("kim_kardashian", "银卡戴珊", "Avatar_ Kim", "#EC4899", "+1 310 555 0505", "kim@bruh.app", "Los Angeles"),
+            ("luo_yonghao", "老罗", "Avatar_LuoYonghao", "#EF4444", "+86 10 5555 0606", "luo@bruh.app", "北京"),
+        ]
+
+        for item in candidates {
+            // If the contact already exists by name, upgrade it to a persona-linked contact so
+            // Messages can resolve avatar/theme by `linkedPersonaId`.
+            if let existing = contacts.first(where: { contact in
+                let matchesLegacyName = legacyInvitationNames[item.personaId]?.contains(where: { legacyName in
+                    contact.name.localizedCaseInsensitiveCompare(legacyName) == .orderedSame
+                }) == true
+
+                return contact.linkedPersonaId == item.personaId
+                    || contact.name.localizedCaseInsensitiveCompare(item.name) == .orderedSame
+                    || matchesLegacyName
+            }) {
+                if existing.linkedPersonaId == nil {
+                    existing.linkedPersonaId = item.personaId
+                }
+                existing.avatarName = item.avatarName
+                existing.themeColorHex = item.themeHex
+                existing.phoneNumber = item.phone
+                existing.email = item.email
+                existing.locationLabel = item.location
+                existing.updatedAt = Date.now
+                continue
+            }
+
+            modelContext.insert(
+                Contact(
+                    linkedPersonaId: item.personaId,
+                    name: item.name,
+                    phoneNumber: item.phone,
+                    email: item.email,
+                    avatarName: item.avatarName,
+                    themeColorHex: item.themeHex,
+                    locationLabel: item.location,
+                    isFavorite: false
+                )
+            )
+        }
+
+        // Ensure Elon theme is "X black" for the persona contact.
+        if let elon = contacts.first(where: { $0.linkedPersonaId == "musk" }) {
+            if elon.themeColorHex != "#0B0B0C" {
+                elon.themeColorHex = "#0B0B0C"
+                elon.updatedAt = .now
+            }
+        }
+
+        try? modelContext.save()
+    }
+
+    private func normalizeInvitationContactsIfNeeded() {
+        let mappings: [(personaId: String, newName: String, avatarName: String)] = [
+            ("musk", "马期克", "Avatar_ Elon"),
+            ("papi", "Hahi", "Avatar_Papi"),
+            ("sam_altman", "凹凸曼", "Avatar_ Sam Altman"),
+            ("lei_jun", "田车", "Avatar_ Leijun"),
+            ("sun_yuchen", "孙割", "Avatar_Justin Sun"),
+            ("liu_jingkang", "刘瞬间", "Avatar_ LiuJingkang"),
+            ("kim_kardashian", "银卡戴珊", "Avatar_ Kim"),
+            ("luo_yonghao", "老罗", "Avatar_LuoYonghao"),
+        ]
+
+        var didChange = false
+        for item in mappings {
+            if let contact = contacts.first(where: { $0.linkedPersonaId == item.personaId }) {
+                if contact.name != item.newName {
+                    contact.name = item.newName
+                    didChange = true
+                }
+                if contact.avatarName != item.avatarName {
+                    contact.avatarName = item.avatarName
+                    didChange = true
+                }
+                if didChange {
+                    contact.updatedAt = .now
+                }
+            }
+        }
+
+        if didChange {
+            try? modelContext.save()
+        }
+    }
+
+    private var legacyInvitationNames: [String: [String]] {
+        [
+            "papi": ["Papi"],
+            "sam_altman": ["Sam Altman"],
+            "lei_jun": ["Lei Jun"],
+            "sun_yuchen": ["Sun Yuchen"],
+            "liu_jingkang": ["Liu Jingkang"],
+            "kim_kardashian": ["Kim Kardashian", "Kim"],
+            "luo_yonghao": ["Luo Yonghao"],
+        ]
+    }
+
+    private func scheduleAdditionalContactsFollowUps() {
+        Task { @MainActor in
+            // Small stagger so the inbox feels alive without spamming instantly.
+            let script: [(personaId: String, delaySeconds: UInt64, text: String)] = [
+                ("musk", 3, "Saw your add. If you want the most important X/AI signals, I can filter the noise. ⚡️"),
+                ("lei_jun", 5, "兄弟，欢迎。小米最近节奏很猛，产品、生态、供应链我都能给你一句话讲明白。"),
+                ("sam_altman", 7, "Hey — good to connect. I can share the short version of what's changing in AI, and what actually matters."),
+                ("kim_kardashian", 9, "Hi love. Let’s keep it cute and efficient — I’ll send you the highlights, not the drama."),
+                ("luo_yonghao", 11, "我跟你说，很多东西就是——一眼假。以后我看到离谱的我会第一时间吐槽给你听。"),
+                ("liu_jingkang", 13, "有空聊聊影像和硬件。运动相机这块，我只给你讲能落地的。"),
+                ("sun_yuchen", 15, "你也在看链上？挺好。信息差就是机会，别浪费。"),
+                ("papi", 17, "在吗兄弟？今天有几个热点，我给你挑最有意思的。"),
+            ]
+
+            for item in script {
+                try? await Task.sleep(nanoseconds: item.delaySeconds * 1_000_000_000)
+                insertIncomingMessage(personaId: item.personaId, text: item.text, sourcePostIds: [])
+            }
         }
     }
 

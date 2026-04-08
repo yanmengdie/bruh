@@ -28,11 +28,25 @@ func seedSystemContacts(into context: ModelContext) {
                 contact.themeColorHex = meta.themeHex
                 contact.updatedAt = .now
             }
+
+            if personaId == "musk", contact.avatarName != "Avatar_ Elon" {
+                contact.avatarName = "Avatar_ Elon"
+                contact.updatedAt = .now
+            }
         }
 
-        if contact.linkedPersonaId == nil, contact.name.caseInsensitiveCompare("Sam Altman") == .orderedSame {
+        if contact.linkedPersonaId == nil,
+           ["Sam Altman", "凹凸曼"].contains(where: { contact.name.caseInsensitiveCompare($0) == .orderedSame }) {
+            if contact.name != "凹凸曼" {
+                contact.name = "凹凸曼"
+                contact.updatedAt = .now
+            }
             if contact.themeColorHex != "#1AA987" {
                 contact.themeColorHex = "#1AA987"
+                contact.updatedAt = .now
+            }
+            if contact.avatarName != "Avatar_ Sam Altman" {
+                contact.avatarName = "Avatar_ Sam Altman"
                 contact.updatedAt = .now
             }
         }
@@ -50,24 +64,6 @@ func seedSystemContacts(into context: ModelContext) {
                 avatarName: persona.avatarName,
                 themeColorHex: meta.themeHex,
                 locationLabel: meta.location,
-                isFavorite: true
-            )
-        )
-    }
-
-    // Example non-persona contact used for theme-color binding demonstrations.
-    let hasSam = existingContacts.contains {
-        $0.linkedPersonaId == nil && $0.name.caseInsensitiveCompare("Sam Altman") == .orderedSame
-    }
-    if !hasSam {
-        context.insert(
-            Contact(
-                name: "Sam Altman",
-                phoneNumber: "+1 415 555 0124",
-                email: "sam@openai.com",
-                avatarName: "avatar_default",
-                themeColorHex: "#1AA987",
-                locationLabel: "San Francisco",
                 isFavorite: true
             )
         )

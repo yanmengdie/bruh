@@ -47,8 +47,8 @@ extension Persona {
 
     static let musk = Persona(
         id: "musk",
-        displayName: "Elon Musk",
-        avatarName: "avatar_musk",
+        displayName: "马期克",
+        avatarName: "Avatar_ Elon",
         handle: "@elonmusk",
         domains: ["tech", "ai", "space", "ev"],
         stance: "技术乐观派, 嘲讽竞争对手, 语气随意",
