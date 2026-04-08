@@ -75,6 +75,7 @@ struct NewBruhView: View {
 
     let invitation: BruhInvitation
     let onAccept: (BruhInvitation) -> Void
+    let onIgnore: (BruhInvitation) -> Void
     private var invitationThemeColor: Color {
         AppTheme.color(from: invitation.themeHex, fallback: invitation.avatarColor)
     }
@@ -152,9 +153,10 @@ struct NewBruhView: View {
                         .buttonStyle(.plain)
 
                         Button {
+                            onIgnore(invitation)
                             dismiss()
                         } label: {
-                            Text("Later")
+                            Text("Nah")
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundStyle(Color.black.opacity(0.35))
                                 .frame(maxWidth: .infinity)
@@ -203,6 +205,7 @@ struct NewBruhView: View {
         .background(AppTheme.messagesBackground)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 AppBackButton(action: { dismiss() })
@@ -231,6 +234,6 @@ struct NewBruhView: View {
 
 #Preview {
     NavigationStack {
-        NewBruhView(invitation: .trump, onAccept: { _ in })
+        NewBruhView(invitation: .trump, onAccept: { _ in }, onIgnore: { _ in })
     }
 }
