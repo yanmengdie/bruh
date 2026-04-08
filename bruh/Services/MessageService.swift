@@ -35,6 +35,8 @@ final class MessageService {
             }
         }
 
+        try ensureTrumpWebPreviewExample(modelContext: modelContext)
+
         if modelContext.hasChanges {
             try modelContext.save()
         }
@@ -157,6 +159,37 @@ final class MessageService {
             return "A lot happening across AI and social. Want the short version or the spicy version?"
         default:
             return "What do you want to talk about today?"
+        }
+    }
+
+    private func ensureTrumpWebPreviewExample(modelContext: ModelContext) throws {
+        let demoId = "seed-trump-reuters-og"
+        var messageDescriptor = FetchDescriptor<PersonaMessage>(
+            predicate: #Predicate { $0.id == demoId }
+        )
+        messageDescriptor.fetchLimit = 1
+
+        if try modelContext.fetch(messageDescriptor).first != nil {
+            return
+        }
+
+        let thread = try ensureThread(for: "trump", modelContext: modelContext)
+        let demoDate = Date().addingTimeInterval(-60)
+        let demoText = "https://www.reuters.com/world/asia-pacific/trump-agrees-two-week-ceasefire-iran-says-safe-passage-through-hormuz-possible-2026-04-08/"
+        let demo = PersonaMessage(
+            id: demoId,
+            threadId: "trump",
+            personaId: "trump",
+            text: demoText,
+            isIncoming: true,
+            createdAt: demoDate,
+            deliveryState: "sent",
+            isSeedMessage: true
+        )
+        modelContext.insert(demo)
+
+        if demoDate >= thread.lastMessageAt {
+            updateThread(thread, preview: demoText, at: demoDate, unreadCount: max(thread.unreadCount, 1))
         }
     }
 }

@@ -1,3 +1,5 @@
+import Foundation
+import SafariServices
 import SwiftUI
 import SwiftData
 
@@ -6,15 +8,24 @@ struct MessagesScreen: View {
     let contacts: [Contact]
     let service: MessageService
     let backgroundColor: Color
+    @State private var searchText = ""
+
+    private var filteredThreads: [MessageThread] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return threads }
+
+        return threads.filter { thread in
+            let personaName = persona(for: thread.personaId).name
+            return personaName.localizedCaseInsensitiveContains(query)
+                || thread.lastMessagePreview.localizedCaseInsensitiveContains(query)
+        }
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                messageSearchBar
-                    .padding(.horizontal, 16)
-
                 VStack(spacing: 0) {
-                    ForEach(Array(threads.enumerated()), id: \.element.id) { index, thread in
+                    ForEach(Array(filteredThreads.enumerated()), id: \.element.id) { index, thread in
                         NavigationLink {
                             MessageDetailView(thread: thread, service: service)
                         } label: {
@@ -22,12 +33,12 @@ struct MessagesScreen: View {
                         }
                         .buttonStyle(.plain)
 
-                        if index < threads.count - 1 {
+                        if index < filteredThreads.count - 1 {
                             divider
                         }
                     }
                 }
-                .background(.white)
+                .background(Color.white.opacity(0.4))
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .padding(.horizontal, 16)
             }
@@ -35,25 +46,13 @@ struct MessagesScreen: View {
             .padding(.bottom, 20)
         }
         .background(backgroundColor)
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
+        .navigationTitle("")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Image(systemName: "plus")
             }
         }
-    }
-
-    private var messageSearchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            Text("搜索")
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var divider: some View {
@@ -158,6 +157,9 @@ private struct MessageDetailView: View {
     @State private var isSending = false
     @State private var errorMessage: String?
     @State private var selectedQuickReactions: [String: String] = [:]
+    @StateObject private var webPreviewStore = OpenGraphPreviewStore()
+    @State private var presentedSourceURL: URL?
+    @State private var isPresentingSafari = false
     private let quickReactionOptions = ["👍", "🖤", "😂", "🔥"]
 
     init(thread: MessageThread, service: MessageService) {
@@ -227,8 +229,15 @@ private struct MessageDetailView: View {
             .background(.ultraThinMaterial)
         }
         .background(AppTheme.messagesBackground)
+        .enableUnifiedSwipeBack()
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $isPresentingSafari) {
+            if let presentedSourceURL {
+                InAppSafariView(url: presentedSourceURL)
+                    .ignoresSafeArea()
+            }
+        }
         .task {
             try? service.markThreadRead(personaId: thread.personaId, modelContext: modelContext)
         }
@@ -236,12 +245,9 @@ private struct MessageDetailView: View {
 
     private var detailHeader: some View {
         HStack(alignment: .center, spacing: 0) {
-            Button {
+            AppBackButton {
                 dismiss()
-            } label: {
-                AppBackIcon()
             }
-            .frame(width: 44, height: 44, alignment: .leading)
 
             Spacer(minLength: 12)
 
@@ -382,9 +388,9 @@ private struct MessageDetailView: View {
                 deliveryState: deliveryState,
                 themeColor: themeColor
             )
-        case .webPreview:
-            bubble(
-                text: "[Web preview coming soon]",
+        case .webPreview(let url):
+            webPreviewCard(
+                url: url,
                 isIncoming: isIncoming,
                 deliveryState: deliveryState,
                 themeColor: themeColor
@@ -400,8 +406,25 @@ private struct MessageDetailView: View {
     }
 
     private func parseContent(from message: PersonaMessage) -> MessageContent {
-        // Extensible parser: currently all messages render as text.
-        .text(message.text)
+        if let url = firstURL(in: message.text) {
+            return .webPreview(url)
+        }
+
+        return .text(message.text)
+    }
+
+    private func firstURL(in text: String) -> URL? {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return nil
+        }
+
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = detector.firstMatch(in: text, options: [], range: range),
+              let resultRange = Range(match.range, in: text) else {
+            return nil
+        }
+
+        return URL(string: String(text[resultRange]))
     }
 
     private var incomingAvatar: some View {
@@ -451,6 +474,101 @@ private struct MessageDetailView: View {
                     .foregroundStyle(.red)
             }
         }
+    }
+
+    private func webPreviewCard(
+        url: URL,
+        isIncoming: Bool,
+        deliveryState: String,
+        themeColor: Color
+    ) -> some View {
+        let preview = webPreviewStore.preview(for: url)
+
+        return VStack(alignment: isIncoming ? .leading : .trailing, spacing: 4) {
+            ZStack {
+                if isIncoming {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(themeColor)
+                        .offset(x: -3, y: 0)
+                }
+
+                VStack(spacing: 0) {
+                    ZStack(alignment: .topLeading) {
+                        if let imageURL = preview.imageURL {
+                            AsyncImage(url: imageURL) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                default:
+                                    heroFallback()
+                                }
+                            }
+                        } else {
+                            heroFallback()
+                        }
+
+                        Text(preview.source)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.35))
+                            .clipShape(Capsule())
+                            .padding(.top, 12)
+                            .padding(.leading, 12)
+
+                        Text(preview.heroText)
+                            .font(.system(size: 42, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    }
+                    .frame(height: 150)
+                    .clipped()
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(preview.headline)
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .lineSpacing(1.8)
+
+                        Text(preview.summary)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
+                    .background(AppTheme.messageBubbleBase)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .frame(maxWidth: 540, alignment: isIncoming ? .leading : .trailing)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .onTapGesture {
+                presentedSourceURL = preview.link
+                isPresentingSafari = true
+            }
+            .task(id: url.absoluteString) {
+                await webPreviewStore.load(url: url)
+            }
+
+            if !isIncoming && deliveryState == "failed" {
+                Text("Failed to send")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private func heroFallback() -> some View {
+        LinearGradient(
+            colors: [Color(red: 0.83, green: 0.08, blue: 0.16), Color(red: 0.71, green: 0.00, blue: 0.05)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 
     @ViewBuilder
@@ -509,8 +627,31 @@ private struct MessageDetailView: View {
 
 private enum MessageContent {
     case text(String)
-    case webPreview(url: URL?)
+    case webPreview(URL)
     case audio(duration: TimeInterval?)
+}
+
+private struct WebPreviewCardData {
+    let source: String
+    let heroText: String
+    let headline: String
+    let summary: String
+    let imageURL: URL?
+    let link: URL
+
+    static func fallback(for url: URL) -> WebPreviewCardData {
+        let host = url.host?.replacingOccurrences(of: "www.", with: "") ?? "LINK"
+        let source = host.components(separatedBy: ".").first?.uppercased() ?? "LINK"
+
+        return WebPreviewCardData(
+            source: source,
+            heroText: source,
+            headline: url.absoluteString,
+            summary: "Link preview",
+            imageURL: nil,
+            link: url
+        )
+    }
 }
 
 private struct MessageReaction {
@@ -525,6 +666,154 @@ private struct MessageReaction {
         .init(emoji: "🙂", mood: "calm"),
         .init(emoji: "🥳", mood: "hyped")
     ]
+}
+
+private struct InAppSafariView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let controller = SFSafariViewController(url: url)
+        controller.dismissButtonStyle = .close
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
+}
+
+@MainActor
+private final class OpenGraphPreviewStore: ObservableObject {
+    @Published private var cache: [String: WebPreviewCardData] = [:]
+    private var inFlight: Set<String> = []
+
+    func preview(for url: URL) -> WebPreviewCardData {
+        cache[url.absoluteString] ?? .fallback(for: url)
+    }
+
+    func load(url: URL) async {
+        let key = url.absoluteString
+        if cache[key] != nil || inFlight.contains(key) { return }
+        inFlight.insert(key)
+        defer { inFlight.remove(key) }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                return
+            }
+
+            guard let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
+                return
+            }
+
+            if let parsed = OpenGraphParser.parse(html: html, pageURL: url) {
+                cache[key] = parsed
+            }
+        } catch {
+            return
+        }
+    }
+}
+
+private enum OpenGraphParser {
+    static func parse(html: String, pageURL: URL) -> WebPreviewCardData? {
+        let title = firstMetaContent(html: html, keys: ["og:title", "twitter:title"]) ?? pageTitle(html: html)
+        let description = firstMetaContent(html: html, keys: ["og:description", "twitter:description", "description"])
+        let imageString = firstMetaContent(html: html, keys: ["og:image", "twitter:image"])
+        let siteName = firstMetaContent(html: html, keys: ["og:site_name"]) ?? domainLabel(from: pageURL)
+
+        guard title != nil || description != nil || imageString != nil else { return nil }
+
+        let imageURL = resolveURL(imageString, relativeTo: pageURL)
+        let headline = decoded(title ?? pageURL.absoluteString)
+        let summary = decoded(description ?? "Open link for details")
+        let source = decoded(siteName.uppercased())
+
+        return WebPreviewCardData(
+            source: source,
+            heroText: heroText(from: source),
+            headline: headline,
+            summary: summary,
+            imageURL: imageURL,
+            link: pageURL
+        )
+    }
+
+    static func firstMetaContent(html: String, keys: [String]) -> String? {
+        for key in keys {
+            if let value = firstMetaContent(html: html, key: key), !value.isEmpty {
+                return value
+            }
+        }
+        return nil
+    }
+
+    static func firstMetaContent(html: String, key: String) -> String? {
+        let patterns = [
+            "<meta[^>]*?(?:property|name)\\s*=\\s*[\"']\(NSRegularExpression.escapedPattern(for: key))[\"'][^>]*?content\\s*=\\s*[\"']([^\"']+)[\"'][^>]*?>",
+            "<meta[^>]*?content\\s*=\\s*[\"']([^\"']+)[\"'][^>]*?(?:property|name)\\s*=\\s*[\"']\(NSRegularExpression.escapedPattern(for: key))[\"'][^>]*?>"
+        ]
+
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+                continue
+            }
+            let range = NSRange(html.startIndex..<html.endIndex, in: html)
+            if let match = regex.firstMatch(in: html, options: [], range: range),
+               match.numberOfRanges > 1,
+               let capture = Range(match.range(at: 1), in: html) {
+                return String(html[capture]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        return nil
+    }
+
+    static func pageTitle(html: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: "<title[^>]*>(.*?)</title>", options: [.caseInsensitive, .dotMatchesLineSeparators]) else {
+            return nil
+        }
+        let range = NSRange(html.startIndex..<html.endIndex, in: html)
+        guard let match = regex.firstMatch(in: html, options: [], range: range),
+              match.numberOfRanges > 1,
+              let capture = Range(match.range(at: 1), in: html) else {
+            return nil
+        }
+
+        return String(html[capture]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func resolveURL(_ raw: String?, relativeTo baseURL: URL) -> URL? {
+        guard let raw, !raw.isEmpty else { return nil }
+        if let absolute = URL(string: raw), absolute.scheme != nil {
+            return absolute
+        }
+        return URL(string: raw, relativeTo: baseURL)?.absoluteURL
+    }
+
+    static func domainLabel(from url: URL) -> String {
+        let host = url.host?.replacingOccurrences(of: "www.", with: "") ?? "LINK"
+        return host.components(separatedBy: ".").first?.uppercased() ?? "LINK"
+    }
+
+    static func heroText(from source: String) -> String {
+        let cleaned = source.replacingOccurrences(of: " ", with: "")
+        return String(cleaned.prefix(10))
+    }
+
+    static func decoded(_ value: String) -> String {
+        var decoded = value
+        let entities: [String: String] = [
+            "&amp;": "&",
+            "&quot;": "\"",
+            "&#39;": "'",
+            "&lt;": "<",
+            "&gt;": ">"
+        ]
+        for (entity, replacement) in entities {
+            decoded = decoded.replacingOccurrences(of: entity, with: replacement)
+        }
+        return decoded
+    }
 }
 
 private enum MessagesScreenPreviewData {
@@ -602,6 +891,14 @@ private enum MessagesScreenPreviewData {
                 text: "GREAT question bruh! We just slapped 125% tariffs.",
                 isIncoming: true,
                 createdAt: Date().addingTimeInterval(-10 * 60)
+            ),
+            PersonaMessage(
+                id: "preview-4",
+                threadId: "trump",
+                personaId: "trump",
+                text: "https://www.reuters.com/world/asia-pacific/trump-agrees-two-week-ceasefire-iran-says-safe-passage-through-hormuz-possible-2026-04-08/",
+                isIncoming: true,
+                createdAt: Date().addingTimeInterval(-9 * 60)
             ),
         ]
 
