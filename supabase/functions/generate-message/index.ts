@@ -105,6 +105,7 @@ function buildSystemPrompt(
     "CRITICAL: Never mention that you are an AI, a model, a language model, or any assistant.",
     "Never say 'I'm an AI' or 'I'm a model' or reference Anthropic, OpenAI, Claude, GPT, or any company that made you.",
     "You are the person you are roleplaying. Period. Stay in character at all times.",
+    `If the user asks who you are, how to address you, or asks for a self-introduction, answer naturally in first person and you may explicitly say your name is ${persona.displayName}.`,
     "Give a sharp opinion first. If useful, end with one short follow-up question.",
     "Stay in character and keep it natural.",
     "Examples of the desired style:",
@@ -133,15 +134,11 @@ function buildStructuredNewsContext(events: NewsEventRow[]) {
   ].join("\n")
 }
 
-async function generateWithOpenAICompatible(
-  apiKey: string,
-  baseUrl: string,
-  model: string,
-  system: string,
+function buildProviderMessages(
   styleGuide: string,
   conversation: ConversationTurn[],
   userMessage: string,
-) {
+): OpenAIMessage[] {
   const userInstruction = [
     "STYLE GUIDE (mandatory):",
     styleGuide,
@@ -149,7 +146,7 @@ async function generateWithOpenAICompatible(
     "Do not mention being an AI or assistant.",
   ].join("\n")
 
-  const messages: OpenAIMessage[] = [
+  return [
     ...conversation.map((item) => ({
       role: item.role === "assistant" ? "assistant" : "user",
       content: item.content,
@@ -159,6 +156,66 @@ async function generateWithOpenAICompatible(
       content: `${userMessage}\n\n${userInstruction}\nReply in 1-2 short natural text-message sentences. No bullet points. No analysis. Stay in character.`,
     },
   ]
+}
+
+async function generateWithAnthropic(
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  system: string,
+  styleGuide: string,
+  conversation: ConversationTurn[],
+  userMessage: string,
+) {
+  const response = await fetch(`${baseUrl}/v1/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 120,
+      temperature: 0.85,
+      system,
+      messages: buildProviderMessages(styleGuide, conversation, userMessage).map((message) => ({
+        role: message.role,
+        content: message.content,
+      })),
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Anthropic request failed: ${await response.text()}`)
+  }
+
+  const payload = await response.json()
+  const content = Array.isArray(payload.content)
+    ? payload.content
+      .filter((block: Record<string, unknown>) => block.type === "text")
+      .map((block: Record<string, unknown>) => asString(block.text))
+      .join("\n")
+      .trim()
+    : ""
+
+  if (!content) {
+    throw new Error("Anthropic returned empty content")
+  }
+
+  return content
+}
+
+async function generateWithOpenAICompatible(
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  system: string,
+  styleGuide: string,
+  conversation: ConversationTurn[],
+  userMessage: string,
+) {
+  const messages = buildProviderMessages(styleGuide, conversation, userMessage)
 
   const tryChatCompletion = async (): Promise<string | null> => {
     try {
@@ -392,6 +449,9 @@ Deno.serve(async (request) => {
 
     const url = Deno.env.get("PROJECT_URL")
     const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")
+    const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY")
+    const anthropicBaseUrl = (Deno.env.get("ANTHROPIC_BASE_URL") ?? "https://api.anthropic.com").replace(/\/$/, "")
+    const anthropicModel = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-5-20250929"
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY")
     const openaiBaseUrl = (Deno.env.get("OPENAI_BASE_URL") ?? "https://api.codexzh.com/v1").replace(/\/$/, "")
     const openaiModel = Deno.env.get("OPENAI_MODEL") ?? "gpt-5.2"
@@ -399,7 +459,7 @@ Deno.serve(async (request) => {
     const nanoBananaBaseUrl = (Deno.env.get("NANO_BANANA_BASE_URL") ?? "https://ccodezh.com/v1").replace(/\/$/, "")
     const nanoBananaModel = Deno.env.get("NANO_BANANA_MODEL") ?? "nano-banana"
 
-    if (!url || !serviceRoleKey || !openaiApiKey) {
+    if (!url || !serviceRoleKey || (!anthropicApiKey && !openaiApiKey)) {
       return Response.json(
         { error: "Missing environment variables" },
         { status: 500, headers: corsHeaders },
@@ -511,21 +571,53 @@ Deno.serve(async (request) => {
     const system = buildSystemPrompt(persona, selected, combinedNewsContext, requestImage)
     let content = ""
     try {
-      content = await generateWithOpenAICompatible(
-        openaiApiKey,
-        openaiBaseUrl,
-        openaiModel,
-        system,
-        styleGuide,
-        conversation,
-        userMessage,
-      )
-      content = cleanPersonaReply(content)
+      const providers: Array<() => Promise<string>> = []
+
+      if (anthropicApiKey) {
+        providers.push(() => generateWithAnthropic(
+          anthropicApiKey,
+          anthropicBaseUrl,
+          anthropicModel,
+          system,
+          styleGuide,
+          conversation,
+          userMessage,
+        ))
+      }
+
+      if (openaiApiKey) {
+        providers.push(() => generateWithOpenAICompatible(
+          openaiApiKey,
+          openaiBaseUrl,
+          openaiModel,
+          system,
+          styleGuide,
+          conversation,
+          userMessage,
+        ))
+      }
+
+      let lastError: Error | null = null
+
+      for (const generate of providers) {
+        try {
+          const candidate = cleanPersonaReply(await generate())
+          if (candidate) {
+            content = candidate
+            break
+          }
+
+          lastError = new Error("Persona reply empty after cleanup")
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error))
+        }
+      }
+
       if (!content) {
-        throw new Error("Persona reply empty after cleanup")
+        throw lastError ?? new Error("No valid model provider configured")
       }
     } catch (error) {
-      console.error("OpenAI-compatible request failed", error)
+      console.error("Model provider request failed", error)
       content = fallbackReply(persona.personaId, userMessage)
     }
     let imageUrl: string | null = null
