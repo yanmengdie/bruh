@@ -1,0 +1,12 @@
+{
+  "name": "xhs-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "login": "node login.mjs",
+    "sync": "node sync-profile.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.54.0"
+  }
+}

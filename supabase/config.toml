@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.ingest-x-posts]
 verify_jwt = false
 
+[functions.ingest-xhs-posts]
+verify_jwt = false
+
 [functions.build-feed]
 verify_jwt = false
 

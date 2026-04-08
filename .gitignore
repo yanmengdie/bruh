@@ -34,3 +34,7 @@ supabase/.postgres/
 # Logs
 *.log
 
+# Local scraping/auth artifacts
+tools/xhs/.auth/
+tools/xhs/output/
+tools/xhs/node_modules/
