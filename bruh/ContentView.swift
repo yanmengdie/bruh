@@ -69,9 +69,6 @@ struct ContentView: View {
         .toolbarBackground(AppTheme.messagesBackground, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .onAppear(perform: configureTabBarAppearance)
-        .task {
-            try? messageService.ensureThreadsExist(modelContext: modelContext)
-        }
     }
 
     private var totalUnreadMessages: Int {
@@ -247,11 +244,18 @@ private struct ContactsView: View {
 
     @State private var searchText = ""
     @State private var isPresentingForm = false
+    @State private var presentedInvitation: BruhInvitation?
     @State private var editingContact: Contact?
     @State private var draft = ContactDraft()
     @State private var validationError: String?
     @State private var activeIndexLetter: String?
     @State private var lastIndexFeedbackLetter: String?
+    @AppStorage("invite_flow_initialized") private var inviteFlowInitialized = false
+    @AppStorage("invite_trump_accepted") private var inviteTrumpAccepted = false
+    @AppStorage("invite_musk_unlocked") private var inviteMuskUnlocked = false
+    @AppStorage("invite_musk_accepted") private var inviteMuskAccepted = false
+    @AppStorage("invite_zuckerberg_unlocked") private var inviteZuckerbergUnlocked = false
+    @AppStorage("invite_zuckerberg_accepted") private var inviteZuckerbergAccepted = false
     private static let alphabet: [String] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map(String.init) + ["#"]
 
     private var filteredContacts: [Contact] {
@@ -280,6 +284,18 @@ private struct ContactsView: View {
             guard let values = grouped[key], !values.isEmpty else { return nil }
             return (key, values)
         }
+    }
+
+    private var pendingInvitations: [BruhInvitation] {
+        var items: [BruhInvitation] = []
+        if !inviteTrumpAccepted { items.append(.trump) }
+        if inviteMuskUnlocked, !inviteMuskAccepted { items.append(.musk) }
+        if inviteZuckerbergUnlocked, !inviteZuckerbergAccepted { items.append(.zuckerberg) }
+        return items
+    }
+
+    private var pendingInvitationCount: Int {
+        pendingInvitations.count
     }
 
     var body: some View {
@@ -348,8 +364,15 @@ private struct ContactsView: View {
                 )
             }
         }
+        .navigationDestination(item: $presentedInvitation) { invitation in
+            NewBruhView(
+                invitation: invitation,
+                onAccept: acceptInvitation
+            )
+        }
         .task {
-            seedContactsIfNeeded()
+            bootstrapInviteFlowIfNeeded()
+            restoreInviteFlowIfNeeded()
         }
     }
 
@@ -397,15 +420,15 @@ private struct ContactsView: View {
                 icon: "🤝",
                 iconBackground: Color(red: 0.94, green: 0.84, blue: 0.84),
                 title: "New Bruhs",
-                trailing: AnyView(
-                    Text("2")
+                trailing: pendingInvitationCount > 0 ? AnyView(
+                    Text("\(pendingInvitationCount)")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                         .frame(width: 30, height: 30)
                         .background(Color(red: 0.84, green: 0.15, blue: 0.24))
                         .clipShape(Circle())
-                ),
-                action: startCreating
+                ) : AnyView(EmptyView()),
+                action: openNewBruh
             )
 
             Divider().opacity(0.28)
@@ -618,6 +641,28 @@ private struct ContactsView: View {
         isPresentingForm = true
     }
 
+    private func openNewBruh() {
+        guard let invitation = pendingInvitations.first else { return }
+        presentedInvitation = invitation
+    }
+
+    private func acceptInvitation(_ invitation: BruhInvitation) {
+        addContactIfNeeded(for: invitation)
+
+        switch invitation.personaId {
+        case "trump":
+            inviteTrumpAccepted = true
+            scheduleTrumpFollowUps()
+        case "musk":
+            inviteMuskAccepted = true
+        case "zuckerberg":
+            inviteZuckerbergAccepted = true
+        default:
+            break
+        }
+        try? modelContext.save()
+    }
+
     private func startEditing(_ contact: Contact) {
         editingContact = contact
         draft = ContactDraft(
@@ -681,8 +726,128 @@ private struct ContactsView: View {
         try? modelContext.save()
     }
 
-    private func seedContactsIfNeeded() {
-        seedSystemContacts(into: modelContext)
+    private func bootstrapInviteFlowIfNeeded() {
+        guard !inviteFlowInitialized else { return }
+
+        let existingContacts: [Contact] = (try? modelContext.fetch(FetchDescriptor<Contact>())) ?? []
+        for contact in existingContacts {
+            modelContext.delete(contact)
+        }
+
+        let existingThreads: [MessageThread] = (try? modelContext.fetch(FetchDescriptor<MessageThread>())) ?? []
+        for thread in existingThreads {
+            modelContext.delete(thread)
+        }
+
+        let existingMessages: [PersonaMessage] = (try? modelContext.fetch(FetchDescriptor<PersonaMessage>())) ?? []
+        for message in existingMessages {
+            modelContext.delete(message)
+        }
+
+        inviteTrumpAccepted = false
+        inviteMuskUnlocked = false
+        inviteMuskAccepted = false
+        inviteZuckerbergUnlocked = false
+        inviteZuckerbergAccepted = false
+        inviteFlowInitialized = true
+        try? modelContext.save()
+    }
+
+    private func restoreInviteFlowIfNeeded() {
+        guard contacts.isEmpty, pendingInvitations.isEmpty else { return }
+
+        inviteTrumpAccepted = false
+        inviteMuskUnlocked = false
+        inviteMuskAccepted = false
+        inviteZuckerbergUnlocked = false
+        inviteZuckerbergAccepted = false
+    }
+
+    private func addContactIfNeeded(for invitation: BruhInvitation) {
+        let alreadyExists = contacts.contains { contact in
+            contact.linkedPersonaId == invitation.personaId
+                || contact.name.localizedCaseInsensitiveCompare(invitation.displayName) == .orderedSame
+        }
+        guard !alreadyExists else { return }
+
+        let contact = Contact(
+            linkedPersonaId: invitation.personaId,
+            name: invitation.displayName,
+            phoneNumber: invitation.phoneNumber,
+            email: invitation.email,
+            avatarName: invitation.avatarName,
+            themeColorHex: invitation.themeHex,
+            locationLabel: invitation.location,
+            isFavorite: false
+        )
+        modelContext.insert(contact)
+    }
+
+    private func scheduleTrumpFollowUps() {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            insertIncomingMessage(
+                personaId: "trump",
+                text: "You’re in. Big moves ahead. I’ll send you the most important update first.",
+                sourcePostIds: []
+            )
+
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            insertIncomingMessage(
+                personaId: "trump",
+                text: "https://www.reuters.com/world/asia-pacific/trump-agrees-two-week-ceasefire-iran-says-safe-passage-through-hormuz-possible-2026-04-08/",
+                sourcePostIds: ["trump-news-1"]
+            )
+
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            inviteMuskUnlocked = true
+
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            inviteZuckerbergUnlocked = true
+        }
+    }
+
+    private func insertIncomingMessage(personaId: String, text: String, sourcePostIds: [String]) {
+        let thread = ensureThread(for: personaId)
+        let now = Date()
+        let message = PersonaMessage(
+            id: UUID().uuidString,
+            threadId: thread.id,
+            personaId: personaId,
+            text: text,
+            isIncoming: true,
+            createdAt: now,
+            deliveryState: "sent",
+            sourcePostIds: sourcePostIds,
+            isSeedMessage: false
+        )
+        modelContext.insert(message)
+        thread.lastMessagePreview = text
+        thread.lastMessageAt = now
+        thread.unreadCount = max(thread.unreadCount, 0) + 1
+        thread.updatedAt = now
+        try? modelContext.save()
+    }
+
+    private func ensureThread(for personaId: String) -> MessageThread {
+        var descriptor = FetchDescriptor<MessageThread>(
+            predicate: #Predicate { $0.id == personaId }
+        )
+        descriptor.fetchLimit = 1
+
+        if let existing = try? modelContext.fetch(descriptor).first {
+            return existing
+        }
+
+        let thread = MessageThread(
+            id: personaId,
+            personaId: personaId,
+            lastMessagePreview: "",
+            lastMessageAt: .distantPast,
+            unreadCount: 0
+        )
+        modelContext.insert(thread)
+        return thread
     }
 }
 

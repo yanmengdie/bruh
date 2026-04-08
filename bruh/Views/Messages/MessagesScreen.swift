@@ -23,30 +23,35 @@ struct MessagesScreen: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                VStack(spacing: 0) {
-                    ForEach(Array(filteredThreads.enumerated()), id: \.element.id) { index, thread in
-                        NavigationLink {
-                            MessageDetailView(thread: thread, service: service)
-                        } label: {
-                            messageRow(thread: thread)
-                        }
-                        .buttonStyle(.plain)
+        ZStack {
+            backgroundColor.ignoresSafeArea()
 
-                        if index < filteredThreads.count - 1 {
-                            divider
+            ScrollView {
+                VStack(spacing: 14) {
+                    if !threads.isEmpty {
+                        VStack(spacing: 0) {
+                            ForEach(Array(filteredThreads.enumerated()), id: \.element.id) { index, thread in
+                                NavigationLink {
+                                    MessageDetailView(thread: thread, service: service)
+                                } label: {
+                                    messageRow(thread: thread)
+                                }
+                                .buttonStyle(.plain)
+
+                                if index < filteredThreads.count - 1 {
+                                    divider
+                                }
+                            }
                         }
+                        .background(Color.white.opacity(0.4))
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .padding(.horizontal, 16)
                     }
                 }
-                .background(Color.white.opacity(0.4))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 20)
             }
-            .padding(.top, 10)
-            .padding(.bottom, 20)
         }
-        .background(backgroundColor)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
         .navigationTitle("")
         .toolbar {
@@ -171,7 +176,7 @@ private struct MessageDetailView: View {
     init(
         thread: MessageThread,
         service: MessageService,
-        timestampProvider: any MessageTimestampProviding = HardcodedMessageTimestampProvider()
+        timestampProvider: any MessageTimestampProviding = RealTimeMessageTimestampProvider()
     ) {
         self.thread = thread
         self.service = service
@@ -758,20 +763,19 @@ private protocol MessageTimestampProviding {
     func timestampLabel(for message: PersonaMessage, previous: PersonaMessage?) -> String?
 }
 
-private struct HardcodedMessageTimestampProvider: MessageTimestampProviding {
-    private let labelsByMessageId: [String: String]
-
-    init(labelsByMessageId: [String: String] = [
-        "preview-1": "Today 11:12 AM",
-        "preview-2": "11:15 AM",
-        "preview-3": "11:18 AM",
-        "seed-trump-reuters-og": "11:20 AM"
-    ]) {
-        self.labelsByMessageId = labelsByMessageId
-    }
-
+private struct RealTimeMessageTimestampProvider: MessageTimestampProviding {
     func timestampLabel(for message: PersonaMessage, previous: PersonaMessage?) -> String? {
-        labelsByMessageId[message.id]
+        let gap: TimeInterval = 5 * 60
+        if let previous, message.createdAt.timeIntervalSince(previous.createdAt) < gap {
+            return nil
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.doesRelativeDateFormatting = true
+        formatter.timeStyle = .short
+        formatter.dateStyle = Calendar.current.isDateInToday(message.createdAt) ? .none : .medium
+        return formatter.string(from: message.createdAt)
     }
 }
 
