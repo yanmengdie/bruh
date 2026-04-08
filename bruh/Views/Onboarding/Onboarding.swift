@@ -55,7 +55,7 @@ struct Onboarding: View {
                 .foregroundStyle(Color(red: 0.10, green: 0.11, blue: 0.13))
                 .tracking(1)
 
-            Text("News from your bruh.")
+            Text("来自你鸽们的消息。")
                 .font(.system(size: 19, weight: .regular))
                 .foregroundStyle(Color(red: 0.57, green: 0.57, blue: 0.57))
         }
@@ -71,25 +71,25 @@ struct Onboarding: View {
                 avatar(color: Color(red: 0.95, green: 0.41, blue: 0.14), emoji: "👩🏽")
             }
 
-            bubble(text: "Fake news! 🗣️", textColor: Color(red: 0.85, green: 0.24, blue: 0.30))
+            bubble(text: "假新闻！🗣️", textColor: Color(red: 0.85, green: 0.24, blue: 0.30))
                 .offset(x: -74, y: -38)
 
-            bubble(text: "To Mars 🚀", textColor: Color(red: 0.35, green: 0.36, blue: 0.60))
+            bubble(text: "去火星 🚀", textColor: Color(red: 0.35, green: 0.36, blue: 0.60))
                 .offset(x: -38, y: 26)
 
-            bubble(text: "AGI soon 🧠", textColor: Color(red: 0.07, green: 0.64, blue: 0.52))
+            bubble(text: "AGI 快来了 🧠", textColor: Color(red: 0.07, green: 0.64, blue: 0.52))
                 .offset(x: 82, y: -34)
         }
     }
 
     private var nameSection: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text("WHAT'S YOUR NAME, BRUH?")
+            Text("你叫什么，鸽们？")
                 .font(.system(size: 18, weight: .heavy))
                 .tracking(1)
                 .foregroundStyle(Color(red: 0.12, green: 0.13, blue: 0.15))
 
-            TextField("Bruh", text: $name)
+            TextField("请输入昵称", text: $name)
                 .font(.system(size: 19, weight: .regular))
                 .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.17))
                 .textInputAutocapitalization(.words)
@@ -105,12 +105,10 @@ struct Onboarding: View {
 
     private var interestsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("WHAT ARE YOU INTO?")
+            Text("你感兴趣什么？")
                 .font(.system(size: 18, weight: .heavy))
                 .tracking(1)
                 .foregroundStyle(Color(red: 0.12, green: 0.13, blue: 0.15))
-
-            interestChip(.politics)
 
             HStack(spacing: 16) {
                 interestChip(.entertainment)
@@ -127,7 +125,7 @@ struct Onboarding: View {
     private var ctaSection: some View {
         VStack(spacing: 16) {
             Button(action: {}) {
-                Text("Meet your bruhs ➔")
+                Text("去认识你的鸽们 ➔")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -143,7 +141,7 @@ struct Onboarding: View {
             }
             .buttonStyle(.plain)
 
-            Text("By continuing you agree to bruh's Terms of Service")
+            Text("继续即表示你同意 bruh 的服务条款")
                 .font(.system(size: 10, weight: .regular))
                 .foregroundStyle(Color(red: 0.74, green: 0.74, blue: 0.74))
                 .multilineTextAlignment(.center)
@@ -187,7 +185,7 @@ struct Onboarding: View {
                     .lineLimit(1)
 
                 if interest.isHot {
-                    Text("HOT")
+                    Text("热门")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(Color(red: 0.86, green: 0.23, blue: 0.28))
                         .padding(.horizontal, 10)
@@ -212,7 +210,7 @@ struct Onboarding: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(interest.title)
-        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityValue(isSelected ? "已选中" : "未选中")
     }
 
     private func toggleInterest(_ interest: OnboardingInterest) {
@@ -237,11 +235,11 @@ enum OnboardingInterest: String, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .politics: return "Politics"
-        case .entertainment: return "Entertainment"
-        case .sports: return "Sports"
-        case .finance: return "Finance"
-        case .tech: return "Tech"
+        case .politics: return "政治"
+        case .entertainment: return "娱乐"
+        case .sports: return "体育"
+        case .finance: return "财经"
+        case .tech: return "科技"
         }
     }
 
@@ -256,13 +254,13 @@ enum OnboardingInterest: String, CaseIterable, Hashable {
     }
 
     var isHot: Bool {
-        self == .politics || self == .tech
+        self == .tech
     }
 }
 
 enum OnboardingInterestStore {
     static let userDefaultsKey = "onboarding.selectedInterestTopics"
-    private static let defaultSelection: Set<OnboardingInterest> = [.politics, .sports, .tech]
+    private static let defaultSelection: Set<OnboardingInterest> = [.sports, .tech]
 
     static func load(userDefaults: UserDefaults = .standard) -> Set<OnboardingInterest> {
         guard let raw = userDefaults.string(forKey: userDefaultsKey), !raw.isEmpty else {

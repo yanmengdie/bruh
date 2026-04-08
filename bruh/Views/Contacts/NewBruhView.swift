@@ -28,8 +28,8 @@ struct BruhInvitation: Identifiable, Hashable {
         personaId: "trump",
         displayName: "Donald Trump",
         handle: "@realdonaldtrump",
-        subtitle: "45th & 47th POTUS",
-        inviteMessage: "Hey bruh! I heard you're interested in politics. GREAT choice. Nobody knows politics better than me. Accept this and I'll keep you updated on everything. Believe me. ☝️🇺🇸",
+        subtitle: "第45任与第47任美国总统",
+        inviteMessage: "嘿，bro！我听说你关注政治，选得太对了。没有人比我更懂政治。接受这次请求，我会把最重要的动态第一时间发给你。相信我。☝️🇺🇸",
         avatarEmoji: "🧑‍💼",
         avatarColor: Color(red: 0.84, green: 0.15, blue: 0.24),
         themeHex: "#D62839",
@@ -44,7 +44,7 @@ struct BruhInvitation: Identifiable, Hashable {
         displayName: "Elon Musk",
         handle: "@elonmusk",
         subtitle: "CEO · SpaceX · xAI",
-        inviteMessage: "You seem sharp. Want first access to what matters in AI, rockets, and product launches? Let’s talk. 🚀",
+        inviteMessage: "你很有想法。想第一时间获取 AI、火箭和新品发布的关键信息吗？聊聊。🚀",
         avatarEmoji: "👨‍🚀",
         avatarColor: Color(red: 0.20, green: 0.35, blue: 0.74),
         themeHex: "#1F2A8A",
@@ -58,8 +58,8 @@ struct BruhInvitation: Identifiable, Hashable {
         personaId: "zuckerberg",
         displayName: "Mark Zuckerberg",
         handle: "@finkd",
-        subtitle: "Meta · AI & Social",
-        inviteMessage: "I can send you concise updates on social platforms, AI releases, and what creators are reacting to in real time. 🤝",
+        subtitle: "Meta · AI 与社交",
+        inviteMessage: "我可以给你推送社交平台、AI 发布以及创作者实时反馈的精简更新。🤝",
         avatarEmoji: "🧑‍💻",
         avatarColor: Color(red: 0.42, green: 0.35, blue: 0.88),
         themeHex: "#6A5AE0",
@@ -88,10 +88,10 @@ struct NewBruhView: View {
                     .padding(.top, 10)
 
                 VStack(spacing: 6) {
-                    Text("You got a bruh request!")
+                    Text("你收到一个鸽们请求！")
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(Color.black.opacity(0.9))
-                    Text("Someone important wants to talk to you.")
+                    Text("有位重要的人想和你聊聊。")
                         .font(.system(size: 18, weight: .regular))
                         .foregroundStyle(Color.black.opacity(0.40))
                 }
@@ -142,7 +142,7 @@ struct NewBruhView: View {
                             onAccept(invitation)
                             dismiss()
                         } label: {
-                            Text("Accept bruh ✓")
+                            Text("接受请求 ✓")
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -156,7 +156,7 @@ struct NewBruhView: View {
                             onIgnore(invitation)
                             dismiss()
                         } label: {
-                            Text("Nah")
+                            Text("不了")
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundStyle(Color.black.opacity(0.35))
                                 .frame(maxWidth: .infinity)
@@ -172,7 +172,7 @@ struct NewBruhView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("MORE BRUHS WANT TO CONNECT")
+                    Text("更多鸽们想和你建立联系")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Color.black.opacity(0.35))
                         .tracking(2)
@@ -190,9 +190,9 @@ struct NewBruhView: View {
                 Spacer(minLength: 18)
 
                 (
-                    Text("Accept ").foregroundStyle(Color.black.opacity(0.26))
+                    Text("接受 ").foregroundStyle(Color.black.opacity(0.26))
                     + Text(invitation.displayName.components(separatedBy: " ").first ?? invitation.displayName).fontWeight(.bold)
-                    + Text(" to unlock more bruhs").foregroundStyle(Color.black.opacity(0.26))
+                    + Text(" 以解锁更多鸽们").foregroundStyle(Color.black.opacity(0.26))
                 )
                 .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(Color.black.opacity(0.9))

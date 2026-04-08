@@ -26,20 +26,20 @@ struct HomeScreen: View {
 
     private var gridApps: [AppItem] {
         [
-            AppItem(name: "Contacts", icon: "person.crop.circle.fill", iconColor: .green, destination: .contacts, unreadCount: 0, badgeText: nil),
-            AppItem(name: "Messages", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: messageUnreadCount, badgeText: nil),
+            AppItem(name: "联系人", icon: "person.crop.circle.fill", iconColor: .green, destination: .contacts, unreadCount: 0, badgeText: nil),
+            AppItem(name: "消息", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: messageUnreadCount, badgeText: nil),
             AppItem(name: "朋友圈", icon: "globe", iconColor: Color(red: 1.0, green: 0.72, blue: 0.62), destination: .feed, unreadCount: momentsUnreadCount, badgeText: nil),
-            AppItem(name: "Album", icon: "photo.on.rectangle.angled", iconColor: .red, destination: .album, unreadCount: 0, badgeText: hasNewAlbumBadge ? "NEW" : nil),
-            AppItem(name: "Settings", icon: "gearshape.fill", iconColor: Color(red: 0.55, green: 0.62, blue: 0.95), destination: .settings, unreadCount: 0, badgeText: nil),
+            AppItem(name: "相册", icon: "photo.on.rectangle.angled", iconColor: .red, destination: .album, unreadCount: 0, badgeText: hasNewAlbumBadge ? "新" : nil),
+            AppItem(name: "设置", icon: "gearshape.fill", iconColor: Color(red: 0.55, green: 0.62, blue: 0.95), destination: .settings, unreadCount: 0, badgeText: nil),
         ]
     }
 
     private var dockApps: [AppItem] {
         [
-            AppItem(name: "Contacts", icon: "person.crop.circle.fill", iconColor: .green, destination: .contacts, unreadCount: 0, badgeText: nil),
-            AppItem(name: "Messages", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: messageUnreadCount, badgeText: nil),
+            AppItem(name: "联系人", icon: "person.crop.circle.fill", iconColor: .green, destination: .contacts, unreadCount: 0, badgeText: nil),
+            AppItem(name: "消息", icon: "message.fill", iconColor: .green, destination: .imessage, unreadCount: messageUnreadCount, badgeText: nil),
             AppItem(name: "朋友圈", icon: "globe", iconColor: Color(red: 1.0, green: 0.72, blue: 0.62), destination: .feed, unreadCount: momentsUnreadCount, badgeText: nil),
-            AppItem(name: "Album", icon: "photo.on.rectangle.angled", iconColor: .red, destination: .album, unreadCount: 0, badgeText: nil),
+            AppItem(name: "相册", icon: "photo.on.rectangle.angled", iconColor: .red, destination: .album, unreadCount: 0, badgeText: nil),
         ]
     }
 

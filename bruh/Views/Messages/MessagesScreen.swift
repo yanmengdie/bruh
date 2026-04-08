@@ -93,7 +93,7 @@ struct MessagesScreen: View {
                 }
 
                 HStack {
-                    Text(thread.lastMessagePreview.isEmpty ? "Start the conversation" : thread.lastMessagePreview)
+                    Text(thread.lastMessagePreview.isEmpty ? "开始聊天" : thread.lastMessagePreview)
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -142,7 +142,7 @@ struct MessagesScreen: View {
     }
 
     private func relativeTime(_ date: Date) -> String {
-        guard date > Date.distantPast else { return "Now" }
+        guard date > Date.distantPast else { return "刚刚" }
 
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
@@ -252,7 +252,7 @@ private struct MessageDetailView: View {
                     .buttonStyle(.plain)
                     .disabled(isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                    TextField("Message \(displayName)...", text: $draft)
+                    TextField("发消息给\(displayName)...", text: $draft)
                         .submitLabel(.send)
                         .onSubmit {
                             send()
@@ -341,7 +341,7 @@ private struct MessageDetailView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.primary)
 
-                Text("my bruh · \(presenceText)")
+                Text("我的鸽们 · \(presenceText)")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -365,7 +365,7 @@ private struct MessageDetailView: View {
     private var presenceText: String {
         let threshold: TimeInterval = 10 * 60
         let secondsSinceLastMessage = Date().timeIntervalSince(thread.lastMessageAt)
-        return secondsSinceLastMessage <= threshold ? "online" : "offline"
+        return secondsSinceLastMessage <= threshold ? "在线" : "离线"
     }
 
     private var headerAvatar: some View {
@@ -609,7 +609,7 @@ private struct MessageDetailView: View {
                 }
 
             if !isIncoming && deliveryState == "failed" {
-                Text("Failed to send")
+                Text("发送失败")
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
             }
@@ -696,7 +696,7 @@ private struct MessageDetailView: View {
             }
 
             if !isIncoming && deliveryState == "failed" {
-                Text("Failed to send")
+                Text("发送失败")
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
             }
@@ -750,7 +750,7 @@ private struct MessageDetailView: View {
 
     private func reaction(for messageId: String) -> MessageReaction {
         if let forcedId = forcedExcitedMessageIdForTesting, forcedId == messageId {
-            return MessageReaction.presets.first(where: { $0.mood == "excited" }) ?? .init(emoji: "🔥", mood: "excited")
+            return MessageReaction.presets.first(where: { $0.mood == "兴奋" }) ?? .init(emoji: "🔥", mood: "兴奋")
         }
 
         let list = MessageReaction.presets
@@ -774,7 +774,7 @@ private struct MessageDetailView: View {
 
         guard initialUnreadCount > 0 else { return }
         guard let latestIncoming = messages.last(where: { $0.isIncoming }) else { return }
-        guard reaction(for: latestIncoming.id).mood == "excited" else { return }
+        guard reaction(for: latestIncoming.id).mood == "兴奋" else { return }
         guard let videoURL = Bundle.main.url(forResource: "trump_joy", withExtension: "mp4") else { return }
 
         let player = AVPlayer(url: videoURL)
@@ -819,7 +819,7 @@ private struct WebPreviewCardData {
             source: source,
             heroText: source,
             headline: url.absoluteString,
-            summary: "Link preview",
+            summary: "链接预览",
             imageURL: nil,
             link: url
         )
@@ -831,12 +831,12 @@ private struct MessageReaction {
     let mood: String
 
     static let presets: [MessageReaction] = [
-        .init(emoji: "😌", mood: "chill"),
-        .init(emoji: "🔥", mood: "excited"),
-        .init(emoji: "😎", mood: "confident"),
-        .init(emoji: "🤔", mood: "curious"),
-        .init(emoji: "🙂", mood: "calm"),
-        .init(emoji: "🥳", mood: "hyped")
+        .init(emoji: "😌", mood: "淡定"),
+        .init(emoji: "🔥", mood: "兴奋"),
+        .init(emoji: "😎", mood: "自信"),
+        .init(emoji: "🤔", mood: "好奇"),
+        .init(emoji: "🙂", mood: "平静"),
+        .init(emoji: "🥳", mood: "嗨起来")
     ]
 }
 
@@ -934,7 +934,7 @@ private enum OpenGraphParser {
 
         let imageURL = resolveURL(imageString, relativeTo: pageURL)
         let headline = decoded(title ?? pageURL.absoluteString)
-        let summary = decoded(description ?? "Open link for details")
+        let summary = decoded(description ?? "打开链接查看更多详情")
         let source = decoded(siteName.uppercased())
 
         return WebPreviewCardData(
@@ -1118,7 +1118,7 @@ private enum MessagesScreenPreviewData {
     }()
 }
 
-#Preview("Messages List") {
+#Preview("消息列表") {
     NavigationStack {
         MessagesScreen(
             threads: MessagesScreenPreviewData.threads,
@@ -1130,7 +1130,7 @@ private enum MessagesScreenPreviewData {
     .modelContainer(MessagesScreenPreviewData.container)
 }
 
-#Preview("Message Detail") {
+#Preview("消息详情") {
     NavigationStack {
         MessageDetailView(
             thread: MessagesScreenPreviewData.threads[0],

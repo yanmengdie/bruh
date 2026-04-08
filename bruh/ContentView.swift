@@ -19,7 +19,7 @@ struct ContentView: View {
             }
             .enableUnifiedSwipeBack()
             .tabItem {
-                Label("Contacts", systemImage: "person.crop.circle.fill")
+                Label("鸽们", systemImage: "person.crop.circle.fill")
             }
             .tag(MainTab.contacts)
 
@@ -33,7 +33,7 @@ struct ContentView: View {
             }
             .enableUnifiedSwipeBack()
             .tabItem {
-                Label("message", systemImage: "message.fill")
+                Label("消息", systemImage: "message.fill")
             }
             .badge(totalUnreadMessages > 0 ? Text("\(totalUnreadMessages)") : nil)
             .tag(MainTab.messages)
@@ -43,7 +43,7 @@ struct ContentView: View {
             }
             .enableUnifiedSwipeBack()
             .tabItem {
-                Label("朋友圈", systemImage: "globe")
+                Label("日常", systemImage: "globe")
             }
             .badge(totalUnreadMoments > 0 ? Text("\(totalUnreadMoments)") : nil)
             .tag(MainTab.feed)
@@ -53,9 +53,9 @@ struct ContentView: View {
             }
             .enableUnifiedSwipeBack()
             .tabItem {
-                Label("album", systemImage: "photo.on.rectangle.angled")
+                Label("相册", systemImage: "photo.on.rectangle.angled")
             }
-            .badge(!hasOpenedAlbum ? Text("NEW") : nil)
+            .badge(!hasOpenedAlbum ? Text("新") : nil)
             .tag(MainTab.album)
         }
         .onChange(of: selectedTab) { _, newValue in
@@ -115,16 +115,16 @@ private struct AlbumView: View {
                     .padding(.top, 8)
 
                 sectionTitle(
-                    title: "Recents",
-                    subtitle: "Today — 128 photos & videos"
+                    title: "最近",
+                    subtitle: "今天 - 128 张照片和视频"
                 )
 
                 recentsMosaic
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 sectionTitle(
-                    title: "Yesterday",
-                    subtitle: "Apr 7 — 84 photos & videos"
+                    title: "昨天",
+                    subtitle: "4 月 7 日 - 84 张照片和视频"
                 )
                 .padding(.top, 6)
 
@@ -146,7 +146,7 @@ private struct AlbumView: View {
 
     private var topBar: some View {
         HStack(alignment: .center) {
-            Text("ALBUM")
+            Text("相册")
                 .font(.system(size: 24, weight: .black, design: .rounded))
                 .foregroundStyle(Color.black.opacity(0.9))
 
@@ -228,7 +228,7 @@ private struct SettingsScreen: View {
         List {
             Label("通知设置", systemImage: "bell.badge")
             Label("内容偏好", systemImage: "slider.horizontal.3")
-            Label("关于 Bruh", systemImage: "info.circle")
+            Label("关于鸽们", systemImage: "info.circle")
         }
         .navigationTitle("设置")
     }
@@ -248,6 +248,7 @@ private struct ContactsView: View {
     @State private var searchText = ""
     @State private var isPresentingForm = false
     @State private var presentedInvitation: BruhInvitation?
+    @State private var isPresentingAddBruh = false
     @State private var editingContact: Contact?
     @State private var draft = ContactDraft()
     @State private var validationError: String?
@@ -317,9 +318,9 @@ private struct ContactsView: View {
 
                     if filteredContacts.isEmpty {
                         ContentUnavailableView(
-                            searchText.isEmpty ? "No Contacts" : "No Results",
+                            searchText.isEmpty ? "暂无鸽们" : "无搜索结果",
                             systemImage: searchText.isEmpty ? "person.crop.circle.badge.plus" : "magnifyingglass",
-                            description: Text(searchText.isEmpty ? "Tap New Bruhs to add your first contact." : "Try another name, phone number, or email.")
+                            description: Text(searchText.isEmpty ? "点击“新鸽们”添加第一个鸽们。" : "试试其他姓名、手机号或邮箱。")
                         )
                         .frame(maxWidth: .infinity, alignment: .center)
                         .listRowBackground(Color.clear)
@@ -360,7 +361,7 @@ private struct ContactsView: View {
         .sheet(isPresented: $isPresentingForm) {
             NavigationStack {
                 ContactFormView(
-                    title: editingContact == nil ? "New Contact" : "Edit Contact",
+                    title: editingContact == nil ? "新建鸽们" : "编辑鸽们",
                     draft: $draft,
                     validationError: validationError,
                     onCancel: {
@@ -376,6 +377,21 @@ private struct ContactsView: View {
                 onAccept: acceptInvitation,
                 onIgnore: ignoreInvitation
             )
+        }
+        .navigationDestination(isPresented: $isPresentingAddBruh) {
+            AddBruhView()
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isPresentingAddBruh = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .regular))
+                        .foregroundStyle(Color(red: 0.56, green: 0.57, blue: 0.58))
+                }
+                .buttonStyle(.plain)
+            }
         }
         .task {
             bootstrapInviteFlowIfNeeded()
@@ -402,10 +418,10 @@ private struct ContactsView: View {
                 }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("You")
+                Text("我")
                     .font(.system(size: 21, weight: .bold))
                     .foregroundStyle(Color.black.opacity(0.86))
-                Text("bruh ID: @yourboi")
+                Text("鸽们账号：@yourboi")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color.black.opacity(0.3))
             }
@@ -427,7 +443,7 @@ private struct ContactsView: View {
             quickActionRow(
                 icon: "🤝",
                 iconBackground: Color(red: 0.94, green: 0.84, blue: 0.84),
-                title: "New Bruhs",
+                title: "新鸽们",
                 trailing: pendingInvitationCount > 0 ? AnyView(
                     Text("\(pendingInvitationCount)")
                         .font(.system(size: 14, weight: .bold))
@@ -444,7 +460,7 @@ private struct ContactsView: View {
             quickActionRow(
                 icon: "👥",
                 iconBackground: Color(red: 0.86, green: 0.87, blue: 0.88),
-                title: "Group Chats",
+                title: "群聊",
                 action: {}
             )
 
@@ -453,7 +469,7 @@ private struct ContactsView: View {
             quickActionRow(
                 icon: "🏷️",
                 iconBackground: Color(red: 0.84, green: 0.89, blue: 0.82),
-                title: "Tags",
+                title: "标签",
                 action: {}
             )
         }
@@ -600,11 +616,11 @@ private struct ContactsView: View {
     private func contactListRow(_ contact: Contact) -> some View {
         contactRow(contact)
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                Button("Delete", role: .destructive) {
+                Button("删除", role: .destructive) {
                     delete(contact)
                 }
 
-                Button("Edit") {
+                Button("编辑") {
                     startEditing(contact)
                 }
                 .tint(.blue)
@@ -718,12 +734,12 @@ private struct ContactsView: View {
         let normalizedEmail = draft.email.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !normalizedName.isEmpty else {
-            validationError = "Name cannot be empty."
+            validationError = "姓名不能为空。"
             return
         }
 
         guard !normalizedPhone.isEmpty else {
-            validationError = "Phone number cannot be empty."
+            validationError = "手机号不能为空。"
             return
         }
 
@@ -881,7 +897,7 @@ private struct ContactsView: View {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             insertIncomingMessage(
                 personaId: "trump",
-                text: "You’re in. Big moves ahead. I’ll send you the most important update first.",
+                text: "你已加入。接下来有大动作，我先把最重要的更新发给你。",
                 sourcePostIds: []
             )
 
@@ -953,21 +969,21 @@ private struct ContactFormView: View {
 
     var body: some View {
         Form {
-            Section("Basic Info") {
-                TextField("Name", text: $draft.name)
+            Section("基本信息") {
+                TextField("姓名", text: $draft.name)
                     .textInputAutocapitalization(.words)
 
-                TextField("Phone Number", text: $draft.phoneNumber)
+                TextField("手机号", text: $draft.phoneNumber)
                     .keyboardType(.phonePad)
 
-                TextField("Email", text: $draft.email)
+                TextField("邮箱", text: $draft.email)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
                     .autocorrectionDisabled(true)
             }
 
-            Section("Options") {
-                Toggle("Favorite Contact", isOn: $draft.isFavorite)
+            Section("选项") {
+                Toggle("收藏联系人", isOn: $draft.isFavorite)
             }
 
             if let validationError {
@@ -982,10 +998,10 @@ private struct ContactFormView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel", action: onCancel)
+                Button("取消", action: onCancel)
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Save", action: onSave)
+                Button("保存", action: onSave)
             }
         }
     }
