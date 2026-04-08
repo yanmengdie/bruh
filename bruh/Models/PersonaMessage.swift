@@ -7,6 +7,7 @@ final class PersonaMessage {
     var threadId: String
     var personaId: String
     var text: String
+    var imageUrl: String?
     var isIncoming: Bool
     var createdAt: Date
     var deliveryState: String
@@ -18,6 +19,7 @@ final class PersonaMessage {
         threadId: String,
         personaId: String,
         text: String,
+        imageUrl: String? = nil,
         isIncoming: Bool,
         createdAt: Date = .now,
         deliveryState: String = "sent",
@@ -28,6 +30,7 @@ final class PersonaMessage {
         self.threadId = threadId
         self.personaId = personaId
         self.text = text
+        self.imageUrl = imageUrl
         self.isIncoming = isIncoming
         self.createdAt = createdAt
         self.deliveryState = deliveryState

@@ -1,6 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 import { personaMap, resolvePersonaById } from "../_shared/personas.ts"
+import { personaSocialPrompt } from "../_shared/persona_skills.ts"
 
 type ExistingComment = {
   id: string
@@ -244,19 +245,6 @@ function displayNameFor(authorId: string): string {
   return resolvePersonaProfile(authorId).displayName
 }
 
-function personaVoiceGuidance(personaId: string): string {
-  switch (personaId) {
-    case "musk":
-      return "Short, punchy, slightly sarcastic, technical confidence, internet-native cadence."
-    case "trump":
-      return "Confident, combative, headline-first, big claims, very conversational."
-    case "zuckerberg":
-      return "Builder mindset, product-focused, measured, quietly competitive."
-    default:
-      return "Natural, concise, social."
-  }
-}
-
 function cleanGeneratedText(text: string): string {
   return text
     .split("\n")
@@ -429,7 +417,7 @@ async function generateInteractionsWithFallback(
     const reason = matchedContact?.reasonCodes.join(", ") || (targetId === authorId ? "author_reply" : "topic_match")
     const system = [
       `You are ${targetPersona.displayName}.`,
-      personaVoiceGuidance(targetId),
+      personaSocialPrompt(targetId),
       "You are writing a short comment under a social feed post, not sending a DM.",
       "Be concise, natural, specific, and in character.",
       "Maximum: 2 short sentences.",

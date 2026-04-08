@@ -327,14 +327,6 @@ struct FeedCard: View {
         }
     }
 
-    private var baseLikeCount: Int {
-        Int(post.importanceScore * 5200)
-    }
-
-    private var displayLikeCount: String {
-        String(baseLikeCount + likeNames.count)
-    }
-
     private var likeNames: [String] {
         var names = likes.map(\.authorDisplayName)
         if isLiked {
@@ -345,12 +337,8 @@ struct FeedCard: View {
     }
 
     private var likeSummaryText: String {
-        if likeNames.isEmpty {
-            return isLiked ? "♥ 你觉得很赞" : ""
-        }
-
-        let preview = likeNames.prefix(3).joined(separator: ", ")
-        return "♥ \(preview) 等 \(displayLikeCount) 人"
+        guard !likeNames.isEmpty else { return "" }
+        return "♥ \(likeNames.joined(separator: ", "))"
     }
 
     private func commentPrefix(for comment: FeedComment) -> String {

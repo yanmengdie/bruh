@@ -211,15 +211,40 @@ private struct MessageDetailView: View {
 
                 Divider()
 
-                TextField("Message \(displayName)...", text: $draft)
-                    .submitLabel(.send)
-                    .onSubmit {
-                        send()
+                HStack(spacing: 10) {
+                    Button {
+                        send(requestImage: true)
+                    } label: {
+                        Image(systemName: "photo.badge.plus")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 42, height: 42)
+                            .background(Color.white.opacity(0.65))
+                            .clipShape(Circle())
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
-                    .background(Color.white.opacity(0.65))
-                    .clipShape(Capsule())
+                    .buttonStyle(.plain)
+                    .disabled(isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    TextField("Message \(displayName)...", text: $draft)
+                        .submitLabel(.send)
+                        .onSubmit {
+                            send()
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 14)
+                        .background(Color.white.opacity(0.65))
+                        .clipShape(Capsule())
+
+                    Button {
+                        send()
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary : .blue)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
                 .padding(.horizontal, 12)
                 .padding(.top, 4)
                 .padding(.bottom, 8)
@@ -313,7 +338,7 @@ private struct MessageDetailView: View {
         }
     }
 
-    private func send() {
+    private func send(requestImage: Bool = false) {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isSending else { return }
 
@@ -327,7 +352,8 @@ private struct MessageDetailView: View {
                     personaId: thread.personaId,
                     text: text,
                     modelContext: modelContext,
-                    userInterests: InterestPreferences.selectedInterests()
+                    userInterests: InterestPreferences.selectedInterests(),
+                    requestImage: requestImage
                 )
             } catch {
                 errorMessage = error.localizedDescription
@@ -380,9 +406,10 @@ private struct MessageDetailView: View {
         themeColor: Color
     ) -> some View {
         switch content {
-        case .text(let text):
+        case .text(let text, let imageUrl):
             bubble(
                 text: text,
+                imageURL: imageUrl,
                 isIncoming: isIncoming,
                 deliveryState: deliveryState,
                 themeColor: themeColor
@@ -390,6 +417,7 @@ private struct MessageDetailView: View {
         case .webPreview:
             bubble(
                 text: "[Web preview coming soon]",
+                imageURL: nil,
                 isIncoming: isIncoming,
                 deliveryState: deliveryState,
                 themeColor: themeColor
@@ -397,6 +425,7 @@ private struct MessageDetailView: View {
         case .audio:
             bubble(
                 text: "[Audio message coming soon]",
+                imageURL: nil,
                 isIncoming: isIncoming,
                 deliveryState: deliveryState,
                 themeColor: themeColor
@@ -405,8 +434,7 @@ private struct MessageDetailView: View {
     }
 
     private func parseContent(from message: PersonaMessage) -> MessageContent {
-        // Extensible parser: currently all messages render as text.
-        .text(message.text)
+        .text(message.text, imageUrl: message.imageUrl.flatMap(URL.init(string:)))
     }
 
     private var incomingAvatar: some View {
@@ -424,16 +452,52 @@ private struct MessageDetailView: View {
 
     private func bubble(
         text: String,
+        imageURL: URL?,
         isIncoming: Bool,
         deliveryState: String,
         themeColor: Color
     ) -> some View {
         VStack(alignment: isIncoming ? .leading : .trailing, spacing: 4) {
-            Text(text)
-                .font(.system(size: 16))
-                .foregroundColor(.primary)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
+            VStack(alignment: .leading, spacing: imageURL == nil ? 0 : 10) {
+                if !text.isEmpty {
+                    Text(text)
+                        .font(.system(size: 16))
+                        .foregroundColor(.primary)
+                }
+
+                if let imageURL {
+                    AsyncImage(url: imageURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 220, height: 220)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        case .failure:
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.black.opacity(0.06))
+                                .frame(width: 220, height: 220)
+                                .overlay {
+                                    Image(systemName: "photo")
+                                        .font(.system(size: 28))
+                                        .foregroundStyle(.secondary)
+                                }
+                        case .empty:
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.black.opacity(0.04))
+                                .frame(width: 220, height: 220)
+                                .overlay {
+                                    ProgressView()
+                                }
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
                 .background {
                     if isIncoming {
                         ZStack {
@@ -461,17 +525,19 @@ private struct MessageDetailView: View {
     @ViewBuilder
     private func incomingReactions(for messageId: String, reaction: MessageReaction) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("\(reaction.emoji) \(reaction.mood)")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
-                .padding(.leading, 2)
+            HStack(spacing: 4) {
+                reactionEmojiText(reaction.emoji)
+                Text(reaction.mood)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.leading, 2)
 
             if let selected = selectedQuickReactions[messageId] {
                 Button {
                     toggleQuickReaction(selected, for: messageId)
                 } label: {
-                    Text(selected)
-                        .font(.system(size: 13))
+                    reactionEmojiText(selected)
                 }
                 .buttonStyle(.plain)
                 .padding(.leading, 2)
@@ -481,8 +547,7 @@ private struct MessageDetailView: View {
                         Button {
                             toggleQuickReaction(emoji, for: messageId)
                         } label: {
-                            Text(emoji)
-                                .font(.system(size: 13))
+                            reactionEmojiText(emoji)
                                 .opacity(0.82)
                         }
                         .buttonStyle(.plain)
@@ -510,10 +575,15 @@ private struct MessageDetailView: View {
             selectedQuickReactions[messageId] = emoji
         }
     }
+
+    private func reactionEmojiText(_ emoji: String) -> some View {
+        Text(verbatim: emoji)
+            .font(.system(size: 15))
+    }
 }
 
 private enum MessageContent {
-    case text(String)
+    case text(String, imageUrl: URL?)
     case webPreview(url: URL?)
     case audio(duration: TimeInterval?)
 }

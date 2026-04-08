@@ -26,9 +26,16 @@ final class MessageService {
         }
     }
 
-    func sendMessage(personaId: String, text: String, modelContext: ModelContext, userInterests: [String]) async throws {
+    func sendMessage(
+        personaId: String,
+        text: String,
+        modelContext: ModelContext,
+        userInterests: [String],
+        requestImage: Bool = false
+    ) async throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        let wantsImage = requestImage || shouldRequestImage(for: trimmed)
 
         let thread = try ensureThread(for: personaId, modelContext: modelContext)
         let outgoing = PersonaMessage(
@@ -49,22 +56,25 @@ final class MessageService {
                 personaId: personaId,
                 userMessage: trimmed,
                 conversation: try recentConversation(for: thread.id, modelContext: modelContext),
-                userInterests: userInterests
+                userInterests: userInterests,
+                requestImage: wantsImage
             )
 
             outgoing.deliveryState = "sent"
+            let replyPreview = messagePreview(text: reply.content, imageUrl: reply.imageUrl)
             let incoming = PersonaMessage(
                 id: reply.id,
                 threadId: thread.id,
                 personaId: personaId,
                 text: reply.content,
+                imageUrl: reply.imageUrl,
                 isIncoming: true,
                 createdAt: reply.generatedAt,
                 deliveryState: "sent",
                 sourcePostIds: reply.sourcePostIds
             )
             modelContext.insert(incoming)
-            updateThread(thread, preview: reply.content, at: reply.generatedAt, unreadCount: 0)
+            updateThread(thread, preview: replyPreview, at: reply.generatedAt, unreadCount: 0)
             try modelContext.save()
         } catch {
             outgoing.deliveryState = "failed"
@@ -222,6 +232,20 @@ final class MessageService {
         thread.lastMessageAt = date
         thread.updatedAt = Date()
         thread.unreadCount = unreadCount
+    }
+
+    private func messagePreview(text: String, imageUrl: String?) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard imageUrl != nil else { return trimmed }
+        return trimmed.isEmpty ? "[图片]" : "[图片] \(trimmed)"
+    }
+
+    private func shouldRequestImage(for text: String) -> Bool {
+        let lower = text.lowercased()
+        let triggers = [
+            "生成", "生图", "图片", "图像", "画", "插画", "海报", "壁纸", "封面", "render", "image", "illustration",
+        ]
+        return triggers.contains(where: { lower.contains($0) })
     }
 
     private func starterMessage(for personaId: String) -> String {

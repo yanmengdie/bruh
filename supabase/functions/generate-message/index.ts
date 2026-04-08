@@ -2,6 +2,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 import { topNewsSummaryBlock } from "../_shared/news.ts"
 import { resolvePersonaById } from "../_shared/personas.ts"
+import { personaFewShotExamples, personaImageStyle, personaRolePrompt } from "../_shared/persona_skills.ts"
 
 type ConversationTurn = {
   role: string
@@ -78,80 +79,12 @@ function selectContext(rows: ContextRow[], personaId: string, userMessage: strin
     .slice(0, 3)
 }
 
-function personaVoiceGuidance(personaId: string): string {
-  switch (personaId) {
-    case "musk":
-      return [
-        "You are Elon Musk texting casually.",
-        "Use short, punchy sentences. Mix technical precision with dry humor.",
-        "You love first-principles thinking. Dismiss hype. Praise execution.",
-        "Occasional sarcasm is fine. Never be formal or corporate.",
-        "Use phrases like 'the thing is', 'obviously', 'lol', 'interesting'.",
-        "Avoid long explanations — you think fast and type fast.",
-      ].join(" ")
-    case "trump":
-      return [
-        "You are Donald Trump texting casually.",
-        "Use superlatives: 'huge', 'tremendous', 'the best', 'very unfair'.",
-        "Short declarative sentences. Repetition for emphasis is fine.",
-        "You name-drop, brag, and frame everything as winning or losing.",
-        "Use ALL CAPS for emphasis on key words occasionally.",
-        "Never sound analytical or balanced — you have strong opinions.",
-        "Phrases you like: 'believe me', 'many people are saying', 'nobody does it better'.",
-      ].join(" ")
-    case "zuckerberg":
-      return [
-        "You are Mark Zuckerberg texting casually.",
-        "Builder mindset: you think in products, systems, and shipping speed.",
-        "Calm and measured, but not boring — you get excited about technical details.",
-        "You reference internal metrics, user behavior, and platform dynamics naturally.",
-        "Slightly awkward but genuine. Not salesy. Not corporate-speak.",
-        "Your instinct is to see everything through a product/business lens.",
-        "When big world events happen, you naturally think about: how does this affect",
-        "user behavior, ad markets, content moderation, or platform growth? Lead with that.",
-        "You're a builder, not a pundit. Your opinions are about execution, not politics.",
-        "Phrases you use: 'the thing we're seeing is', 'iteration speed', 'on the roadmap'.",
-      ].join(" ")
-    default:
-      return "Sound like a real person texting."
-  }
-}
-
-function personaFewShot(personaId: string): string {
-  switch (personaId) {
-    case "musk":
-      return [
-        'User: "OpenAI just released a new model"',
-        'Reply: "Cool. Show me the benchmarks. Marketing ≠ performance."',
-        'User: "Should I learn to code in 2026?"',
-        'Reply: "Yes. But learn to think in systems, not just syntax."',
-        'User: "Tesla stock is down again"',
-        'Reply: "Short-term noise. We\'re building the future. That\'s what matters."',
-      ].join("\n")
-    case "trump":
-      return [
-        'User: "The market is crashing"',
-        'Reply: "Terrible. The other side doesn\'t know what they\'re doing. Very sad."',
-        'User: "China is leading in AI now"',
-        'Reply: "Not for long. We have the best people. Believe me."',
-        'User: "What\'s your plan for TikTok?"',
-        'Reply: "Strong deal. Very strong. We\'ll see what happens. A lot of people want it."',
-      ].join("\n")
-    case "zuckerberg":
-      return [
-        'User: "Threads is growing fast"',
-        'Reply: "Yeah, the engagement loop is finally clicking. We shipped the right features."',
-        'User: "Is VR actually going to work?"',
-        'Reply: "It\'s a 10-year bet. But the Quest numbers are real. People are using it daily."',
-        'User: "Meta AI is everywhere now"',
-        'Reply: "Distribution is the moat. We put it in every surface — that\'s the play."',
-      ].join("\n")
-    default:
-      return 'Reply in 1-2 natural text-message sentences.'
-  }
-}
-
-function buildSystemPrompt(persona: NonNullable<ReturnType<typeof resolvePersonaById>>, contextRows: ContextRow[], newsContext?: string) {
+function buildSystemPrompt(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+  contextRows: ContextRow[],
+  newsContext: string | undefined,
+  requestImage: boolean,
+) {
   const contextBlock = contextRows.length === 0
     ? "No recent feed context was found."
     : contextRows.map((row) => `- ${row.content}`).join("\n")
@@ -160,9 +93,10 @@ function buildSystemPrompt(persona: NonNullable<ReturnType<typeof resolvePersona
     ? `\n\nA news headline was just shared in the conversation:\n"${newsContext}"\nReact to this news in character. Give your take — opinionated, short, in your voice.`
     : ""
 
-  return [
-    `You are ${persona.displayName}.`,
-    personaVoiceGuidance(persona.personaId),
+  const base = [
+    "You are the persona described below.",
+    personaRolePrompt(persona.personaId),
+    "Your voice must be unmistakable and consistent with the persona description. If it could be said by a generic assistant, it's wrong.",
     `Domains: ${persona.domains.join(", ")}.`,
     "This is a private text conversation.",
     "Reply with 1-2 short sentences.",
@@ -174,11 +108,21 @@ function buildSystemPrompt(persona: NonNullable<ReturnType<typeof resolvePersona
     "Give a sharp opinion first. If useful, end with one short follow-up question.",
     "Stay in character and keep it natural.",
     "Examples of the desired style:",
-    personaFewShot(persona.personaId),
+    personaFewShotExamples(persona.personaId),
     "Recent context:",
     contextBlock,
     newsBlock,
-  ].join("\n")
+  ]
+
+  if (requestImage) {
+    base.push(
+      "An image will be generated for this message.",
+      "Do not say you cannot generate images or mention prompts or tools.",
+      "If you add text, keep it to one short in-character sentence.",
+    )
+  }
+
+  return base.join("\n")
 }
 
 function buildStructuredNewsContext(events: NewsEventRow[]) {
@@ -194,9 +138,17 @@ async function generateWithOpenAICompatible(
   baseUrl: string,
   model: string,
   system: string,
+  styleGuide: string,
   conversation: ConversationTurn[],
   userMessage: string,
 ) {
+  const userInstruction = [
+    "STYLE GUIDE (mandatory):",
+    styleGuide,
+    "Use the persona's voice and signature cadence.",
+    "Do not mention being an AI or assistant.",
+  ].join("\n")
+
   const messages: OpenAIMessage[] = [
     ...conversation.map((item) => ({
       role: item.role === "assistant" ? "assistant" : "user",
@@ -204,44 +156,203 @@ async function generateWithOpenAICompatible(
     })),
     {
       role: "user",
-      content: `${userMessage}\n\nReply in 1-2 short natural text-message sentences. No bullet points. No analysis. Stay in character.`,
+      content: `${userMessage}\n\n${userInstruction}\nReply in 1-2 short natural text-message sentences. No bullet points. No analysis. Stay in character.`,
     },
   ]
 
-  const responsesRequest = await fetch(`${baseUrl}/responses`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      instructions: system,
-      input: messages.map((message) => ({
-        role: message.role,
-        content: [{ type: "input_text", text: message.content }],
-      })),
-      max_output_tokens: 70,
-    }),
-  })
+  const tryChatCompletion = async (): Promise<string | null> => {
+    try {
+      const chatResponse = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: system },
+            ...messages,
+          ],
+          max_tokens: 70,
+          temperature: 0.85,
+        }),
+      })
 
-  if (responsesRequest.ok) {
-    const payload = await responsesRequest.json()
-    const content = Array.isArray(payload.output)
-      ? payload.output
-        .flatMap((item: Record<string, unknown>) => Array.isArray(item.content) ? item.content : [])
-        .filter((item: Record<string, unknown>) => item.type === "output_text")
-        .map((item: Record<string, unknown>) => asString(item.text))
-        .join("\n")
-        .trim()
-      : ""
+      if (!chatResponse.ok) {
+        const detail = await chatResponse.text()
+        console.warn("Chat completions request failed", detail)
+        return null
+      }
 
-    if (content) {
-      return content
+      const payload = await chatResponse.json()
+      const content = asString(payload.choices?.[0]?.message?.content)
+      return content || null
+    } catch (error) {
+      console.warn("Chat completions request error", error)
+      return null
     }
   }
 
-  const chatResponse = await fetch(`${baseUrl}/chat/completions`, {
+  const tryResponses = async (): Promise<string | null> => {
+    try {
+      const responsesRequest = await fetch(`${baseUrl}/responses`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          instructions: system,
+          input: messages.map((message) => ({
+            role: message.role,
+            content: [{ type: "input_text", text: message.content }],
+          })),
+          max_output_tokens: 70,
+          temperature: 0.85,
+        }),
+      })
+
+      if (!responsesRequest.ok) {
+        const detail = await responsesRequest.text()
+        console.warn("Responses API request failed", detail)
+        return null
+      }
+
+      const payload = await responsesRequest.json()
+      const content = Array.isArray(payload.output)
+        ? payload.output
+          .flatMap((item: Record<string, unknown>) => Array.isArray(item.content) ? item.content : [])
+          .filter((item: Record<string, unknown>) => item.type === "output_text")
+          .map((item: Record<string, unknown>) => asString(item.text))
+          .join("\n")
+          .trim()
+        : ""
+
+      return content || null
+    } catch (error) {
+      console.warn("Responses API request error", error)
+      return null
+    }
+  }
+
+  const preferChat = !baseUrl.includes("openai.com")
+  const primary = preferChat ? await tryChatCompletion() : await tryResponses()
+  if (primary) return primary
+
+  const secondary = preferChat ? await tryResponses() : await tryChatCompletion()
+  if (secondary) return secondary
+
+  throw new Error("OpenAI-compatible provider returned empty content")
+}
+
+function fallbackReply(personaId: string, userMessage: string) {
+  const trimmed = userMessage.trim()
+  switch (personaId) {
+    case "musk":
+      return trimmed
+        ? `Interesting. Let's sanity-check the assumptions behind "${trimmed}".`
+        : "Interesting. What is the constraint you are optimizing for?"
+    case "trump":
+      return trimmed
+        ? `Strong point. "${trimmed}" is exactly the kind of leverage we need.`
+        : "Big moment. Tell me what you want to focus on."
+    case "zuckerberg":
+      return trimmed
+        ? `I get it. The real question is how this changes behavior and distribution for "${trimmed}".`
+        : "What is the concrete user behavior you want to change?"
+    default:
+      return trimmed ? `Got it: "${trimmed}".` : "Got it. What should we focus on?"
+  }
+}
+
+function cleanPersonaReply(text: string) {
+  const cleaned = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => {
+      const lower = line.toLowerCase()
+      if (!lower) return false
+      return ![
+        "as an ai",
+        "i'm an ai",
+        "i am an ai",
+        "i'm a model",
+        "i am a model",
+        "i'm sorry",
+        "i’m sorry",
+        "i can't",
+        "i cannot",
+        "i won't",
+        "i will not",
+        "as a language model",
+        "i don't roleplay",
+        "i do not roleplay",
+        "i cannot discuss",
+        "i can't discuss",
+      ].some((prefix) => lower.startsWith(prefix))
+    })
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  return cleaned
+}
+
+function normalizeBoolean(value: unknown) {
+  if (typeof value === "boolean") return value
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase()
+    return normalized === "true" || normalized === "1" || normalized === "yes"
+  }
+  return false
+}
+
+function buildImagePrompt(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+  userMessage: string,
+  conversation: ConversationTurn[],
+) {
+  const recentConversation = conversation
+    .slice(-4)
+    .map((item) => `${item.role}: ${item.content}`)
+    .join("\n")
+
+  return [
+    `Create an image that ${persona.displayName} would share.`,
+    `Persona style: ${personaImageStyle(persona.personaId)}`,
+    `User request: ${userMessage}`,
+    recentConversation ? `Recent chat context:\n${recentConversation}` : "",
+    "Make the image visually specific, modern, and coherent.",
+    "Ignore any mentions of chat UIs or devices unless the user explicitly asked for them.",
+    "Avoid phones, UI mockups, chat bubbles, screenshots, device frames, or text overlays.",
+    "Do not add text unless the user explicitly asked for text inside the image.",
+  ].filter((item) => item.length > 0).join("\n\n")
+}
+
+function extractImageUrl(payload: Record<string, unknown>) {
+  const collectionCandidates = [payload.data, payload.images, payload.output, payload.results]
+
+  for (const candidate of collectionCandidates) {
+    if (!Array.isArray(candidate)) continue
+    for (const item of candidate) {
+      const row = item as Record<string, unknown>
+      const imageUrl = asString(row.url ?? row.image_url ?? row.imageUrl)
+      if (imageUrl) return imageUrl
+    }
+  }
+
+  return asString(payload.url ?? payload.image_url ?? payload.imageUrl)
+}
+
+async function generateImageWithNanoBanana(
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  prompt: string,
+) {
+  const response = await fetch(`${baseUrl}/images/generations`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -249,26 +360,24 @@ async function generateWithOpenAICompatible(
     },
     body: JSON.stringify({
       model,
-      messages: [
-        { role: "system", content: system },
-        ...messages,
-      ],
-      max_tokens: 70,
+      prompt,
+      aspect_ratio: "1:1",
+      image_size: "1k",
+      response_format: "url",
     }),
   })
 
-  if (!chatResponse.ok) {
-    throw new Error(`OpenAI-compatible request failed: ${await chatResponse.text()}`)
+  if (!response.ok) {
+    throw new Error(`Nano Banana request failed: ${await response.text()}`)
   }
 
-  const payload = await chatResponse.json()
-  const content = asString(payload.choices?.[0]?.message?.content)
-
-  if (!content) {
-    throw new Error("OpenAI-compatible provider returned empty content")
+  const payload = await response.json()
+  const imageUrl = extractImageUrl(payload)
+  if (!imageUrl) {
+    throw new Error("Nano Banana returned no image URL")
   }
 
-  return content
+  return imageUrl
 }
 
 Deno.serve(async (request) => {
@@ -286,6 +395,9 @@ Deno.serve(async (request) => {
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY")
     const openaiBaseUrl = (Deno.env.get("OPENAI_BASE_URL") ?? "https://api.codexzh.com/v1").replace(/\/$/, "")
     const openaiModel = Deno.env.get("OPENAI_MODEL") ?? "gpt-5.2"
+    const nanoBananaApiKey = Deno.env.get("NANO_BANANA_API_KEY")
+    const nanoBananaBaseUrl = (Deno.env.get("NANO_BANANA_BASE_URL") ?? "https://ccodezh.com/v1").replace(/\/$/, "")
+    const nanoBananaModel = Deno.env.get("NANO_BANANA_MODEL") ?? "nano-banana"
 
     if (!url || !serviceRoleKey || !openaiApiKey) {
       return Response.json(
@@ -300,6 +412,7 @@ Deno.serve(async (request) => {
     const conversation = normalizeConversation(body.conversation)
     const newsContext = asString(body.newsContext)
     const userInterests = normalizeInterests(body.userInterests)
+    const requestImage = normalizeBoolean(body.requestImage)
 
     if (!personaId) {
       return Response.json({ error: "personaId is required" }, { status: 400, headers: corsHeaders })
@@ -389,15 +502,46 @@ Deno.serve(async (request) => {
       : "",
     ].filter((item) => item.length > 0).join("\n\n")
 
-    const system = buildSystemPrompt(persona, selected, combinedNewsContext)
-    const content = await generateWithOpenAICompatible(
-      openaiApiKey,
-      openaiBaseUrl,
-      openaiModel,
-      system,
-      conversation,
-      userMessage,
-    )
+    const styleGuide = [
+      personaRolePrompt(persona.personaId),
+      "Examples:",
+      personaFewShotExamples(persona.personaId),
+    ].join("\n")
+
+    const system = buildSystemPrompt(persona, selected, combinedNewsContext, requestImage)
+    let content = ""
+    try {
+      content = await generateWithOpenAICompatible(
+        openaiApiKey,
+        openaiBaseUrl,
+        openaiModel,
+        system,
+        styleGuide,
+        conversation,
+        userMessage,
+      )
+      content = cleanPersonaReply(content)
+      if (!content) {
+        throw new Error("Persona reply empty after cleanup")
+      }
+    } catch (error) {
+      console.error("OpenAI-compatible request failed", error)
+      content = fallbackReply(persona.personaId, userMessage)
+    }
+    let imageUrl: string | null = null
+    if (requestImage && nanoBananaApiKey) {
+      try {
+        imageUrl = await generateImageWithNanoBanana(
+          nanoBananaApiKey,
+          nanoBananaBaseUrl,
+          nanoBananaModel,
+          buildImagePrompt(persona, userMessage, conversation),
+        )
+      } catch (error) {
+        console.error("Nano Banana image generation failed", error)
+        imageUrl = null
+      }
+    }
     const generatedAt = new Date().toISOString()
 
     return Response.json(
@@ -405,6 +549,7 @@ Deno.serve(async (request) => {
         id: `msg-${crypto.randomUUID()}`,
         personaId,
         content,
+        imageUrl,
         sourcePostIds: [...selected.map((row) => row.id), ...relevantNews.map((row) => row.id)],
         generatedAt,
       },

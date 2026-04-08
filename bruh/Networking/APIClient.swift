@@ -66,7 +66,8 @@ actor APIClient {
         personaId: String,
         userMessage: String,
         conversation: [MessageTurnDTO],
-        userInterests: [String]
+        userInterests: [String],
+        requestImage: Bool = false
     ) async throws -> MessageReplyDTO {
         guard let url = URL(string: "\(baseURL)/generate-message") else {
             throw NetworkError.invalidURL
@@ -82,7 +83,8 @@ actor APIClient {
                 personaId: personaId,
                 userMessage: userMessage,
                 conversation: conversation,
-                userInterests: userInterests
+                userInterests: userInterests,
+                requestImage: requestImage
             )
         )
 
@@ -198,12 +200,14 @@ struct SendMessageRequestDTO: Codable {
     let userMessage: String
     let conversation: [MessageTurnDTO]
     let userInterests: [String]
+    let requestImage: Bool
 }
 
 struct MessageReplyDTO: Codable, Identifiable {
     let id: String
     let personaId: String
     let content: String
+    let imageUrl: String?
     let sourcePostIds: [String]
     let generatedAt: Date
 }

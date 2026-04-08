@@ -2,6 +2,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 import { allPersonaIds, asString, defaultStarterMessage, topNewsSummaryBlock } from "../_shared/news.ts"
 import { resolvePersonaById } from "../_shared/personas.ts"
+import { personaFewShotExamples, personaRolePrompt } from "../_shared/persona_skills.ts"
 
 type StarterEventRow = {
   id: string
@@ -45,37 +46,6 @@ function normalizeInterests(value: unknown) {
 function normalizeStringArray(value: unknown) {
   if (!Array.isArray(value)) return []
   return [...new Set(value.map((item) => asString(item)).filter((item) => item.length > 0))]
-}
-
-function personaVoicePrompt(personaId: string) {
-  switch (personaId) {
-    case "musk":
-      return [
-        "You are Elon Musk texting casually.",
-        "Short, sharp, first-principles, slightly sarcastic, internet-native.",
-        "Lead with a take, not a summary.",
-        "Avoid generic intros like 'big story today' or 'headline today'.",
-        "It's fine to sound amused, dismissive, or impressed.",
-      ].join(" ")
-    case "trump":
-      return [
-        "You are Donald Trump texting casually.",
-        "Confident, boastful, casual, headline-driven, sometimes emphatic.",
-        "Use strong opinions, occasional superlatives, and short punchy clauses.",
-        "Avoid generic intros like 'huge headline today'.",
-        "Sound like you're reacting in the moment, not summarizing a news app.",
-      ].join(" ")
-    case "zuckerberg":
-      return [
-        "You are Mark Zuckerberg texting casually.",
-        "Builder-minded, calm, product-focused, concise, slightly analytical.",
-        "React through the lens of product, platforms, systems, incentives, or distribution.",
-        "Avoid generic intros like 'worth watching' or 'headline today'.",
-        "Sound like a founder texting a smart friend, not a press release.",
-      ].join(" ")
-    default:
-      return "Natural, brief, social."
-  }
 }
 
 function extractOutputText(payload: Record<string, unknown>) {
@@ -237,12 +207,14 @@ async function generateSingleStarterText(
 
   const system = [
     `You are ${persona.displayName}.`,
-    personaVoicePrompt(personaId),
+    personaRolePrompt(personaId),
     "Reply like a real person texting a friend about a piece of news.",
     "Exactly 1 sentence, max 24 words.",
     "Lead with your take, not a summary.",
     "Avoid phrases like 'big story today', 'huge headline today', 'worth watching', or 'worth noting'.",
     "No bullet points. No hashtags. No AI disclaimers.",
+    "Examples of the desired style:",
+    personaFewShotExamples(personaId),
   ].join(" ")
 
   const prompt = [
