@@ -6,6 +6,13 @@ struct FeedInteractionState {
     let comments: [FeedComment]
 }
 
+struct FeedInteractionTarget {
+    let id: String
+    let personaId: String
+    let postContent: String
+    let topic: String?
+}
+
 @MainActor
 final class FeedInteractionService {
     private let api: APIClient
@@ -14,57 +21,57 @@ final class FeedInteractionService {
         self.api = api
     }
 
-    func loadInteractions(for post: PersonaPost, modelContext: ModelContext) async throws -> FeedInteractionState {
+    func loadInteractions(for target: FeedInteractionTarget, modelContext: ModelContext) async throws -> FeedInteractionState {
         let reply = try await api.generatePostInteractions(
-            postId: post.id,
-            personaId: post.personaId,
-            postContent: post.content,
-            topic: post.topic
+            postId: target.id,
+            personaId: target.personaId,
+            postContent: target.postContent,
+            topic: target.topic
         )
 
         try replaceState(with: reply, modelContext: modelContext)
-        return try interactionState(for: post.id, modelContext: modelContext)
+        return try interactionState(for: target.id, modelContext: modelContext)
     }
 
     func sendViewerComment(
-        for post: PersonaPost,
+        for target: FeedInteractionTarget,
         text: String,
         modelContext: ModelContext
     ) async throws -> FeedInteractionState {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            return try interactionState(for: post.id, modelContext: modelContext)
+            return try interactionState(for: target.id, modelContext: modelContext)
         }
 
         let commentId = "viewer-\(UUID().uuidString)"
         let reply = try await api.generatePostInteractions(
-            postId: post.id,
-            personaId: post.personaId,
-            postContent: post.content,
-            topic: post.topic,
+            postId: target.id,
+            personaId: target.personaId,
+            postContent: target.postContent,
+            topic: target.topic,
             viewerComment: trimmed,
             viewerCommentId: commentId
         )
 
         try replaceState(with: reply, modelContext: modelContext)
-        return try interactionState(for: post.id, modelContext: modelContext)
+        return try interactionState(for: target.id, modelContext: modelContext)
     }
 
     func setViewerLike(
-        for post: PersonaPost,
+        for target: FeedInteractionTarget,
         isLiked: Bool,
         modelContext: ModelContext
     ) async throws -> FeedInteractionState {
         let reply = try await api.generatePostInteractions(
-            postId: post.id,
-            personaId: post.personaId,
-            postContent: post.content,
-            topic: post.topic,
+            postId: target.id,
+            personaId: target.personaId,
+            postContent: target.postContent,
+            topic: target.topic,
             viewerLikeAction: isLiked ? "like" : "unlike"
         )
 
         try replaceState(with: reply, modelContext: modelContext)
-        return try interactionState(for: post.id, modelContext: modelContext)
+        return try interactionState(for: target.id, modelContext: modelContext)
     }
 
     func interactionState(for postId: String, modelContext: ModelContext) throws -> FeedInteractionState {

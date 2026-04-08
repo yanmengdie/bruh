@@ -11,8 +11,8 @@ struct FeedView: View {
         order: .reverse,
         animation: .default
     ) private var deliveries: [ContentDelivery]
-
-    @Query private var posts: [PersonaPost]
+    @Query private var events: [ContentEvent]
+    @Query private var sourceItems: [SourceItem]
 
     @Query private var contacts: [Contact]
 
@@ -27,14 +27,12 @@ struct FeedView: View {
     }
 
     private var visibleEntries: [FeedEntry] {
-        let postsByLegacyId: [String: PersonaPost] = Dictionary(
-            uniqueKeysWithValues: posts.map { ($0.id, $0) }
+        let eventsById: [String: ContentEvent] = Dictionary(
+            uniqueKeysWithValues: events.map { ($0.id, $0) }
         )
-
-        let postsByEventId: [String: PersonaPost] = posts.reduce(into: [:]) { result, post in
-            guard let eventId = post.contentEventId else { return }
-            result[eventId] = post
-        }
+        let sourceItemsById: [String: SourceItem] = Dictionary(
+            uniqueKeysWithValues: sourceItems.map { ($0.id, $0) }
+        )
 
         var entries: [FeedEntry] = []
 
@@ -45,14 +43,17 @@ struct FeedView: View {
                 continue
             }
 
-            let matchedPost = delivery.legacyPostId.flatMap { postsByLegacyId[$0] }
-                ?? postsByEventId[delivery.eventId]
-            let personaId = delivery.personaId ?? matchedPost?.personaId ?? ""
+            let event = eventsById[delivery.eventId]
+            let sourceItem = event?.sourceReferenceIds
+                .compactMap { sourceItemsById[$0] }
+                .first
+            let personaId = delivery.personaId ?? event?.primaryPersonaId ?? ""
 
             entries.append(
                 FeedEntry(
                     delivery: delivery,
-                    post: matchedPost,
+                    event: event,
+                    sourceItem: sourceItem,
                     contact: contacts.first(where: { $0.linkedPersonaId == personaId })
                 )
             )
@@ -85,7 +86,8 @@ struct FeedView: View {
                         ForEach(visibleEntries) { entry in
                             FeedCard(
                                 delivery: entry.delivery,
-                                post: entry.post,
+                                event: entry.event,
+                                sourceItem: entry.sourceItem,
                                 contact: entry.contact
                             )
                             .padding(.horizontal, 16)
@@ -180,7 +182,8 @@ struct FeedView: View {
 
 private struct FeedEntry: Identifiable {
     let delivery: ContentDelivery
-    let post: PersonaPost?
+    let event: ContentEvent?
+    let sourceItem: SourceItem?
     let contact: Contact?
 
     var id: String { delivery.id }

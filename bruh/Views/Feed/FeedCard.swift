@@ -6,7 +6,8 @@ struct FeedCard: View {
     @Environment(\.modelContext) private var modelContext
 
     let delivery: ContentDelivery
-    let post: PersonaPost?
+    let event: ContentEvent?
+    let sourceItem: SourceItem?
     let contact: Contact?
 
     @State private var isLiked = false
@@ -36,11 +37,11 @@ struct FeedCard: View {
     }
 
     private var resolvedPersonaId: String {
-        post?.personaId ?? delivery.personaId ?? "unknown"
+        delivery.personaId ?? event?.primaryPersonaId ?? "unknown"
     }
 
     private var displayName: String {
-        contact?.name ?? delivery.personaId ?? post?.personaId ?? "Unknown"
+        contact?.name ?? resolvedPersonaId
     }
 
     private var bodyText: String {
@@ -48,11 +49,38 @@ struct FeedCard: View {
         if !text.isEmpty {
             return text
         }
-        return post?.content ?? delivery.previewText
+        let eventBody = event?.bodyText.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !eventBody.isEmpty {
+            return eventBody
+        }
+        return delivery.previewText
+    }
+
+    private var interactionTarget: FeedInteractionTarget? {
+        let targetId = [
+            delivery.legacyPostId,
+            delivery.eventId,
+            delivery.id,
+        ]
+        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .first(where: { !$0.isEmpty }) ?? ""
+        let personaId = resolvedPersonaId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let content = bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !targetId.isEmpty, !personaId.isEmpty, !content.isEmpty else {
+            return nil
+        }
+
+        return FeedInteractionTarget(
+            id: targetId,
+            personaId: personaId,
+            postContent: content,
+            topic: normalizedValue(event?.category)
+        )
     }
 
     private var canInteract: Bool {
-        post != nil
+        interactionTarget != nil
     }
 
     private var imageColumnCount: Int {
@@ -334,7 +362,7 @@ struct FeedCard: View {
     }
 
     private var locationText: String {
-        if post?.sourceType == "xiaohongshu" {
+        if sourceItem?.sourceType == "xiaohongshu" {
             return "中国"
         }
 
@@ -371,13 +399,13 @@ struct FeedCard: View {
 
     private func loadInteractionsIfNeeded() async {
         guard !hasLoadedInteractions else { return }
-        guard let post else { return }
+        guard let interactionTarget else { return }
         hasLoadedInteractions = true
         isLoadingInteractions = true
         interactionError = nil
 
         do {
-            let state = try await interactionService.loadInteractions(for: post, modelContext: modelContext)
+            let state = try await interactionService.loadInteractions(for: interactionTarget, modelContext: modelContext)
             likes = state.likes
             comments = state.comments
             isLiked = state.likes.contains(where: { $0.authorId == "viewer" })
@@ -392,7 +420,7 @@ struct FeedCard: View {
 
     private func sendComment() {
         let text = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !isSendingComment, let post else { return }
+        guard !text.isEmpty, !isSendingComment, let interactionTarget else { return }
 
         commentDraft = ""
         interactionError = nil
@@ -401,7 +429,7 @@ struct FeedCard: View {
         Task {
             do {
                 let state = try await interactionService.sendViewerComment(
-                    for: post,
+                    for: interactionTarget,
                     text: text,
                     modelContext: modelContext
                 )
@@ -412,7 +440,7 @@ struct FeedCard: View {
                 if !shouldIgnoreInteractionError(error) {
                     interactionError = error.localizedDescription
                 }
-                if let state = try? interactionService.interactionState(for: post.id, modelContext: modelContext) {
+                if let state = try? interactionService.interactionState(for: interactionTarget.id, modelContext: modelContext) {
                     likes = state.likes
                     comments = state.comments
                     isLiked = state.likes.contains(where: { $0.authorId == "viewer" })
@@ -423,7 +451,7 @@ struct FeedCard: View {
     }
 
     private func toggleLike() {
-        guard let post else { return }
+        guard let interactionTarget else { return }
         let targetState = !isLiked
         interactionError = nil
         isUpdatingLike = true
@@ -431,7 +459,7 @@ struct FeedCard: View {
         Task {
             do {
                 let state = try await interactionService.setViewerLike(
-                    for: post,
+                    for: interactionTarget,
                     isLiked: targetState,
                     modelContext: modelContext
                 )
@@ -459,6 +487,13 @@ struct FeedCard: View {
 
         let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return message == "cancelled" || message == "canceled"
+    }
+
+    private func normalizedValue(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
     }
 }
 
