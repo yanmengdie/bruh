@@ -43,7 +43,7 @@ const stopWords = new Set([
 ])
 
 const entityKeywords: Record<string, string[]> = {
-  musk: ["elon", "musk", "tesla", "spacex", "xai", "openai", "grok", "x.com", "x "],
+  musk: ["elon", "musk", "tesla", "spacex", "xai", "openai", "grok", "x.com", "starlink", "neuralink"],
   trump: ["trump", "white house", "republican", "election", "tariff", "china", "trade", "washington"],
   zuckerberg: ["meta", "zuckerberg", "instagram", "facebook", "threads", "llama", "quest"],
 }
@@ -139,12 +139,12 @@ export function inferInterestTags(text: string, category: string) {
   const lower = `${category} ${text}`.toLowerCase()
   const tags = new Set<string>(["global", category])
 
-  if (["politics", "world"].includes(category)) tags.add("politics")
-  if (["finance"].includes(category) || /market|stocks?|trade|economy|fed|bank|tariff/.test(lower)) tags.add("finance")
-  if (["tech"].includes(category) || /ai|tech|software|meta|tesla|spacex|xai|openai|chip|semiconductor/.test(lower)) tags.add("tech")
-  if (/china|beijing|shanghai/.test(lower)) tags.add("china")
-  if (/war|ukraine|russia|middle east|taiwan|nato|election|congress|government|white house/.test(lower)) tags.add("politics")
-  if (/social|threads|instagram|facebook|tiktok|xiaohongshu/.test(lower)) tags.add("social")
+  if (category === "politics") tags.add("politics")
+  if (["finance"].includes(category) || /\b(market|markets|stock|stocks|trade|economy|fed|bank|banks|tariff|tariffs)\b/.test(lower)) tags.add("finance")
+  if (["tech"].includes(category) || /\b(ai|tech|software|meta|tesla|spacex|xai|openai|chip|chips|semiconductor|semiconductors)\b/.test(lower)) tags.add("tech")
+  if (/\b(china|beijing|shanghai)\b/.test(lower)) tags.add("china")
+  if (/\b(war|ukraine|russia|middle east|taiwan|nato|election|congress|government|white house)\b/.test(lower)) tags.add("politics")
+  if (/\b(social|threads|instagram|facebook|tiktok|xiaohongshu)\b/.test(lower)) tags.add("social")
 
   return [...tags]
 }
@@ -252,11 +252,11 @@ export function topNewsSummaryBlock(events: NewsEventRow[]) {
 export function defaultStarterMessage(personaId: string, title: string) {
   switch (personaId) {
     case "musk":
-      return `Big story today: ${title}. The engineering angle is underrated.`
+      return `${title} and people still focus on the surface instead of the underlying system.`
     case "trump":
-      return `Huge headline today: ${title}. A lot of people are talking about it.`
+      return `${title} is what weak leadership looks like when a problem gets completely out of hand.`
     case "zuckerberg":
-      return `Worth watching: ${title}. The downstream product impact could be real.`
+      return `${title} is really an incentives and distribution story once you look past the headline.`
     default:
       return title
   }

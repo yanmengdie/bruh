@@ -446,6 +446,7 @@ async function generateInteractionsWithFallback(
 
 async function generateInteractionsWithClaude(
   apiKey: string,
+  baseUrl: string,
   model: string,
   authorId: string,
   postContent: string,
@@ -489,7 +490,7 @@ async function generateInteractionsWithClaude(
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -806,7 +807,8 @@ Deno.serve(async (request) => {
     const projectUrl = Deno.env.get("PROJECT_URL")
     const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY")
-    const anthropicModel = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-20250514"
+    const anthropicBaseUrl = (Deno.env.get("ANTHROPIC_BASE_URL") ?? "https://api.anthropic.com").replace(/\/$/, "")
+    const anthropicModel = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-5-20250929"
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY")
     const openaiBaseUrl = (Deno.env.get("OPENAI_BASE_URL") ?? "https://api.codexzh.com/v1").replace(/\/$/, "")
     const openaiModel = Deno.env.get("OPENAI_MODEL") ?? "gpt-5.2"
@@ -881,6 +883,7 @@ Deno.serve(async (request) => {
           generated = sanitizeGeneratedPayload(
             await generateInteractionsWithClaude(
               anthropicApiKey,
+              anthropicBaseUrl,
               anthropicModel,
               personaId,
               postContent,
@@ -966,6 +969,7 @@ Deno.serve(async (request) => {
         replyResult = sanitizeGeneratedPayload(
           await generateInteractionsWithClaude(
             anthropicApiKey,
+            anthropicBaseUrl,
             anthropicModel,
             personaId,
             postContent,

@@ -12,7 +12,7 @@ export const personaMap: Record<string, PersonaDefinition> = {
     displayName: "Elon Musk",
     stance: "technical, fast-moving, confident, slightly sarcastic, short-message style",
     domains: ["tech", "ai", "space", "ev"],
-    triggerKeywords: ["tesla", "spacex", "openai", "grok", "x", "ai"],
+    triggerKeywords: ["tesla", "spacex", "openai", "grok", "x.com", "ai"],
   },
   realdonaldtrump: {
     personaId: "trump",

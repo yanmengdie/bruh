@@ -114,7 +114,14 @@ final class MessageService {
             return
         }
 
-        for starter in reply.starters {
+        let sortedStarters = reply.starters.sorted { left, right in
+            if left.personaId == right.personaId {
+                return left.createdAt < right.createdAt
+            }
+            return left.personaId < right.personaId
+        }
+
+        for starter in sortedStarters {
             let thread = try ensureThread(for: starter.personaId, modelContext: modelContext)
             let messageId = starter.id
             var descriptor = FetchDescriptor<PersonaMessage>(
@@ -122,7 +129,26 @@ final class MessageService {
             )
             descriptor.fetchLimit = 1
 
-            if try modelContext.fetch(descriptor).first == nil {
+            if let existing = try modelContext.fetch(descriptor).first {
+                guard existing.isSeedMessage else { continue }
+
+                let previousText = existing.text
+                let previousCreatedAt = existing.createdAt
+                existing.threadId = starter.personaId
+                existing.personaId = starter.personaId
+                existing.text = starter.text
+                existing.createdAt = starter.createdAt
+                existing.deliveryState = "sent"
+                existing.sourcePostIds = starter.sourcePostIds
+
+                let shouldRefreshPreview =
+                    (thread.lastMessagePreview == previousText && thread.lastMessageAt == previousCreatedAt) ||
+                    thread.lastMessageAt < starter.createdAt
+
+                if shouldRefreshPreview {
+                    updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: thread.unreadCount)
+                }
+            } else {
                 let message = PersonaMessage(
                     id: starter.id,
                     threadId: starter.personaId,
@@ -135,7 +161,8 @@ final class MessageService {
                     isSeedMessage: true
                 )
                 modelContext.insert(message)
-                updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: max(thread.unreadCount, 1))
+                let nextUnreadCount = thread.unreadCount + 1
+                updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: nextUnreadCount)
             }
         }
 
