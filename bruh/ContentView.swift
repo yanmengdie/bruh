@@ -72,7 +72,7 @@ struct ContentView: View {
     }
 
     private var messagesScreenBackground: Color {
-        Color(red: 0.93, green: 0.91, blue: 0.87)
+        AppTheme.messagesBackground
     }
 
     private var totalUnreadMoments: Int {

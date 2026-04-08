@@ -147,6 +147,7 @@ struct MessagesScreen: View {
 
 private struct MessageDetailView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Query private var messages: [PersonaMessage]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
 
@@ -169,14 +170,16 @@ private struct MessageDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            detailHeader
+                .padding(.horizontal, 16)
+                .padding(.top, 2)
+                .padding(.bottom, 8)
+
+            Divider()
+
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 14) {
-                        Text("Messages with \(displayName)")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 8)
-
                         LazyVStack(spacing: 10) {
                             ForEach(messages, id: \.id) { message in
                                 HStack {
@@ -255,16 +258,91 @@ private struct MessageDetailView: View {
             }
             .background(.ultraThinMaterial)
         }
-        .background(Color.white)
-        .navigationTitle(displayName)
+        .background(AppTheme.messagesBackground)
+        .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             try? service.markThreadRead(personaId: thread.personaId, modelContext: modelContext)
         }
     }
 
+    private var detailHeader: some View {
+        HStack(alignment: .center, spacing: 0) {
+            Button {
+                dismiss()
+            } label: {
+                AppBackIcon()
+            }
+            .frame(width: 44, height: 44, alignment: .leading)
+
+            Spacer(minLength: 12)
+
+            VStack(spacing: 2) {
+                headerAvatar
+
+                Text(displayName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text("my bruh · \(presenceText)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            Color.clear
+                .frame(width: 44, height: 44)
+        }
+        .frame(maxWidth: .infinity, alignment: .top)
+    }
+
+    private var matchedContact: Contact? {
+        contacts.first(where: { $0.linkedPersonaId == thread.personaId })
+    }
+
     private var displayName: String {
-        contacts.first(where: { $0.linkedPersonaId == thread.personaId })?.name ?? thread.personaId.capitalized
+        matchedContact?.name ?? thread.personaId.capitalized
+    }
+
+    private var presenceText: String {
+        let threshold: TimeInterval = 10 * 60
+        let secondsSinceLastMessage = Date().timeIntervalSince(thread.lastMessageAt)
+        return secondsSinceLastMessage <= threshold ? "online" : "offline"
+    }
+
+    private var headerAvatar: some View {
+        let persona = persona(for: thread.personaId)
+
+        return Circle()
+            .fill(persona.tint.opacity(0.18))
+            .frame(width: 52, height: 52)
+            .overlay {
+                Text(String(persona.name.prefix(1)))
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(persona.tint)
+            }
+    }
+
+    private func persona(for personaId: String) -> (name: String, tint: Color) {
+        if let contact = contacts.first(where: { $0.linkedPersonaId == personaId }) {
+            return (contact.name, tint(for: personaId))
+        }
+
+        return (personaId.capitalized, tint(for: personaId))
+    }
+
+    private func tint(for personaId: String) -> Color {
+        switch personaId {
+        case "trump":
+            return .orange
+        case "musk":
+            return .blue
+        case "zuckerberg":
+            return .purple
+        default:
+            return .gray
+        }
     }
 
     private func send() {
@@ -302,4 +380,111 @@ private struct MessageDetailView: View {
             }
         }
     }
+}
+
+private enum MessagesScreenPreviewData {
+    static let contacts: [Contact] = [
+        Contact(
+            linkedPersonaId: "trump",
+            name: "Donald Trump",
+            phoneNumber: "+1 561 555 0145",
+            email: "donald@truthsocial.com",
+            avatarName: "avatar_trump",
+            locationLabel: "海湖庄园",
+            isFavorite: true
+        ),
+        Contact(
+            linkedPersonaId: "musk",
+            name: "Elon Musk",
+            phoneNumber: "+1 310 555 0142",
+            email: "elon@x.ai",
+            avatarName: "avatar_musk",
+            locationLabel: "X HQ",
+            isFavorite: true
+        ),
+    ]
+
+    static let threads: [MessageThread] = [
+        MessageThread(
+            id: "trump",
+            personaId: "trump",
+            lastMessagePreview: "Markets looking very good today.",
+            lastMessageAt: Date().addingTimeInterval(-8 * 60),
+            unreadCount: 3
+        ),
+        MessageThread(
+            id: "musk",
+            personaId: "musk",
+            lastMessagePreview: "Just launched 40 Starlinks.",
+            lastMessageAt: Date().addingTimeInterval(-15 * 60),
+            unreadCount: 1
+        ),
+    ]
+
+    static let container: ModelContainer = {
+        let container = try! ModelContainer(
+            for: Contact.self,
+            MessageThread.self,
+            PersonaMessage.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+
+        let context = ModelContext(container)
+
+        contacts.forEach { context.insert($0) }
+
+        let seedMessages: [PersonaMessage] = [
+            PersonaMessage(
+                id: "preview-1",
+                threadId: "trump",
+                personaId: "trump",
+                text: "Good morning bruh. Markets looking VERY good today.",
+                isIncoming: true,
+                createdAt: Date().addingTimeInterval(-12 * 60)
+            ),
+            PersonaMessage(
+                id: "preview-2",
+                threadId: "trump",
+                personaId: "trump",
+                text: "What's happening with the tariffs?",
+                isIncoming: false,
+                createdAt: Date().addingTimeInterval(-11 * 60)
+            ),
+            PersonaMessage(
+                id: "preview-3",
+                threadId: "trump",
+                personaId: "trump",
+                text: "GREAT question bruh! We just slapped 125% tariffs.",
+                isIncoming: true,
+                createdAt: Date().addingTimeInterval(-10 * 60)
+            ),
+        ]
+
+        seedMessages.forEach { context.insert($0) }
+        try? context.save()
+
+        return container
+    }()
+}
+
+#Preview("Messages List") {
+    NavigationStack {
+        MessagesScreen(
+            threads: MessagesScreenPreviewData.threads,
+            contacts: MessagesScreenPreviewData.contacts,
+            service: MessageService(),
+            backgroundColor: AppTheme.messagesBackground
+        )
+    }
+    .modelContainer(MessagesScreenPreviewData.container)
+}
+
+#Preview("Message Detail") {
+    NavigationStack {
+        MessageDetailView(
+            thread: MessagesScreenPreviewData.threads[0],
+            service: MessageService()
+        )
+    }
+    .modelContainer(MessagesScreenPreviewData.container)
 }
