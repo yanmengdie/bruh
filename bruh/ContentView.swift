@@ -9,133 +9,61 @@ struct ContentView: View {
     @AppStorage("hasOpenedAlbum") private var hasOpenedAlbum = false
     @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
 
-    @State private var currentDestination: AppDestination? = nil
+    @State private var selectedTab: MainTab = .contacts
     @State private var messageService = MessageService()
 
     var body: some View {
-        ZStack {
-            if let destination = currentDestination {
-                destinationView(for: destination)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.move(edge: .trailing))
-            } else {
-                HomeScreen(onNavigate: { destination in
-                    if destination == .feed {
-                        lastViewedFeedAtInterval = Date().timeIntervalSince1970
-                    }
-                    if destination == .album {
-                        hasOpenedAlbum = true
-                    }
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        currentDestination = destination
-                    }
-                }, messageUnreadCount: totalUnreadMessages, momentsUnreadCount: totalUnreadMoments, hasNewAlbumBadge: !hasOpenedAlbum)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .transition(.opacity)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.easeInOut(duration: 0.25), value: currentDestination)
-        .task {
-            try? messageService.ensureThreadsExist(modelContext: modelContext)
-        }
-    }
-
-    @ViewBuilder
-    private func destinationView(for destination: AppDestination) -> some View {
-        switch destination {
-        case .feed:
+        TabView(selection: $selectedTab) {
             NavigationStack {
-                FeedView()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            backButton
-                        }
-                    }
+                ContactsView()
             }
-            .swipeBackGesture(onBack: goBackToHome)
+            .tabItem {
+                Label("Contacts", systemImage: "person.crop.circle.fill")
+            }
+            .tag(MainTab.contacts)
 
-        case .imessage:
             NavigationStack {
                 MessagesScreen(
                     threads: threads,
                     contacts: contacts,
                     service: messageService,
-                    onBack: goBackToHome,
                     backgroundColor: messagesScreenBackground
                 )
             }
-            .swipeBackGesture(onBack: goBackToHome)
-
-        case .contacts:
-            NavigationStack {
-                ContactsView()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            backButton
-                        }
-                    }
+            .tabItem {
+                Label("message", systemImage: "message.fill")
             }
-            .swipeBackGesture(onBack: goBackToHome)
+            .badge(totalUnreadMessages > 0 ? Text("\(totalUnreadMessages)") : nil)
+            .tag(MainTab.messages)
 
-        case .album:
             NavigationStack {
-                ScrollView {
-                    VStack(spacing: 14) {
-                        Image(systemName: "photo.on.rectangle.angled")
-                            .font(.system(size: 34))
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 18)
-
-                        Text("Album")
-                            .font(.system(size: 24, weight: .bold))
-
-                        Text("这里将展示你的照片与回忆。")
-                            .font(.system(size: 15))
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 28)
-                }
-                .navigationTitle("")
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        backButton
-                    }
-                }
+                FeedView()
             }
-            .swipeBackGesture(onBack: goBackToHome)
+            .tabItem {
+                Label("朋友圈", systemImage: "globe")
+            }
+            .badge(totalUnreadMoments > 0 ? Text("\(totalUnreadMoments)") : nil)
+            .tag(MainTab.feed)
 
-        case .settings:
             NavigationStack {
-                List {
-                    Label("通知设置", systemImage: "bell.badge")
-                    Label("内容偏好", systemImage: "slider.horizontal.3")
-                    Label("关于 Bruh", systemImage: "info.circle")
-                }
-                .navigationTitle("设置")
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        backButton
-                    }
-                }
+                albumView
             }
-            .swipeBackGesture(onBack: goBackToHome)
+            .tabItem {
+                Label("album", systemImage: "photo.on.rectangle.angled")
+            }
+            .badge(!hasOpenedAlbum ? Text("NEW") : nil)
+            .tag(MainTab.album)
         }
-    }
-
-    private var backButton: some View {
-        Button {
-            goBackToHome()
-        } label: {
-            Image(systemName: "chevron.left")
+        .onChange(of: selectedTab) { _, newValue in
+            if newValue == .feed {
+                lastViewedFeedAtInterval = Date().timeIntervalSince1970
+            }
+            if newValue == .album {
+                hasOpenedAlbum = true
+            }
         }
-    }
-
-    private func goBackToHome() {
-        withAnimation {
-            currentDestination = nil
+        .task {
+            try? messageService.ensureThreadsExist(modelContext: modelContext)
         }
     }
 
@@ -155,6 +83,45 @@ struct ContentView: View {
         }
     }
 
+    private var albumView: some View {
+        ScrollView {
+            VStack(spacing: 14) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 34))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 18)
+
+                Text("Album")
+                    .font(.system(size: 24, weight: .bold))
+
+                Text("这里将展示你的照片与回忆。")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 28)
+        }
+        .navigationTitle("")
+    }
+}
+
+private enum MainTab: Hashable {
+    case contacts
+    case messages
+    case feed
+    case album
+}
+
+private struct SettingsScreen: View {
+    var body: some View {
+        List {
+            Label("通知设置", systemImage: "bell.badge")
+            Label("内容偏好", systemImage: "slider.horizontal.3")
+            Label("关于 Bruh", systemImage: "info.circle")
+        }
+        .navigationTitle("设置")
+    }
 }
 
 private struct ContactDraft {

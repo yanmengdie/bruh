@@ -5,7 +5,6 @@ struct MessagesScreen: View {
     let threads: [MessageThread]
     let contacts: [Contact]
     let service: MessageService
-    let onBack: () -> Void
     let backgroundColor: Color
 
     var body: some View {
@@ -37,13 +36,8 @@ struct MessagesScreen: View {
         }
         .background(backgroundColor)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                }
-            }
             ToolbarItem(placement: .topBarTrailing) {
-                Image(systemName: "square.and.pencil")
+                Image(systemName: "plus")
             }
         }
     }
