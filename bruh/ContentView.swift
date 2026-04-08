@@ -7,72 +7,61 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\MessageThread.lastMessageAt, order: .reverse)]) private var threads: [MessageThread]
     @Query(sort: [SortDescriptor(\PersonaPost.publishedAt, order: .reverse)]) private var posts: [PersonaPost]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("hasOpenedAlbum") private var hasOpenedAlbum = false
     @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
 
-    @State private var selectedTab: MainTab = .contacts
+    @State private var homePath: [AppDestination] = []
     @State private var messageService = MessageService()
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack {
-                ContactsView()
-            }
-            .enableUnifiedSwipeBack()
-            .tabItem {
-                Label("鸽们", systemImage: "person.crop.circle.fill")
-            }
-            .tag(MainTab.contacts)
-
-            NavigationStack {
-                MessagesScreen(
-                    threads: threads,
-                    contacts: contacts,
-                    service: messageService,
-                    backgroundColor: messagesScreenBackground
-                )
-            }
-            .enableUnifiedSwipeBack()
-            .tabItem {
-                Label("消息", systemImage: "message.fill")
-            }
-            .badge(totalUnreadMessages > 0 ? Text("\(totalUnreadMessages)") : nil)
-            .tag(MainTab.messages)
-
-            NavigationStack {
-                FeedView()
-            }
-            .enableUnifiedSwipeBack()
-            .tabItem {
-                Label("日常", systemImage: "globe")
-            }
-            .badge(totalUnreadMoments > 0 ? Text("\(totalUnreadMoments)") : nil)
-            .tag(MainTab.feed)
-
-            NavigationStack {
-                AlbumView()
-            }
-            .enableUnifiedSwipeBack()
-            .tabItem {
-                Label("相册", systemImage: "photo.on.rectangle.angled")
-            }
-            .badge(!hasOpenedAlbum ? Text("新") : nil)
-            .tag(MainTab.album)
-        }
-        .onChange(of: selectedTab) { _, newValue in
-            if newValue == .feed {
-                lastViewedFeedAtInterval = Date().timeIntervalSince1970
-            }
-            if newValue == .album {
-                hasOpenedAlbum = true
+        Group {
+            if hasCompletedOnboarding {
+                NavigationStack(path: $homePath) {
+                    HomeScreen(
+                        onNavigate: handleHomeNavigation,
+                        messageUnreadCount: totalUnreadMessages,
+                        momentsUnreadCount: totalUnreadMoments,
+                        hasNewAlbumBadge: !hasOpenedAlbum
+                    )
+                    .navigationBarHidden(true)
+                    .navigationDestination(for: AppDestination.self) { destination in
+                        switch destination {
+                        case .contacts:
+                            ContactsView()
+                        case .imessage:
+                            MessagesScreen(
+                                threads: threads,
+                                contacts: contacts,
+                                service: messageService,
+                                backgroundColor: messagesScreenBackground
+                            )
+                        case .feed:
+                            FeedView()
+                                .onAppear {
+                                    lastViewedFeedAtInterval = Date().timeIntervalSince1970
+                                }
+                        case .album:
+                            AlbumView()
+                                .onAppear {
+                                    hasOpenedAlbum = true
+                                }
+                        case .settings:
+                            SettingsScreen()
+                        }
+                    }
+                }
+                .enableUnifiedSwipeBack()
+                .task {
+                    try? await messageService.ensureThreadsExist(modelContext: modelContext, userInterests: InterestPreferences.selectedInterests())
+                }
+                .onAppear(perform: configureNavigationAppearance)
+            } else {
+                Onboarding {
+                    hasCompletedOnboarding = true
+                }
             }
         }
-        .task {
-            try? await messageService.ensureThreadsExist(modelContext: modelContext, userInterests: InterestPreferences.selectedInterests())
-        }
-        .toolbarBackground(AppTheme.messagesBackground, for: .tabBar)
-        .toolbarBackground(.visible, for: .tabBar)
-        .onAppear(perform: configureTabBarAppearance)
     }
 
     private var totalUnreadMessages: Int {
@@ -91,21 +80,14 @@ struct ContentView: View {
         }
     }
 
-    private func configureTabBarAppearance() {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(AppTheme.messagesBackground)
-        appearance.shadowColor = UIColor.black.withAlphaComponent(0.05)
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
+    private func handleHomeNavigation(_ destination: AppDestination) {
+        homePath.append(destination)
     }
-}
 
-private enum MainTab: Hashable {
-    case contacts
-    case messages
-    case feed
-    case album
+    private func configureNavigationAppearance() {
+        let backColor = UIColor(red: 0.52, green: 0.54, blue: 0.57, alpha: 1.0)
+        UINavigationBar.appearance().tintColor = backColor
+    }
 }
 
 private struct AlbumView: View {
