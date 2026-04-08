@@ -6,6 +6,7 @@ import SwiftData
 
 struct MessagesScreen: View {
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
+    @Query(sort: [SortDescriptor(\PersonaMessage.createdAt, order: .reverse)]) private var recentMessages: [PersonaMessage]
     let threads: [MessageThread]
     let contacts: [Contact]
     let service: MessageService
@@ -178,7 +179,18 @@ struct MessagesScreen: View {
         messageDeliveries.first(where: { $0.personaId == personaId })
     }
 
+    private func latestPersistedMessage(for personaId: String) -> PersonaMessage? {
+        recentMessages.first(where: { $0.threadId == personaId })
+    }
+
     private func latestPreview(for thread: MessageThread) -> String {
+        if let message = latestPersistedMessage(for: thread.personaId) {
+            let preview = messagePreview(for: message)
+            if !preview.isEmpty {
+                return preview
+            }
+        }
+
         let preview = thread.lastMessagePreview.trimmingCharacters(in: .whitespacesAndNewlines)
         if !preview.isEmpty {
             return preview
@@ -191,8 +203,9 @@ struct MessagesScreen: View {
     }
 
     private func latestActivityDate(for thread: MessageThread) -> Date {
-        let fallbackDate = latestMessageDelivery(for: thread.personaId)?.sortDate ?? .distantPast
-        return max(thread.lastMessageAt, fallbackDate)
+        let latestMessageDate = latestPersistedMessage(for: thread.personaId)?.createdAt ?? .distantPast
+        let latestDeliveryDate = latestMessageDelivery(for: thread.personaId)?.sortDate ?? .distantPast
+        return max(thread.lastMessageAt, max(latestMessageDate, latestDeliveryDate))
     }
 
     private func unreadCount(for thread: MessageThread) -> Int {
@@ -201,6 +214,12 @@ struct MessagesScreen: View {
             deliveries: messageDeliveries,
             fallbackCount: thread.unreadCount
         )
+    }
+
+    private func messagePreview(for message: PersonaMessage) -> String {
+        let trimmed = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard message.imageUrl != nil else { return trimmed }
+        return trimmed.isEmpty ? "[图片]" : "[图片] \(trimmed)"
     }
 }
 
