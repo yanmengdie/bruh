@@ -23,8 +23,8 @@ struct HomeScreen: View {
         .init(name: "相册", imageAsset: "Icon_album", destination: .album),
         .init(name: "小红书", imageAsset: "Icon_xhs", destination: nil),
         .init(name: "影石", imageAsset: "Icon_insta", destination: nil),
-        .init(name: "鸿蒙", placeholderText: "鸿", placeholderColors: [Color(red: 0.95, green: 0.60, blue: 0.36), Color(red: 0.90, green: 0.38, blue: 0.22)], destination: nil),
-        .init(name: "极客公园", placeholderText: "极", placeholderColors: [Color(red: 0.95, green: 0.45, blue: 0.67), Color(red: 0.79, green: 0.20, blue: 0.46)], destination: nil),
+        .init(name: "鸿蒙", imageAsset: "Icon_harmony", destination: nil),
+        .init(name: "极客公园", imageAsset: "Icon_geek", destination: nil),
     ]
 
     private var dockApps: [HomeQuickApp] {
@@ -39,6 +39,7 @@ struct HomeScreen: View {
     private let iconTileSize: CGFloat = 64
     private let iconCornerRadius: CGFloat = 16
     private let fourColumnLayout: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 14), count: 4)
+    private let homeBackgroundColor = Color(red: 0.93, green: 0.89, blue: 0.82)
 
     var body: some View {
         VStack(spacing: 16) {
@@ -59,7 +60,7 @@ struct HomeScreen: View {
         .padding(.horizontal, 14)
         .padding(.bottom, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(AppTheme.messagesBackground.ignoresSafeArea())
+        .background(homeBackgroundColor.ignoresSafeArea())
     }
 
     private var dateTimePanel: some View {
@@ -105,7 +106,7 @@ struct HomeScreen: View {
             }
 
             VStack(spacing: 10) {
-                messageSnippet(name: "Donald Trump", text: "FAKE NEWS 鸽们！我们的经济要起飞了。", time: "2分")
+                messageSnippet(name: "罗浩安", text: "不是鸽们，你不应该在台上Demo吗？", time: "2分", avatarAsset: "Avatar_LuoHaoan")
                 messageSnippet(name: "Elon Musk", text: "火星计划更新：节奏比预期还快。", time: "15分")
             }
         }
@@ -115,15 +116,23 @@ struct HomeScreen: View {
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func messageSnippet(name: String, text: String, time: String) -> some View {
+    private func messageSnippet(name: String, text: String, time: String, avatarAsset: String? = nil) -> some View {
         HStack(spacing: 10) {
             Circle()
                 .fill(Color.black.opacity(0.85))
                 .frame(width: 42, height: 42)
                 .overlay {
-                    Text(String(name.prefix(1)))
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.white)
+                    if let avatarAsset, UIImage(named: avatarAsset) != nil {
+                        Image(avatarAsset)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 42, height: 42)
+                            .clipShape(Circle())
+                    } else {
+                        Text(String(name.prefix(1)))
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
                 }
 
             VStack(alignment: .leading, spacing: 2) {
