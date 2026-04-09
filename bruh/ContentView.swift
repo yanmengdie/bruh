@@ -568,6 +568,7 @@ private struct ContactsView: View {
     @State private var validationError: String?
     @State private var activeIndexLetter: String?
     @State private var lastIndexFeedbackLetter: String?
+    @State private var messageService = MessageService()
     private static let alphabet: [String] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map(String.init) + ["#"]
     private let invitePersonaAllowlist: Set<String> = [
         "trump",
@@ -1060,7 +1061,21 @@ private struct ContactsView: View {
             scheduleTrumpFollowUps()
         }
 
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            try messageService.prepareThreads(modelContext: modelContext)
+        } catch {
+            print("Failed to accept invitation for \(invitation.personaId): \(error.localizedDescription)")
+        }
+
+        guard !wasAccepted else { return }
+        let userInterests = CurrentUserProfileStore.selectedInterests(in: modelContext)
+        Task {
+            await messageService.refreshStarterMessages(
+                modelContext: modelContext,
+                userInterests: userInterests
+            )
+        }
     }
 
     private func ignoreInvitation(_ invitation: BruhInvitation) {
