@@ -1,6 +1,7 @@
 import AVKit
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct FeedCard: View {
     @Environment(\.modelContext) private var modelContext
@@ -174,9 +175,19 @@ struct FeedCard: View {
             .fill(avatarColor)
             .frame(width: 48, height: 48)
             .overlay {
-                Text(String(displayName.prefix(1)))
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(.white)
+                if let avatarName = contact?.avatarName,
+                   !avatarName.isEmpty,
+                   UIImage(named: avatarName) != nil {
+                    Image(avatarName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 48, height: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                } else {
+                    Text(String(displayName.prefix(1)))
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(.white)
+                }
             }
     }
 

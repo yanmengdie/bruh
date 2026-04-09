@@ -68,11 +68,6 @@ struct MessagesScreen: View {
         }
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
         .navigationTitle("")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Image(systemName: "plus")
-            }
-        }
         .task {
             await refreshStartersIfNeeded()
         }

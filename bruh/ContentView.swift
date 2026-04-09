@@ -8,7 +8,7 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @AppStorage("useHomeScreenMode") private var useHomeScreenMode = true
+    @AppStorage("useHomeScreenMode") private var useHomeScreenMode = false
     @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
     @AppStorage("lastViewedAlbumAt") private var lastViewedAlbumAtInterval: Double = 0
 
@@ -562,6 +562,7 @@ private struct ContactsView: View {
     @State private var isPresentingForm = false
     @State private var presentedInvitation: BruhInvitation?
     @State private var isPresentingAddBruh = false
+    @State private var isPresentingTagContacts = false
     @State private var editingContact: Contact?
     @State private var draft = ContactDraft()
     @State private var validationError: String?
@@ -717,6 +718,9 @@ private struct ContactsView: View {
         .navigationDestination(isPresented: $isPresentingAddBruh) {
             AddBruhView()
         }
+        .navigationDestination(isPresented: $isPresentingTagContacts) {
+            ContactTagsView()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -807,19 +811,10 @@ private struct ContactsView: View {
             Divider().opacity(0.28)
 
             quickActionRow(
-                icon: "👥",
-                iconBackground: Color(red: 0.86, green: 0.87, blue: 0.88),
-                title: "群聊",
-                action: {}
-            )
-
-            Divider().opacity(0.28)
-
-            quickActionRow(
                 icon: "🏷️",
                 iconBackground: Color(red: 0.84, green: 0.89, blue: 0.82),
                 title: "标签",
-                action: {}
+                action: openTagContacts
             )
         }
         .background(Color.white.opacity(0.68))
@@ -1042,6 +1037,10 @@ private struct ContactsView: View {
         normalizeInviteFrontier()
         guard let invitation = pendingInvitations.first else { return }
         presentedInvitation = invitation
+    }
+
+    private func openTagContacts() {
+        isPresentingTagContacts = true
     }
 
     private func acceptInvitation(_ invitation: BruhInvitation) {
