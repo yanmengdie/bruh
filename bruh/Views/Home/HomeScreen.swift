@@ -30,9 +30,25 @@ struct HomeScreen: View {
             deepLinkURL: URL(string: "xhsdiscover://home"),
             fallbackWebURL: URL(string: "https://www.xiaohongshu.com")
         ),
-            .init(name: "影石", imageAsset: "Icon_insta", destination: nil),
-            .init(name: "鸿蒙", imageAsset: "Icon_harmony", destination: nil),
-            .init(name: "极客公园", imageAsset: "Icon_geek", destination: nil),
+        .init(
+            name: "影石",
+            imageAsset: "Icon_insta",
+            destination: nil,
+            deepLinkURL: URL(string: "insta360://"),
+            fallbackWebURL: URL(string: "https://www.insta360.com")
+        ),
+        .init(
+            name: "鸿蒙",
+            imageAsset: "Icon_harmony",
+            destination: nil,
+            fallbackWebURL: URL(string: "https://www.harmonyos.com/")
+        ),
+        .init(
+            name: "极客公园",
+            imageAsset: "Icon_geek",
+            destination: nil,
+            fallbackWebURL: URL(string: "https://www.geekpark.net/")
+        ),
         ]
     }
 
@@ -337,7 +353,11 @@ struct HomeScreen: View {
     }
 
     private func openExternalApp(for app: HomeQuickApp) {
-        guard let deepLinkURL = app.deepLinkURL else { return }
+        guard let deepLinkURL = app.deepLinkURL else {
+            guard let fallbackWebURL = app.fallbackWebURL else { return }
+            openURL(fallbackWebURL)
+            return
+        }
         openURL(deepLinkURL) { accepted in
             guard !accepted, let fallbackWebURL = app.fallbackWebURL else { return }
             openURL(fallbackWebURL)
