@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2"
+import { anthropicModelCandidates, isTerminalAnthropicError } from "../_shared/anthropic.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 import { personaMap, resolvePersonaById } from "../_shared/personas.ts"
 import { personaSocialPrompt } from "../_shared/persona_skills.ts"
@@ -1108,7 +1109,7 @@ Deno.serve(async (request) => {
     const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY")
     const anthropicBaseUrl = (Deno.env.get("ANTHROPIC_BASE_URL") ?? "https://api.anthropic.com").replace(/\/$/, "")
-    const anthropicModel = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-5-20250929"
+    const anthropicModels = anthropicModelCandidates(Deno.env.get("ANTHROPIC_MODEL"))
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY")
     const openaiBaseUrl = (Deno.env.get("OPENAI_BASE_URL") ?? "https://api.codexzh.com/v1").replace(/\/$/, "")
     const openaiModel = Deno.env.get("OPENAI_MODEL") ?? "gpt-5.2"
@@ -1179,63 +1180,74 @@ Deno.serve(async (request) => {
 
       let generated: SanitizedInteractionResult | null = null
       if (anthropicApiKey) {
-        for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES; attempt += 1) {
-          try {
-            const candidate = sanitizeGeneratedPayload(
-              await generateInteractionsWithClaude(
-                anthropicApiKey,
-                anthropicBaseUrl,
-                anthropicModel,
+        modelLoop:
+        for (const anthropicModel of anthropicModels) {
+          for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES; attempt += 1) {
+            try {
+              const candidate = sanitizeGeneratedPayload(
+                await generateInteractionsWithClaude(
+                  anthropicApiKey,
+                  anthropicBaseUrl,
+                  anthropicModel,
+                  personaId,
+                  postContent,
+                  topic,
+                  [],
+                  "",
+                  allowedLikes,
+                  allowedCommenters,
+                ),
+                postId,
                 personaId,
-                postContent,
-                topic,
-                [],
                 "",
                 allowedLikes,
                 allowedCommenters,
-              ),
-              postId,
-              personaId,
-              "",
-              allowedLikes,
-              allowedCommenters,
-              [],
-            )
+                [],
+              )
 
-            if (shouldAcceptSanitizedResult(candidate, personaId, "", allowedCommenters)) {
-              generated = candidate
-              logGenerationEvent("anthropic_seed_success", {
+              if (shouldAcceptSanitizedResult(candidate, personaId, "", allowedCommenters)) {
+                generated = candidate
+                logGenerationEvent("anthropic_seed_success", {
+                  postId,
+                  personaId,
+                  attempt,
+                  model: anthropicModel,
+                  provider: "anthropic",
+                  generatedCommentCount: candidate.metadata.generatedCommentCount,
+                  generatedLikeCount: candidate.metadata.generatedLikeCount,
+                })
+                break modelLoop
+              }
+
+              logGenerationEvent("anthropic_seed_rejected", {
                 postId,
                 personaId,
                 attempt,
+                model: anthropicModel,
                 provider: "anthropic",
                 generatedCommentCount: candidate.metadata.generatedCommentCount,
                 generatedLikeCount: candidate.metadata.generatedLikeCount,
+                usedAuthorFallback: candidate.metadata.usedAuthorFallback,
               })
-              break
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : String(error)
+              logGenerationEvent("anthropic_seed_failure", {
+                postId,
+                personaId,
+                attempt,
+                model: anthropicModel,
+                provider: "anthropic",
+                error: errorMessage,
+              })
+
+              if (isTerminalAnthropicError(errorMessage)) {
+                break modelLoop
+              }
             }
 
-            logGenerationEvent("anthropic_seed_rejected", {
-              postId,
-              personaId,
-              attempt,
-              provider: "anthropic",
-              generatedCommentCount: candidate.metadata.generatedCommentCount,
-              generatedLikeCount: candidate.metadata.generatedLikeCount,
-              usedAuthorFallback: candidate.metadata.usedAuthorFallback,
-            })
-          } catch (error) {
-            logGenerationEvent("anthropic_seed_failure", {
-              postId,
-              personaId,
-              attempt,
-              provider: "anthropic",
-              error: error instanceof Error ? error.message : String(error),
-            })
-          }
-
-          if (attempt < MAX_GENERATION_RETRIES) {
-            await delay(200 * attempt)
+            if (attempt < MAX_GENERATION_RETRIES) {
+              await delay(200 * attempt)
+            }
           }
         }
       }
@@ -1306,62 +1318,73 @@ Deno.serve(async (request) => {
 
     let replyResult: SanitizedInteractionResult | null = null
     if (anthropicApiKey) {
-      for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES; attempt += 1) {
-        try {
-          const candidate = sanitizeGeneratedPayload(
-            await generateInteractionsWithClaude(
-              anthropicApiKey,
-              anthropicBaseUrl,
-              anthropicModel,
+      modelLoop:
+      for (const anthropicModel of anthropicModels) {
+        for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES; attempt += 1) {
+          try {
+            const candidate = sanitizeGeneratedPayload(
+              await generateInteractionsWithClaude(
+                anthropicApiKey,
+                anthropicBaseUrl,
+                anthropicModel,
+                personaId,
+                postContent,
+                topic,
+                existingComments,
+                viewerComment,
+                [],
+                allowedCommenters,
+              ),
+              postId,
               personaId,
-              postContent,
-              topic,
-              existingComments,
               viewerComment,
               [],
               allowedCommenters,
-            ),
-            postId,
-            personaId,
-            viewerComment,
-            [],
-            allowedCommenters,
-            existingComments,
-          )
+              existingComments,
+            )
 
-          if (shouldAcceptSanitizedResult(candidate, personaId, viewerComment, allowedCommenters)) {
-            replyResult = candidate
-            logGenerationEvent("anthropic_reply_success", {
+            if (shouldAcceptSanitizedResult(candidate, personaId, viewerComment, allowedCommenters)) {
+              replyResult = candidate
+              logGenerationEvent("anthropic_reply_success", {
+                postId,
+                personaId,
+                attempt,
+                model: anthropicModel,
+                provider: "anthropic",
+                generatedCommentCount: candidate.metadata.generatedCommentCount,
+                usedAuthorFallback: candidate.metadata.usedAuthorFallback,
+              })
+              break modelLoop
+            }
+
+            logGenerationEvent("anthropic_reply_rejected", {
               postId,
               personaId,
               attempt,
+              model: anthropicModel,
               provider: "anthropic",
               generatedCommentCount: candidate.metadata.generatedCommentCount,
               usedAuthorFallback: candidate.metadata.usedAuthorFallback,
             })
-            break
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            logGenerationEvent("anthropic_reply_failure", {
+              postId,
+              personaId,
+              attempt,
+              model: anthropicModel,
+              provider: "anthropic",
+              error: errorMessage,
+            })
+
+            if (isTerminalAnthropicError(errorMessage)) {
+              break modelLoop
+            }
           }
 
-          logGenerationEvent("anthropic_reply_rejected", {
-            postId,
-            personaId,
-            attempt,
-            provider: "anthropic",
-            generatedCommentCount: candidate.metadata.generatedCommentCount,
-            usedAuthorFallback: candidate.metadata.usedAuthorFallback,
-          })
-        } catch (error) {
-          logGenerationEvent("anthropic_reply_failure", {
-            postId,
-            personaId,
-            attempt,
-            provider: "anthropic",
-            error: error instanceof Error ? error.message : String(error),
-          })
-        }
-
-        if (attempt < MAX_GENERATION_RETRIES) {
-          await delay(200 * attempt)
+          if (attempt < MAX_GENERATION_RETRIES) {
+            await delay(200 * attempt)
+          }
         }
       }
     }

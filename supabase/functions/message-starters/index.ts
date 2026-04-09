@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2"
+import { anthropicModelCandidates, isTerminalAnthropicError } from "../_shared/anthropic.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 import { allPersonaIds, asString, defaultStarterMessage, topNewsSummaryBlock } from "../_shared/news.ts"
 import { resolvePersonaById } from "../_shared/personas.ts"
@@ -87,6 +88,20 @@ function cleanStarterText(text: string) {
     })
     .join(" ")
     .replace(/\s+/g, " ")
+    .trim()
+}
+
+function extractOpenAICompatibleContent(value: unknown) {
+  if (typeof value === "string") return value.trim()
+  if (!Array.isArray(value)) return ""
+
+  return value
+    .map((item) => {
+      const block = item as Record<string, unknown>
+      return asString(block.text ?? block.content)
+    })
+    .filter((item) => item.length > 0)
+    .join("\n")
     .trim()
 }
 
@@ -457,9 +472,12 @@ function collectSelectedStarters(
 }
 
 async function generateSingleStarterText(
+  openaiApiKey: string | undefined,
+  openaiBaseUrl: string,
+  openaiModel: string,
   anthropicApiKey: string | undefined,
   anthropicBaseUrl: string,
-  anthropicModel: string,
+  anthropicModels: string[],
   personaId: string,
   item: CandidateStarter,
   topSummary: string,
@@ -489,39 +507,78 @@ async function generateSingleStarterText(
     "Write the first text you'd send me about this.",
   ].filter((value) => value.length > 0).join("\n\n")
 
+  if (openaiApiKey) {
+    try {
+      const openAIResponse = await fetch(`${openaiBaseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiApiKey}`,
+        },
+        body: JSON.stringify({
+          model: openaiModel,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: prompt },
+          ],
+          max_tokens: 120,
+          temperature: 0.4,
+        }),
+      })
+
+      if (openAIResponse.ok) {
+        const payload = await openAIResponse.json()
+        const cleaned = cleanStarterText(extractOpenAICompatibleContent(payload.choices?.[0]?.message?.content))
+        if (cleaned) {
+          return cleaned
+        }
+      }
+    } catch {
+      // Fall through to Anthropic and then deterministic fallback.
+    }
+  }
+
   if (anthropicApiKey) {
-    const anthropicResponse = await fetch(`${anthropicBaseUrl}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": anthropicApiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: anthropicModel,
-        max_tokens: 120,
-        temperature: 0.4,
-        system,
-        messages: [{
-          role: "user",
-          content: prompt,
-        }],
-      }),
-    })
+    for (const anthropicModel of anthropicModels) {
+      const anthropicResponse = await fetch(`${anthropicBaseUrl}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicApiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: anthropicModel,
+          max_tokens: 120,
+          temperature: 0.4,
+          system,
+          messages: [{
+            role: "user",
+            content: prompt,
+          }],
+        }),
+      })
 
-    if (anthropicResponse.ok) {
-      const payload = await anthropicResponse.json()
-      const content = Array.isArray(payload.content)
-        ? payload.content
-          .filter((block: Record<string, unknown>) => block.type === "text")
-          .map((block: Record<string, unknown>) => asString(block.text))
-          .join(" ")
-          .trim()
-        : ""
+      if (anthropicResponse.ok) {
+        const payload = await anthropicResponse.json()
+        const content = Array.isArray(payload.content)
+          ? payload.content
+            .filter((block: Record<string, unknown>) => block.type === "text")
+            .map((block: Record<string, unknown>) => asString(block.text))
+            .join(" ")
+            .trim()
+          : ""
 
-      const cleaned = cleanStarterText(content)
-      if (cleaned) {
-        return cleaned
+        const cleaned = cleanStarterText(content)
+        if (cleaned) {
+          return cleaned
+        }
+        continue
+      }
+
+      const errorText = await anthropicResponse.text()
+      if (isTerminalAnthropicError(errorText)) {
+        break
       }
     }
   }
@@ -530,9 +587,12 @@ async function generateSingleStarterText(
 }
 
 async function generateStarterTexts(
+  openaiApiKey: string | undefined,
+  openaiBaseUrl: string,
+  openaiModel: string,
   anthropicApiKey: string | undefined,
   anthropicBaseUrl: string,
-  anthropicModel: string,
+  anthropicModels: string[],
   personaId: string,
   items: CandidateStarter[],
   topSummary: string,
@@ -544,7 +604,17 @@ async function generateStarterTexts(
 
   const generatedEntries = await Promise.all(items.map(async (item) => [
     item.event.id,
-    await generateSingleStarterText(anthropicApiKey, anthropicBaseUrl, anthropicModel, personaId, item, topSummary),
+    await generateSingleStarterText(
+      openaiApiKey,
+      openaiBaseUrl,
+      openaiModel,
+      anthropicApiKey,
+      anthropicBaseUrl,
+      anthropicModels,
+      personaId,
+      item,
+      topSummary,
+    ),
   ] as const))
 
   return new Map(generatedEntries)
@@ -562,9 +632,12 @@ Deno.serve(async (request) => {
 
     const projectUrl = Deno.env.get("PROJECT_URL")
     const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY")
+    const openaiBaseUrl = (Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1").replace(/\/$/, "")
+    const openaiModel = Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini"
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY")
     const anthropicBaseUrl = (Deno.env.get("ANTHROPIC_BASE_URL") ?? "https://api.anthropic.com").replace(/\/$/, "")
-    const anthropicModel = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-5-20250929"
+    const anthropicModels = anthropicModelCandidates(Deno.env.get("ANTHROPIC_MODEL"))
     const nanoBananaApiKey = Deno.env.get("NANO_BANANA_API_KEY")
     const nanoBananaBaseUrl = (Deno.env.get("NANO_BANANA_BASE_URL") ?? "https://ccodezh.com/v1").replace(/\/$/, "")
     const nanoBananaModel = Deno.env.get("NANO_BANANA_MODEL") ?? "nano-banana"
@@ -631,9 +704,12 @@ Deno.serve(async (request) => {
         }))
 
       const generatedTexts = await generateStarterTexts(
+        openaiApiKey ?? undefined,
+        openaiBaseUrl,
+        openaiModel,
         anthropicApiKey ?? undefined,
         anthropicBaseUrl,
-        anthropicModel,
+        anthropicModels,
         personaId,
         items,
         topSummary,

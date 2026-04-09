@@ -276,6 +276,7 @@ private struct MessageDetailView: View {
     @State private var isShowingExcitedEffect = false
     @State private var hasCheckedEntryEffect = false
     @State private var entryUnreadCount = 0
+    @FocusState private var isComposerFocused: Bool
     private let isExcitedEntryEffectEnabled = false
 
     init(
@@ -326,7 +327,12 @@ private struct MessageDetailView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 12)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        isComposerFocused = false
+                    }
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .onChange(of: messages.count) {
                     if let last = messages.last {
                         withAnimation {
@@ -367,6 +373,7 @@ private struct MessageDetailView: View {
                     .disabled(isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                     TextField("Message \(displayName)...", text: $draft)
+                        .focused($isComposerFocused)
                         .submitLabel(.send)
                         .onSubmit {
                             send()
@@ -444,6 +451,15 @@ private struct MessageDetailView: View {
             effectPlayer = nil
             isShowingExcitedEffect = false
             cleanupAudioPlayer()
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+
+                Button("收起") {
+                    isComposerFocused = false
+                }
+            }
         }
     }
 
@@ -580,6 +596,7 @@ private struct MessageDetailView: View {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isSending else { return }
 
+        isComposerFocused = false
         draft = ""
         errorMessage = nil
         isSending = true

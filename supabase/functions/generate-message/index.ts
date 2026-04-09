@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2"
+import { anthropicModelCandidates, isTerminalAnthropicError } from "../_shared/anthropic.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 import { buildImagePrompt } from "../_shared/image_prompt.ts"
 import { topNewsSummaryBlock } from "../_shared/news.ts"
@@ -132,7 +133,15 @@ function fallbackTopicHint(newsContext: string, contextRows: ContextRow[]) {
     .find((line) => line.length > 0 && !line.startsWith("Here are"))
 
   if (quotedNews) {
-    return quotedNews.replace(/^"+|"+$/g, "").slice(0, 90)
+    const normalizedNews = quotedNews
+      .replace(/^-+\s*/, "")
+      .replace(/^"+|"+$/g, "")
+    const headlineOnly = normalizedNews
+      .replace(/\s+\([^)]+\):.*$/, "")
+      .replace(/:.*$/, "")
+      .trim()
+
+    return (headlineOnly || normalizedNews).slice(0, 90)
   }
 
   const contextTopic = contextRows.find((row) => (row.topic ?? "").trim().length > 0)?.topic
@@ -475,6 +484,59 @@ async function generateWithAnthropic(
 
   if (!content) {
     throw new Error("Anthropic returned empty content")
+  }
+
+  return content
+}
+
+function extractOpenAICompatibleContent(value: unknown) {
+  if (typeof value === "string") return value.trim()
+  if (!Array.isArray(value)) return ""
+
+  return value
+    .map((item) => {
+      const block = item as Record<string, unknown>
+      return asString(block.text ?? block.content)
+    })
+    .filter((item) => item.length > 0)
+    .join("\n")
+    .trim()
+}
+
+async function generateWithOpenAICompatible(
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  system: string,
+  styleGuide: string,
+  conversation: ConversationTurn[],
+  userMessage: string,
+) {
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: system },
+        ...buildProviderMessages(styleGuide, conversation, userMessage),
+      ],
+      max_tokens: 120,
+      temperature: 0.85,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`OpenAI-compatible request failed: ${await response.text()}`)
+  }
+
+  const payload = await response.json()
+  const content = extractOpenAICompatibleContent(payload.choices?.[0]?.message?.content)
+  if (!content) {
+    throw new Error("OpenAI-compatible provider returned empty content")
   }
 
   return content
@@ -839,9 +901,12 @@ Deno.serve(async (request) => {
 
     const url = Deno.env.get("PROJECT_URL")
     const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY")
+    const openaiBaseUrl = (Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1").replace(/\/$/, "")
+    const openaiModel = Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini"
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY")
     const anthropicBaseUrl = (Deno.env.get("ANTHROPIC_BASE_URL") ?? "https://api.anthropic.com").replace(/\/$/, "")
-    const anthropicModel = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-5-20250929"
+    const anthropicModels = anthropicModelCandidates(Deno.env.get("ANTHROPIC_MODEL"))
     const nanoBananaApiKey = Deno.env.get("NANO_BANANA_API_KEY")
     const nanoBananaBaseUrl = (Deno.env.get("NANO_BANANA_BASE_URL") ?? "https://ccodezh.com/v1").replace(/\/$/, "")
     const nanoBananaModel = Deno.env.get("NANO_BANANA_MODEL") ?? "nano-banana"
@@ -967,21 +1032,17 @@ Deno.serve(async (request) => {
     const providerErrors: string[] = []
     let usedFallback = false
     let lastError: Error | null = null
+    let usedProvider: string | null = null
+    let usedOpenAIModel: string | null = null
+    let usedAnthropicModel: string | null = null
 
-    if (!anthropicApiKey) {
-      providerErrors.push("[config] anthropic: ANTHROPIC_API_KEY missing")
-      logGenerationEvent("anthropic_missing_config", {
-        personaId,
-        selectedContextIds: selected.map((row) => row.id),
-        relevantNewsIds: relevantNews.map((row) => row.id),
-      })
-    } else {
+    if (openaiApiKey) {
       for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES && !content; attempt += 1) {
         try {
-          const candidate = cleanPersonaReply(await generateWithAnthropic(
-            anthropicApiKey,
-            anthropicBaseUrl,
-            anthropicModel,
+          const candidate = cleanPersonaReply(await generateWithOpenAICompatible(
+            openaiApiKey,
+            openaiBaseUrl,
+            openaiModel,
             system,
             styleGuide,
             conversation,
@@ -989,9 +1050,12 @@ Deno.serve(async (request) => {
           ))
           if (candidate) {
             content = candidate
-            logGenerationEvent("anthropic_success", {
+            usedProvider = "openai_compatible"
+            usedOpenAIModel = openaiModel
+            logGenerationEvent("openai_success", {
               personaId,
               attempt,
+              model: openaiModel,
               selectedContextIds: selected.map((row) => row.id),
               relevantNewsIds: relevantNews.map((row) => row.id),
             })
@@ -999,19 +1063,83 @@ Deno.serve(async (request) => {
           }
 
           lastError = new Error("Persona reply empty after cleanup")
-          providerErrors.push(`[attempt ${attempt}] anthropic: Provider returned empty content after cleanup`)
+          providerErrors.push(`[${openaiModel} attempt ${attempt}] openai_compatible: Provider returned empty content after cleanup`)
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error))
-          providerErrors.push(`[attempt ${attempt}] anthropic: ${lastError.message}`)
-          logGenerationEvent("anthropic_failure", {
+          providerErrors.push(`[${openaiModel} attempt ${attempt}] openai_compatible: ${lastError.message}`)
+          logGenerationEvent("openai_failure", {
             personaId,
             attempt,
+            model: openaiModel,
             error: lastError.message,
           })
         }
 
         if (!content && attempt < MAX_GENERATION_RETRIES) {
           await delay(200 * attempt)
+        }
+      }
+    } else {
+      providerErrors.push("[config] openai_compatible: OPENAI_API_KEY missing")
+    }
+
+    if (!content) {
+      if (!anthropicApiKey) {
+        providerErrors.push("[config] anthropic: ANTHROPIC_API_KEY missing")
+        logGenerationEvent("anthropic_missing_config", {
+          personaId,
+          selectedContextIds: selected.map((row) => row.id),
+          relevantNewsIds: relevantNews.map((row) => row.id),
+        })
+      } else {
+        modelLoop:
+        for (const anthropicModel of anthropicModels) {
+          for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES && !content; attempt += 1) {
+            try {
+              const candidate = cleanPersonaReply(await generateWithAnthropic(
+                anthropicApiKey,
+                anthropicBaseUrl,
+                anthropicModel,
+                system,
+                styleGuide,
+                conversation,
+                userMessage,
+              ))
+              if (candidate) {
+                content = candidate
+                usedProvider = "anthropic"
+                usedAnthropicModel = anthropicModel
+                logGenerationEvent("anthropic_success", {
+                  personaId,
+                  attempt,
+                  model: anthropicModel,
+                  selectedContextIds: selected.map((row) => row.id),
+                  relevantNewsIds: relevantNews.map((row) => row.id),
+                })
+                break modelLoop
+              }
+
+              lastError = new Error("Persona reply empty after cleanup")
+              providerErrors.push(`[${anthropicModel} attempt ${attempt}] anthropic: Provider returned empty content after cleanup`)
+            } catch (error) {
+              lastError = error instanceof Error ? error : new Error(String(error))
+              providerErrors.push(`[${anthropicModel} attempt ${attempt}] anthropic: ${lastError.message}`)
+              logGenerationEvent("anthropic_failure", {
+                personaId,
+                attempt,
+                model: anthropicModel,
+                error: lastError.message,
+              })
+
+              if (isTerminalAnthropicError(lastError)) {
+                break modelLoop
+              }
+            }
+
+            if (!content && attempt < MAX_GENERATION_RETRIES) {
+              await delay(200 * attempt)
+            }
+          }
         }
       }
     }
@@ -1085,6 +1213,11 @@ Deno.serve(async (request) => {
           debug: {
             providerErrors,
             usedFallback,
+            usedProvider,
+            usedOpenAIModel,
+            usedAnthropicModel,
+            openaiModelTried: openaiApiKey ? openaiModel : null,
+            anthropicModelsTried: anthropicModels,
             selectedContextIds: selected.map((row) => row.id),
             relevantNewsIds: relevantNews.map((row) => row.id),
           },
