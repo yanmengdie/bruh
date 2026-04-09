@@ -14,6 +14,7 @@ struct HomeScreen: View {
     let messageUnreadCount: Int
     let momentsUnreadCount: Int
     let hasNewAlbumBadge: Bool
+    @State private var isVoiceBubblePlaying = false
 
     private let quickApps: [HomeQuickApp] = [
         .init(name: "鸽们", imageAsset: "Icon_contacts", destination: .contacts),
@@ -40,23 +41,24 @@ struct HomeScreen: View {
     private let fourColumnLayout: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 14), count: 4)
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 16) {
-                dateTimePanel
-                    .padding(.top, 6)
+        VStack(spacing: 16) {
+            dateTimePanel
+                .padding(.top, 6)
 
-                messagesWidget
+            messagesWidget
 
+            VStack(spacing: 0) {
                 quickAppsGrid
-
-                marketAndMusicWidgets
-
+                Spacer(minLength: 0)
+                voiceBubbleWidget
+                Spacer(minLength: 0)
                 dock
-                    .padding(.top, 6)
             }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(AppTheme.messagesBackground.ignoresSafeArea())
     }
 
@@ -141,6 +143,63 @@ struct HomeScreen: View {
         }
     }
 
+    private var voiceBubbleWidget: some View {
+        Button {
+            // Audio placeholder: toggle visual state only.
+            withAnimation(.easeInOut(duration: 0.18)) {
+                isVoiceBubblePlaying.toggle()
+            }
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.black.opacity(0.10))
+                        .frame(width: 34, height: 34)
+
+                    Image(systemName: isVoiceBubblePlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.black.opacity(0.76))
+                        .offset(x: isVoiceBubblePlaying ? 0 : 1)
+                }
+
+                HStack(spacing: 4) {
+                    ForEach(0..<16, id: \.self) { index in
+                        Capsule()
+                            .fill(Color.black.opacity(isVoiceBubblePlaying ? 0.44 : 0.30))
+                            .frame(
+                                width: 3,
+                                height: isVoiceBubblePlaying
+                                    ? CGFloat(8 + ((index * 7) % 14))
+                                    : CGFloat(8 + ((index * 5) % 10))
+                            )
+                    }
+                }
+                .frame(height: 24, alignment: .center)
+
+                Spacer(minLength: 0)
+
+                Text(isVoiceBubblePlaying ? "播放中" : "语音消息")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.black.opacity(0.56))
+
+                Text("--:--")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.black.opacity(0.38))
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 68)
+            .frame(maxWidth: 360)
+            .background(Color.white.opacity(0.72))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
     private var quickAppsGrid: some View {
         LazyVGrid(columns: fourColumnLayout, spacing: 14) {
             ForEach(quickApps) { app in
@@ -185,113 +244,21 @@ struct HomeScreen: View {
             }
     }
 
-    private var marketAndMusicWidgets: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("股市")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Color.black.opacity(0.88))
-
-                marketRow(symbol: "AAPL", change: "+2.41%", isUp: true)
-                marketRow(symbol: "TSLA", change: "-1.82%", isUp: false)
-                marketRow(symbol: "NVDA", change: "+5.12%", isUp: true)
-
-                Spacer(minLength: 0)
-
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.green.opacity(0.14))
-                    .frame(height: 56)
-                    .overlay(alignment: .leading) {
-                        Path { path in
-                            path.move(to: CGPoint(x: 8, y: 50))
-                            path.addLine(to: CGPoint(x: 44, y: 42))
-                            path.addLine(to: CGPoint(x: 84, y: 34))
-                            path.addLine(to: CGPoint(x: 126, y: 24))
-                            path.addLine(to: CGPoint(x: 164, y: 14))
-                        }
-                        .stroke(Color.green, lineWidth: 2.5)
-                    }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 190, maxHeight: 190, alignment: .topLeading)
-            .background(Color.white.opacity(0.72))
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white)
-                    .frame(width: 58, height: 58)
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 22))
-                            .foregroundStyle(Color.pink)
-                    }
-
-                Text("正在播放")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.pink.opacity(0.88))
-
-                Text("Shake It Off")
-                    .font(.system(size: 21, weight: .bold))
-                    .foregroundStyle(Color.black.opacity(0.88))
-                    .lineLimit(1)
-
-                Text("Taylor Swift")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.black.opacity(0.36))
-
-                HStack(spacing: 22) {
-                    Text("⏮")
-                    Text("▶")
-                    Text("⏭")
-                }
-                .font(.system(size: 20))
-                .foregroundStyle(Color.pink.opacity(0.88))
-
-                Rectangle()
-                    .fill(Color.black.opacity(0.10))
-                    .frame(height: 4)
-                    .overlay(alignment: .leading) {
-                        Rectangle()
-                            .fill(Color.pink.opacity(0.92))
-                            .frame(width: 84, height: 4)
-                    }
-                    .clipShape(Capsule())
-            }
-            .padding(12)
-            .frame(width: 150)
-            .frame(minHeight: 190, maxHeight: 190, alignment: .topLeading)
-            .background(Color.white.opacity(0.72))
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        }
-    }
-
-    private func marketRow(symbol: String, change: String, isUp: Bool) -> some View {
-        HStack {
-            Text(symbol)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color.black.opacity(0.85))
-
-            Spacer()
-
-            Text(change)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 8)
-                .frame(height: 24)
-                .background(isUp ? Color.green : Color.red)
-                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        }
-    }
-
     private var dock: some View {
-        LazyVGrid(columns: fourColumnLayout, spacing: 14) {
-            ForEach(dockApps) { app in
-                Button {
-                    guard let destination = app.destination else { return }
-                    onNavigate(destination)
-                } label: {
-                    VStack(spacing: 6) {
+        ZStack {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(Color.white.opacity(0.55))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.white.opacity(0.35), lineWidth: 0.8)
+                }
+
+            LazyVGrid(columns: fourColumnLayout, spacing: 14) {
+                ForEach(dockApps) { app in
+                    Button {
+                        guard let destination = app.destination else { return }
+                        onNavigate(destination)
+                    } label: {
                         ZStack(alignment: .topTrailing) {
                             appIconTile(app)
 
@@ -303,16 +270,14 @@ struct HomeScreen: View {
                                     .offset(x: 8, y: -8)
                             }
                         }
-
-                        Text(app.name)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.black.opacity(0.62))
-                            .lineLimit(1)
+                        .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 10)
         }
+        .frame(height: 96)
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
