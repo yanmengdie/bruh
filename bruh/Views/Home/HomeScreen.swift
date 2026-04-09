@@ -16,20 +16,20 @@ struct HomeScreen: View {
 
     private let quickApps: [HomeQuickApp] = [
         .init(name: "消息", icon: "message.fill", colors: [Color.black.opacity(0.88), Color.black.opacity(0.72)], destination: .imessage, badgeCount: 8),
-        .init(name: "朋友圈", icon: "flame.fill", colors: [Color(red: 1.0, green: 0.41, blue: 0.42), Color(red: 0.85, green: 0.14, blue: 0.28)], destination: .feed),
-        .init(name: "群聊", icon: "ellipsis.bubble.fill", colors: [Color(red: 0.61, green: 0.60, blue: 0.98), Color(red: 0.43, green: 0.40, blue: 0.90)], destination: .contacts),
-        .init(name: "资讯", icon: "newspaper.fill", colors: [Color(red: 0.94, green: 0.80, blue: 0.37), Color(red: 0.85, green: 0.66, blue: 0.15)], destination: .album),
+        .init(name: "日常", icon: "flame.fill", colors: [Color(red: 1.0, green: 0.41, blue: 0.42), Color(red: 0.85, green: 0.14, blue: 0.28)], destination: .feed),
+        .init(name: "鸽们", icon: "ellipsis.bubble.fill", colors: [Color(red: 0.61, green: 0.60, blue: 0.98), Color(red: 0.43, green: 0.40, blue: 0.90)], destination: .contacts),
+        .init(name: "相册", icon: "newspaper.fill", colors: [Color(red: 0.94, green: 0.80, blue: 0.37), Color(red: 0.85, green: 0.66, blue: 0.15)], destination: .album),
         .init(name: "小红书", icon: "mic.fill", colors: [Color(red: 0.27, green: 0.86, blue: 0.74), Color(red: 0.08, green: 0.72, blue: 0.58)], destination: nil),
         .init(name: "影石", icon: "chart.bar.fill", colors: [Color(red: 0.39, green: 0.64, blue: 0.98), Color(red: 0.18, green: 0.43, blue: 0.84)], destination: nil),
-        .init(name: "云服务", icon: "trophy.fill", colors: [Color(red: 1.0, green: 0.62, blue: 0.42), Color(red: 0.96, green: 0.41, blue: 0.23)], destination: nil),
+        .init(name: "设置", icon: "gearshape.fill", colors: [Color(red: 1.0, green: 0.62, blue: 0.42), Color(red: 0.96, green: 0.41, blue: 0.23)], destination: .settings),
         .init(name: "极客公园", icon: "music.note", colors: [Color(red: 0.97, green: 0.39, blue: 0.65), Color(red: 0.83, green: 0.15, blue: 0.43)], destination: nil),
     ]
 
     private var dockApps: [HomeQuickApp] {
         [
-            .init(name: "联系人", icon: "person.crop.circle.fill", colors: [.green.opacity(0.92), .green.opacity(0.72)], destination: .contacts),
+            .init(name: "鸽们", icon: "person.crop.circle.fill", colors: [.green.opacity(0.92), .green.opacity(0.72)], destination: .contacts),
             .init(name: "消息", icon: "message.fill", colors: [.green.opacity(0.92), .green.opacity(0.72)], destination: .imessage, badgeCount: messageUnreadCount),
-            .init(name: "朋友圈", icon: "globe", colors: [Color(red: 1.0, green: 0.72, blue: 0.62), Color(red: 1.0, green: 0.55, blue: 0.55)], destination: .feed, badgeCount: momentsUnreadCount),
+            .init(name: "日常", icon: "globe", colors: [Color(red: 1.0, green: 0.72, blue: 0.62), Color(red: 1.0, green: 0.55, blue: 0.55)], destination: .feed, badgeCount: momentsUnreadCount),
             .init(name: "相册", icon: "photo.on.rectangle.angled", colors: [.red.opacity(0.92), .red.opacity(0.72)], destination: .album, badgeText: hasNewAlbumBadge ? "新" : nil),
         ]
     }

@@ -290,7 +290,6 @@ private struct MessageDetailView: View {
     @State private var draft = ""
     @State private var isSending = false
     @State private var errorMessage: String?
-    @State private var selectedQuickReactions: [String: String] = [:]
     @StateObject private var webPreviewStore = OpenGraphPreviewStore()
     @StateObject private var audioPlayback = MessageAudioPlaybackController()
     @State private var presentedSourceURL: URL?
@@ -299,7 +298,6 @@ private struct MessageDetailView: View {
     @State private var isShowingExcitedEffect = false
     @State private var hasCheckedEntryEffect = false
     @State private var entryUnreadCount = 0
-    private let quickReactionOptions = ["👍", "🖤", "😂", "🔥"]
     private let isExcitedEntryEffectEnabled = false
 
     init(
@@ -977,39 +975,13 @@ private struct MessageDetailView: View {
 
     @ViewBuilder
     private func incomingReactions(for messageId: String, reaction: MessageReaction) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                reactionEmojiText(reaction.emoji)
-                Text(reaction.mood)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.leading, 2)
-
-            if let selected = selectedQuickReactions[messageId] {
-                Button {
-                    toggleQuickReaction(selected, for: messageId)
-                } label: {
-                    reactionEmojiText(selected)
-                }
-                .buttonStyle(.plain)
-                .padding(.leading, 2)
-            } else {
-                HStack(spacing: 14) {
-                    ForEach(quickReactionOptions, id: \.self) { emoji in
-                        Button {
-                            toggleQuickReaction(emoji, for: messageId)
-                        } label: {
-                            reactionEmojiText(emoji)
-                                .opacity(0.82)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.top, 2)
-                .padding(.leading, 2)
-            }
+        HStack(spacing: 4) {
+            reactionEmojiText(reaction.emoji)
+            Text(reaction.mood)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
         }
+            .padding(.leading, 2)
     }
 
     private func reaction(for messageId: String) -> MessageReaction {
@@ -1045,14 +1017,6 @@ private struct MessageDetailView: View {
         effectPlayer = player
         isShowingExcitedEffect = true
         player.play()
-    }
-
-    private func toggleQuickReaction(_ emoji: String, for messageId: String) {
-        if selectedQuickReactions[messageId] == emoji {
-            selectedQuickReactions.removeValue(forKey: messageId)
-        } else {
-            selectedQuickReactions[messageId] = emoji
-        }
     }
 
     private func reactionEmojiText(_ emoji: String) -> some View {

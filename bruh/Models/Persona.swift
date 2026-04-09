@@ -46,8 +46,8 @@ struct PersonaCatalogEntry {
 enum PersonaCatalog {
     static let trump = PersonaCatalogEntry(
         id: "trump",
-        displayName: "Donald Trump",
-        avatarName: "avatar_trump",
+        displayName: "特离谱",
+        avatarName: "Avatar_Trump",
         handle: "@realDonaldTrump",
         domains: ["politics", "finance", "trade"],
         stance: "美国优先, 反建制, 自我吹嘘, 攻击对手",
@@ -62,8 +62,8 @@ enum PersonaCatalog {
 
     static let musk = PersonaCatalogEntry(
         id: "musk",
-        displayName: "Elon Musk",
-        avatarName: "Avatar_ Elon",
+        displayName: "马期克",
+        avatarName: "Avatar_Elon",
         handle: "@elonmusk",
         domains: ["tech", "ai", "space", "ev"],
         stance: "技术乐观派, 嘲讽竞争对手, 语气随意",
@@ -94,8 +94,8 @@ enum PersonaCatalog {
 
     static let samAltman = PersonaCatalogEntry(
         id: "sam_altman",
-        displayName: "Sam Altman",
-        avatarName: "Avatar_ Sam Altman",
+        displayName: "凹凸曼",
+        avatarName: "Avatar_Sam Altman",
         handle: "@sama",
         domains: ["tech", "finance", "world", "ai"],
         stance: "AI 产品化推动者, 长期主义, 擅长人才与资源整合, 语气冷静但有明显使命感",
@@ -126,8 +126,8 @@ enum PersonaCatalog {
 
     static let leiJun = PersonaCatalogEntry(
         id: "lei_jun",
-        displayName: "雷军",
-        avatarName: "Avatar_ Leijun",
+        displayName: "田车",
+        avatarName: "Avatar_Leijun",
         handle: "@leijun",
         domains: ["tech", "finance", "china", "ev"],
         stance: "产品经理式表达, 强调效率和结果, 能把复杂产品与制造问题讲清楚",
@@ -142,8 +142,8 @@ enum PersonaCatalog {
 
     static let liuJingkang = PersonaCatalogEntry(
         id: "liu_jingkang",
-        displayName: "刘靖康",
-        avatarName: "Avatar_ LiuJingkang",
+        displayName: "刘瞬间",
+        avatarName: "Avatar_LiuJingkang",
         handle: "@jkliu",
         domains: ["tech", "world", "china", "creator"],
         stance: "硬件创业者, 用户痛点导向, 全球化视角, 说话直接, 很少空谈",
@@ -158,7 +158,7 @@ enum PersonaCatalog {
 
     static let luoYonghao = PersonaCatalogEntry(
         id: "luo_yonghao",
-        displayName: "罗永浩",
+        displayName: "老罗",
         avatarName: "Avatar_LuoYonghao",
         handle: "@luoyonghao",
         domains: ["tech", "entertainment", "china", "consumer"],
@@ -174,7 +174,7 @@ enum PersonaCatalog {
 
     static let justinSun = PersonaCatalogEntry(
         id: "justin_sun",
-        displayName: "孙宇晨",
+        displayName: "孙割",
         avatarName: "Avatar_Justin Sun",
         handle: "@justinsuntron",
         domains: ["finance", "tech", "world", "crypto"],
@@ -191,7 +191,7 @@ enum PersonaCatalog {
     static let kimKardashian = PersonaCatalogEntry(
         id: "kim_kardashian",
         displayName: "Kim Kardashian",
-        avatarName: "Avatar_ Kim",
+        avatarName: "Avatar_Kim",
         handle: "@KimKardashian",
         domains: ["entertainment", "social", "finance", "fashion"],
         stance: "名人品牌运营者, 审美与话题敏感, 擅长把流量转成商业与文化影响力",
@@ -206,7 +206,7 @@ enum PersonaCatalog {
 
     static let papi = PersonaCatalogEntry(
         id: "papi",
-        displayName: "papi酱",
+        displayName: "Hahi酱",
         avatarName: "Avatar_Papi",
         handle: "@papijiang",
         domains: ["entertainment", "social", "china", "creator"],
@@ -402,6 +402,7 @@ extension Contact {
 
 enum CurrentUserProfileStore {
     static let userId = "viewer"
+    static let avatarImageDataKey = "viewer.avatarImageData"
 
     @MainActor
     static func fetchOrCreate(in context: ModelContext) -> UserProfile {
@@ -446,6 +447,35 @@ enum CurrentUserProfileStore {
     }
 
     @MainActor
+    static func completeOnboardingProfile(
+        displayName: String,
+        avatarImageData: Data?,
+        in context: ModelContext,
+        userDefaults: UserDefaults = .standard
+    ) {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let profile = fetchOrCreate(in: context)
+        profile.displayName = trimmed
+        profile.bruhHandle = bruhHandle(from: trimmed)
+        profile.onboardingCompletedAt = profile.onboardingCompletedAt ?? .now
+        profile.updatedAt = .now
+
+        if let avatarImageData, !avatarImageData.isEmpty {
+            userDefaults.set(avatarImageData, forKey: avatarImageDataKey)
+        }
+
+        if context.hasChanges {
+            try? context.save()
+        }
+    }
+
+    static func avatarImageData(userDefaults: UserDefaults = .standard) -> Data? {
+        userDefaults.data(forKey: avatarImageDataKey)
+    }
+
+    @MainActor
     private static func migrateLegacyPreferencesIfNeeded(profile: UserProfile) {
         guard profile.selectedInterestIds.isEmpty else { return }
         profile.selectedInterestIds = legacyOrDefaultInterests()
@@ -469,5 +499,16 @@ enum CurrentUserProfileStore {
         }
 
         return NewsInterest.defaultSelection.map(\.rawValue)
+    }
+
+    private static func bruhHandle(from displayName: String) -> String {
+        let cleaned = displayName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
+
+        if cleaned.isEmpty {
+            return "@yourboi"
+        }
+        return "@\(cleaned)"
     }
 }

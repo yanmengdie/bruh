@@ -1,7 +1,9 @@
 import SwiftUI
 import UIKit
+import SwiftData
 
 struct Onboarding: View {
+    @Environment(\.modelContext) private var modelContext
     let onComplete: () -> Void
 
     @State private var name = ""
@@ -330,6 +332,17 @@ struct Onboarding: View {
     private func completeOnboarding() {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
+
+        let sortedInterestIds = selectedInterests
+            .map(\.rawValue)
+            .sorted()
+
+        CurrentUserProfileStore.updateSelectedInterests(sortedInterestIds, in: modelContext)
+        CurrentUserProfileStore.completeOnboardingProfile(
+            displayName: trimmedName,
+            avatarImageData: profileImage?.jpegData(compressionQuality: 0.85),
+            in: modelContext
+        )
         onComplete()
     }
 }

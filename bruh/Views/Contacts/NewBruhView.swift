@@ -265,7 +265,7 @@ struct NewBruhView: View {
                     name: "Donald Trump",
                     phoneNumber: "+1 561 555 0145",
                     email: "donald@truthsocial.com",
-                    avatarName: "avatar_trump",
+                    avatarName: "Avatar_Trump",
                     themeColorHex: "#D62839",
                     locationLabel: "United States",
                     relationshipStatus: ContactRelationshipStatus.pending.rawValue,
