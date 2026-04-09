@@ -16,16 +16,18 @@ struct HomeScreen: View {
     let hasNewAlbumBadge: Bool
     @State private var isVoiceBubblePlaying = false
 
-    private let quickApps: [HomeQuickApp] = [
-        .init(name: "鸽们", imageAsset: "Icon_contacts", destination: .contacts),
-        .init(name: "消息", imageAsset: "Icon_message", destination: .imessage, badgeCount: 8),
-        .init(name: "日常", imageAsset: "Icon_moments", destination: .feed),
-        .init(name: "相册", imageAsset: "Icon_album", destination: .album),
-        .init(name: "小红书", imageAsset: "Icon_xhs", destination: nil),
-        .init(name: "影石", imageAsset: "Icon_insta", destination: nil),
-        .init(name: "鸿蒙", imageAsset: "Icon_harmony", destination: nil),
-        .init(name: "极客公园", imageAsset: "Icon_geek", destination: nil),
-    ]
+    private var quickApps: [HomeQuickApp] {
+        [
+            .init(name: "鸽们", imageAsset: "Icon_contacts", destination: .contacts),
+            .init(name: "消息", imageAsset: "Icon_message", destination: .imessage, badgeCount: messageUnreadCount),
+            .init(name: "日常", imageAsset: "Icon_moments", destination: .feed, badgeCount: momentsUnreadCount),
+            .init(name: "相册", imageAsset: "Icon_album", destination: .album, badgeText: hasNewAlbumBadge ? "新" : nil),
+            .init(name: "小红书", imageAsset: "Icon_xhs", destination: nil),
+            .init(name: "影石", imageAsset: "Icon_insta", destination: nil),
+            .init(name: "鸿蒙", imageAsset: "Icon_harmony", destination: nil),
+            .init(name: "极客公园", imageAsset: "Icon_geek", destination: nil),
+        ]
+    }
 
     private var dockApps: [HomeQuickApp] {
         [
@@ -106,7 +108,7 @@ struct HomeScreen: View {
             }
 
             VStack(spacing: 10) {
-                messageSnippet(name: "罗浩安", text: "不是鸽们，你不应该在台上Demo吗？", time: "2分", avatarAsset: "Avatar_LuoHaoan")
+                messageSnippet(name: "罗浩安", text: "不是鸽们，你不应该在台上Demo吗？", time: "2分", avatarAsset: "Avatar_LuoHaoan", avatarBackground: Color(red: 0.84, green: 0.76, blue: 0.64))
                 messageSnippet(name: "Elon Musk", text: "火星计划更新：节奏比预期还快。", time: "15分")
             }
         }
@@ -116,10 +118,10 @@ struct HomeScreen: View {
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func messageSnippet(name: String, text: String, time: String, avatarAsset: String? = nil) -> some View {
+    private func messageSnippet(name: String, text: String, time: String, avatarAsset: String? = nil, avatarBackground: Color = Color.black.opacity(0.85)) -> some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(Color.black.opacity(0.85))
+                .fill(avatarBackground)
                 .frame(width: 42, height: 42)
                 .overlay {
                     if let avatarAsset, UIImage(named: avatarAsset) != nil {
