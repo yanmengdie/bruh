@@ -8,59 +8,139 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("useHomeScreenMode") private var useHomeScreenMode = true
     @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
     @AppStorage("lastViewedAlbumAt") private var lastViewedAlbumAtInterval: Double = 0
 
     @State private var homePath: [AppDestination] = []
+    @State private var selectedTab: MainTab = .contacts
     @State private var messageService = MessageService()
 
     var body: some View {
         Group {
             if hasCompletedOnboarding {
-                NavigationStack(path: $homePath) {
-                    HomeScreen(
-                        onNavigate: handleHomeNavigation,
-                        messageUnreadCount: totalUnreadMessages,
-                        momentsUnreadCount: totalUnreadMoments,
-                        hasNewAlbumBadge: unseenAlbumCount > 0
-                    )
-                    .navigationBarHidden(true)
-                    .navigationDestination(for: AppDestination.self) { destination in
-                        switch destination {
-                        case .contacts:
-                            ContactsView()
-                        case .imessage:
-                            MessagesScreen(
-                                threads: threads,
-                                contacts: contacts,
-                                service: messageService,
-                                backgroundColor: messagesScreenBackground
-                            )
-                        case .feed:
-                            FeedView()
-                                .onAppear {
-                                    lastViewedFeedAtInterval = Date().timeIntervalSince1970
-                                }
-                        case .album:
-                            AlbumView()
-                                .onAppear {
-                                    lastViewedAlbumAtInterval = Date().timeIntervalSince1970
-                                }
-                        case .settings:
-                            SettingsScreen()
-                        }
-                    }
+                if useHomeScreenMode {
+                    homeScreenModeView
+                } else {
+                    tabModeView
                 }
-                .enableUnifiedSwipeBack()
-                .task {
-                    await bootstrapApp()
-                }
-                .onAppear(perform: configureNavigationAppearance)
             } else {
                 Onboarding {
                     hasCompletedOnboarding = true
                 }
             }
+        }
+    }
+
+    private var homeScreenModeView: some View {
+        NavigationStack(path: $homePath) {
+            HomeScreen(
+                onNavigate: handleHomeNavigation,
+                messageUnreadCount: totalUnreadMessages,
+                momentsUnreadCount: totalUnreadMoments,
+                hasNewAlbumBadge: unseenAlbumCount > 0
+            )
+            .navigationBarHidden(true)
+            .navigationDestination(for: AppDestination.self) { destination in
+                switch destination {
+                case .contacts:
+                    ContactsView()
+                        .enableUnifiedSwipeBack()
+                case .imessage:
+                    MessagesScreen(
+                        threads: threads,
+                        contacts: contacts,
+                        service: messageService,
+                        backgroundColor: messagesScreenBackground
+                    )
+                    .enableUnifiedSwipeBack()
+                case .feed:
+                    FeedView()
+                        .enableUnifiedSwipeBack()
+                        .onAppear {
+                            lastViewedFeedAtInterval = Date().timeIntervalSince1970
+                        }
+                case .album:
+                    AlbumView()
+                        .enableUnifiedSwipeBack()
+                        .onAppear {
+                            lastViewedAlbumAtInterval = Date().timeIntervalSince1970
+                        }
+                case .settings:
+                    SettingsScreen()
+                        .enableUnifiedSwipeBack()
+                }
+            }
+        }
+        .enableUnifiedSwipeBack()
+        .task {
+            await bootstrapApp()
+        }
+        .onAppear(perform: configureNavigationAppearance)
+    }
+
+    private var tabModeView: some View {
+        TabView(selection: $selectedTab) {
+            NavigationStack {
+                ContactsView()
+            }
+            .enableUnifiedSwipeBack()
+            .tabItem {
+                Label("鸽们", systemImage: "person.crop.circle.fill")
+            }
+            .tag(MainTab.contacts)
+
+            NavigationStack {
+                MessagesScreen(
+                    threads: threads,
+                    contacts: contacts,
+                    service: messageService,
+                    backgroundColor: messagesScreenBackground
+                )
+            }
+            .enableUnifiedSwipeBack()
+            .tabItem {
+                Label("消息", systemImage: "message.fill")
+            }
+            .badge(totalUnreadMessages > 0 ? Text("\(totalUnreadMessages)") : nil)
+            .tag(MainTab.messages)
+
+            NavigationStack {
+                FeedView()
+            }
+            .enableUnifiedSwipeBack()
+            .tabItem {
+                Label("日常", systemImage: "globe")
+            }
+            .badge(totalUnreadMoments > 0 ? Text("\(totalUnreadMoments)") : nil)
+            .tag(MainTab.feed)
+
+            NavigationStack {
+                AlbumView()
+            }
+            .enableUnifiedSwipeBack()
+            .tabItem {
+                Label("相册", systemImage: "photo.on.rectangle.angled")
+            }
+            .badge(unseenAlbumCount > 0 ? Text("\(unseenAlbumCount)") : nil)
+            .tag(MainTab.album)
+        }
+        .onChange(of: selectedTab) { _, newValue in
+            if newValue == .feed {
+                lastViewedFeedAtInterval = Date().timeIntervalSince1970
+            }
+            if newValue == .album {
+                lastViewedAlbumAtInterval = Date().timeIntervalSince1970
+            }
+        }
+        .toolbarBackground(AppTheme.messagesBackground, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .task {
+            await bootstrapApp()
+        }
+        .onAppear {
+            configureTabBarAppearance()
+            configureNavigationAppearance()
         }
     }
 
@@ -144,6 +224,17 @@ struct ContentView: View {
     private func configureNavigationAppearance() {
         let backColor = UIColor(red: 0.52, green: 0.54, blue: 0.57, alpha: 1.0)
         UINavigationBar.appearance().tintColor = backColor
+        UIBarButtonItem.appearance().setTitleTextAttributes([.foregroundColor: backColor], for: .normal)
+        UIBarButtonItem.appearance().setTitleTextAttributes([.foregroundColor: backColor], for: .highlighted)
+    }
+
+    private func configureTabBarAppearance() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(AppTheme.messagesBackground)
+        appearance.shadowColor = UIColor.black.withAlphaComponent(0.05)
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
     }
 }
 
@@ -431,14 +522,27 @@ private struct AlbumPreviewView: View {
 }
 
 private struct SettingsScreen: View {
+    @AppStorage("useHomeScreenMode") private var useHomeScreenMode = true
+
     var body: some View {
         List {
+            Section("Display Mode") {
+                Toggle("Use HomeScreen Mode", isOn: $useHomeScreenMode)
+            }
+
             Label("通知设置", systemImage: "bell.badge")
             Label("内容偏好", systemImage: "slider.horizontal.3")
             Label("关于 Bruh", systemImage: "info.circle")
         }
         .navigationTitle("设置")
     }
+}
+
+private enum MainTab: Hashable {
+    case contacts
+    case messages
+    case feed
+    case album
 }
 
 private struct ContactDraft {
@@ -458,15 +562,31 @@ private struct ContactsView: View {
     @State private var isPresentingForm = false
     @State private var presentedInvitation: BruhInvitation?
     @State private var isPresentingAddBruh = false
+    @State private var isPresentingTagContacts = false
     @State private var editingContact: Contact?
     @State private var draft = ContactDraft()
     @State private var validationError: String?
     @State private var activeIndexLetter: String?
     @State private var lastIndexFeedbackLetter: String?
     private static let alphabet: [String] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map(String.init) + ["#"]
+    private let invitePersonaAllowlist: Set<String> = [
+        "trump",
+        "musk",
+        "lei_jun",
+        "luo_yonghao",
+        "sam_altman",
+        "papi",
+        "justin_sun",
+        "liu_jingkang",
+    ]
 
     private var currentProfile: UserProfile? {
         profiles.first(where: { $0.id == CurrentUserProfileStore.userId })
+    }
+
+    private var currentProfileAvatarImage: UIImage? {
+        guard let data = CurrentUserProfileStore.avatarImageData() else { return nil }
+        return UIImage(data: data)
     }
 
     private var filteredContacts: [Contact] {
@@ -501,8 +621,13 @@ private struct ContactsView: View {
 
     private var pendingInvitations: [BruhInvitation] {
         contacts
-            .filter(\.isPendingInvitation)
-            .sorted { ($0.inviteOrder ?? 999) < ($1.inviteOrder ?? 999) }
+            .filter { contact in
+                guard contact.isPendingInvitation,
+                      let personaId = contact.linkedPersonaId else { return false }
+                return invitePersonaAllowlist.contains(personaId)
+                    && personaMatchesSelectedInterests(personaId: personaId)
+            }
+            .sorted { inviteSortKey(for: $0) < inviteSortKey(for: $1) }
             .compactMap { contact in
                 guard let personaId = contact.linkedPersonaId,
                       let persona = personas.first(where: { $0.id == personaId }) else {
@@ -593,6 +718,9 @@ private struct ContactsView: View {
         .navigationDestination(isPresented: $isPresentingAddBruh) {
             AddBruhView()
         }
+        .navigationDestination(isPresented: $isPresentingTagContacts) {
+            ContactTagsView()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -630,8 +758,16 @@ private struct ContactsView: View {
                 .fill(Color(red: 0.84, green: 0.81, blue: 0.73))
                 .frame(width: 66, height: 66)
                 .overlay {
-                    Text("😎")
-                        .font(.system(size: 35))
+                    if let avatar = currentProfileAvatarImage {
+                        Image(uiImage: avatar)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 66, height: 66)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    } else {
+                        Text("😎")
+                            .font(.system(size: 35))
+                    }
                 }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -675,19 +811,10 @@ private struct ContactsView: View {
             Divider().opacity(0.28)
 
             quickActionRow(
-                icon: "👥",
-                iconBackground: Color(red: 0.86, green: 0.87, blue: 0.88),
-                title: "群聊",
-                action: {}
-            )
-
-            Divider().opacity(0.28)
-
-            quickActionRow(
                 icon: "🏷️",
                 iconBackground: Color(red: 0.84, green: 0.89, blue: 0.82),
                 title: "标签",
-                action: {}
+                action: openTagContacts
             )
         }
         .background(Color.white.opacity(0.68))
@@ -912,6 +1039,10 @@ private struct ContactsView: View {
         presentedInvitation = invitation
     }
 
+    private func openTagContacts() {
+        isPresentingTagContacts = true
+    }
+
     private func acceptInvitation(_ invitation: BruhInvitation) {
         guard let contact = contact(for: invitation.personaId) else { return }
         presentedInvitation = nil
@@ -1009,9 +1140,24 @@ private struct ContactsView: View {
     }
 
     private func normalizeInviteFrontier() {
+        for contact in contacts {
+            guard let personaId = contact.linkedPersonaId,
+                  invitePersonaAllowlist.contains(personaId) else { continue }
+
+            if !personaMatchesSelectedInterests(personaId: personaId),
+               contact.relationshipStatusValue == .pending {
+                contact.relationshipStatusValue = .locked
+                contact.updatedAt = .now
+            }
+        }
+
         let personaContacts = contacts
-            .filter { $0.linkedPersonaId != nil }
-            .sorted { ($0.inviteOrder ?? 999) < ($1.inviteOrder ?? 999) }
+            .filter { contact in
+                guard let personaId = contact.linkedPersonaId else { return false }
+                return invitePersonaAllowlist.contains(personaId)
+                    && personaMatchesSelectedInterests(personaId: personaId)
+            }
+            .sorted { inviteSortKey(for: $0) < inviteSortKey(for: $1) }
 
         var frontierConsumed = false
         for contact in personaContacts {
@@ -1047,10 +1193,61 @@ private struct ContactsView: View {
 
     private func lockedCandidateNames(excluding personaId: String) -> [String] {
         contacts
-            .filter { $0.linkedPersonaId != nil && $0.relationshipStatusValue == .locked }
+            .filter { contact in
+                guard let linkedPersonaId = contact.linkedPersonaId else { return false }
+                return invitePersonaAllowlist.contains(linkedPersonaId)
+                    && personaMatchesSelectedInterests(personaId: linkedPersonaId)
+                    && contact.relationshipStatusValue == .locked
+            }
             .filter { $0.linkedPersonaId != personaId }
-            .sorted { ($0.inviteOrder ?? 999) < ($1.inviteOrder ?? 999) }
+            .sorted { inviteSortKey(for: $0) < inviteSortKey(for: $1) }
             .map(\.name)
+    }
+
+    private var inviteInterestOrder: [String] {
+        let supported = Set(["politics", "entertainment", "finance", "sports", "tech"])
+        let selected = CurrentUserProfileStore.selectedInterests(in: modelContext)
+            .filter { supported.contains($0) }
+
+        let deduped = Array(NSOrderedSet(array: selected)) as? [String] ?? selected
+        if !deduped.isEmpty { return deduped }
+
+        return NewsInterest.defaultSelection
+            .map(\.rawValue)
+            .filter { supported.contains($0) }
+    }
+
+    private var inviteInterestSet: Set<String> {
+        Set(inviteInterestOrder)
+    }
+
+    private func personaMatchesSelectedInterests(personaId: String) -> Bool {
+        guard !inviteInterestSet.isEmpty else { return true }
+        guard let persona = personas.first(where: { $0.id == personaId }) else { return false }
+        return !Set(persona.domains).isDisjoint(with: inviteInterestSet)
+    }
+
+    private var invitePriorityByPersonaId: [String: Int] {
+        let interests = inviteInterestOrder
+        let fallback = interests.count + 10
+        var result: [String: Int] = [:]
+
+        for persona in personas where invitePersonaAllowlist.contains(persona.id) {
+            let rank = persona.domains
+                .compactMap { interests.firstIndex(of: $0) }
+                .min() ?? fallback
+            result[persona.id] = rank
+        }
+
+        return result
+    }
+
+    private func inviteSortKey(for contact: Contact) -> (Int, Int, String) {
+        let fallbackRank = inviteInterestOrder.count + 10
+        let priority = contact.linkedPersonaId
+            .flatMap { invitePriorityByPersonaId[$0] } ?? fallbackRank
+        let order = contact.inviteOrder ?? 999
+        return (priority, order, contact.name)
     }
 
     private func scheduleTrumpFollowUps() {

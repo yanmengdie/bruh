@@ -26,19 +26,29 @@ struct BruhInvitation: Identifiable, Hashable {
     }
 
     init(persona: Persona, contact: Contact) {
-        let fallbackColor = AppTheme.color(from: persona.themeColorHex, fallback: .gray)
         self.personaId = persona.id
-        self.displayName = persona.displayName
         self.handle = persona.handle
-        self.subtitle = persona.subtitle
-        self.inviteMessage = persona.inviteMessage
-        self.avatarEmoji = Self.avatarEmoji(for: persona.id)
-        self.avatarColor = fallbackColor
-        self.themeHex = persona.themeColorHex
         self.avatarName = persona.avatarName
         self.phoneNumber = contact.phoneNumber
         self.email = contact.email
         self.location = contact.locationLabel
+
+        if persona.id == "justin_sun" {
+            self.displayName = "孙割"
+            self.subtitle = "孙宇晨 · 波场 TRON 创始人"
+            self.inviteMessage = "鸽们，来一起冲。链上机会转瞬即逝，我会第一时间把最有价值的信号同步给你，别错过。🚀"
+            self.avatarEmoji = "🧑‍💼"
+            self.avatarColor = Color(red: 0.11, green: 0.74, blue: 0.63)
+            self.themeHex = "#19BCA0"
+        } else {
+            let fallbackColor = AppTheme.color(from: persona.themeColorHex, fallback: .gray)
+            self.displayName = persona.displayName
+            self.subtitle = persona.subtitle
+            self.inviteMessage = persona.inviteMessage
+            self.avatarEmoji = Self.avatarEmoji(for: persona.id)
+            self.avatarColor = fallbackColor
+            self.themeHex = persona.themeColorHex
+        }
     }
 
     private static func avatarEmoji(for personaId: String) -> String {
@@ -147,7 +157,6 @@ struct NewBruhView: View {
                     HStack(spacing: 12) {
                         Button {
                             onAccept(invitation)
-                            dismiss()
                         } label: {
                             Text("接受请求 ✓")
                                 .font(.system(size: 17, weight: .bold))
@@ -161,7 +170,6 @@ struct NewBruhView: View {
 
                         Button {
                             onIgnore(invitation)
-                            dismiss()
                         } label: {
                             Text("暂时不了")
                                 .font(.system(size: 17, weight: .bold))
@@ -267,7 +275,7 @@ struct NewBruhView: View {
                     name: "Donald Trump",
                     phoneNumber: "+1 561 555 0145",
                     email: "donald@truthsocial.com",
-                    avatarName: "avatar_trump",
+                    avatarName: "Avatar_Trump",
                     themeColorHex: "#D62839",
                     locationLabel: "United States",
                     relationshipStatus: ContactRelationshipStatus.pending.rawValue,

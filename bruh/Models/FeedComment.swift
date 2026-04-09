@@ -9,6 +9,7 @@ final class FeedComment {
     var authorDisplayName: String
     var content: String
     var reasonCode: String
+    var generationMode: String
     var inReplyToCommentId: String?
     var isViewer: Bool
     var createdAt: Date
@@ -21,6 +22,7 @@ final class FeedComment {
         authorDisplayName: String,
         content: String,
         reasonCode: String,
+        generationMode: String = "seed",
         inReplyToCommentId: String? = nil,
         isViewer: Bool = false,
         createdAt: Date = .now,
@@ -32,6 +34,7 @@ final class FeedComment {
         self.authorDisplayName = authorDisplayName
         self.content = content
         self.reasonCode = reasonCode
+        self.generationMode = generationMode
         self.inReplyToCommentId = inReplyToCommentId
         self.isViewer = isViewer
         self.createdAt = createdAt

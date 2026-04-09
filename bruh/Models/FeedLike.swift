@@ -8,6 +8,7 @@ final class FeedLike {
     var authorId: String
     var authorDisplayName: String
     var reasonCode: String
+    var generationMode: String
     var createdAt: Date
     var isViewer: Bool
 
@@ -17,6 +18,7 @@ final class FeedLike {
         authorId: String,
         authorDisplayName: String,
         reasonCode: String,
+        generationMode: String = "seed",
         createdAt: Date = .now,
         isViewer: Bool = false
     ) {
@@ -25,7 +27,31 @@ final class FeedLike {
         self.authorId = authorId
         self.authorDisplayName = authorDisplayName
         self.reasonCode = reasonCode
+        self.generationMode = generationMode
         self.createdAt = createdAt
         self.isViewer = isViewer
+    }
+}
+
+@Model
+final class FeedInteractionSeedState {
+    @Attribute(.unique) var postId: String
+    var generationVersion: Int
+    var strategy: String
+    var seededAt: Date
+    var updatedAt: Date
+
+    init(
+        postId: String,
+        generationVersion: Int,
+        strategy: String,
+        seededAt: Date = .now,
+        updatedAt: Date = .now
+    ) {
+        self.postId = postId
+        self.generationVersion = generationVersion
+        self.strategy = strategy
+        self.seededAt = seededAt
+        self.updatedAt = updatedAt
     }
 }

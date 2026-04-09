@@ -301,7 +301,7 @@ final class MessageService {
     }
 
     private func starterMessage(for personaId: String) -> String {
-        PersonaCatalog.friendGreeting(for: personaId)
+        PersonaCatalog.starterMessage(for: personaId)
     }
 
     private func ensureTrumpWebPreviewExample(modelContext: ModelContext) throws {

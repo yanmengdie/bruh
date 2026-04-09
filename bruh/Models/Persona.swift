@@ -131,6 +131,7 @@ enum PersonaCatalog {
     static var kimKardashian: PersonaCatalogEntry { requiredEntry(for: "kim_kardashian") }
     static var papi: PersonaCatalogEntry { requiredEntry(for: "papi") }
     static var kobeBryant: PersonaCatalogEntry { requiredEntry(for: "kobe_bryant") }
+    static var cristianoRonaldo: PersonaCatalogEntry { requiredEntry(for: "cristiano_ronaldo") }
 
     static var all: [PersonaCatalogEntry] {
         loadedEntries
@@ -142,6 +143,10 @@ enum PersonaCatalog {
 
     static func friendGreeting(for personaId: String) -> String {
         entry(for: personaId)?.friendGreeting ?? "我已添加你了，直接开始聊天吧。"
+    }
+
+    static func starterMessage(for personaId: String) -> String {
+        entry(for: personaId)?.friendGreeting ?? "今天你想聊什么？"
     }
 
     static func inviteOrderMap(for selectedInterestIds: [String]) -> [String: Int] {
@@ -418,6 +423,7 @@ extension Contact {
 
 enum CurrentUserProfileStore {
     static let userId = "viewer"
+    static let avatarImageDataKey = "viewer.avatarImageData"
 
     @MainActor
     static func fetchOrCreate(in context: ModelContext) -> UserProfile {
@@ -492,6 +498,35 @@ enum CurrentUserProfileStore {
     }
 
     @MainActor
+    static func completeOnboardingProfile(
+        displayName: String,
+        avatarImageData: Data?,
+        in context: ModelContext,
+        userDefaults: UserDefaults = .standard
+    ) {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let profile = fetchOrCreate(in: context)
+        profile.displayName = trimmed
+        profile.bruhHandle = bruhHandle(from: trimmed)
+        profile.onboardingCompletedAt = profile.onboardingCompletedAt ?? .now
+        profile.updatedAt = .now
+
+        if let avatarImageData, !avatarImageData.isEmpty {
+            userDefaults.set(avatarImageData, forKey: avatarImageDataKey)
+        }
+
+        if context.hasChanges {
+            try? context.save()
+        }
+    }
+
+    static func avatarImageData(userDefaults: UserDefaults = .standard) -> Data? {
+        userDefaults.data(forKey: avatarImageDataKey)
+    }
+
+    @MainActor
     private static func migrateLegacyPreferencesIfNeeded(profile: UserProfile) {
         guard profile.selectedInterestIds.isEmpty else { return }
         profile.selectedInterestIds = legacyOrDefaultInterests()
@@ -522,5 +557,16 @@ enum CurrentUserProfileStore {
         }
 
         return NewsInterest.defaultSelection.map(\.rawValue)
+    }
+
+    private static func bruhHandle(from displayName: String) -> String {
+        let cleaned = displayName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
+
+        if cleaned.isEmpty {
+            return "@yourboi"
+        }
+        return "@\(cleaned)"
     }
 }

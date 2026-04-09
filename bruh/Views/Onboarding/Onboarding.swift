@@ -1,7 +1,9 @@
 import SwiftUI
 import UIKit
+import SwiftData
 
 struct Onboarding: View {
+    @Environment(\.modelContext) private var modelContext
     let onComplete: () -> Void
 
     @State private var name = ""
@@ -101,11 +103,31 @@ struct Onboarding: View {
     private var avatarsCluster: some View {
         ZStack {
             HStack(spacing: -9) {
-                avatar(color: Color(red: 0.84, green: 0.17, blue: 0.22), emoji: "🧑🏻")
-                avatar(color: Color(red: 0.13, green: 0.18, blue: 0.61), emoji: "👩🏻")
-                avatar(color: Color(red: 0.10, green: 0.67, blue: 0.56), emoji: "🧑🏽")
-                avatar(color: Color(red: 0.75, green: 0.57, blue: 0.04), emoji: "👩🏼")
-                avatar(color: Color(red: 0.95, green: 0.41, blue: 0.14), emoji: "👩🏽")
+                avatar(
+                    color: Color(red: 0.84, green: 0.17, blue: 0.22),
+                    assetName: "Avatar_Trump",
+                    fallbackEmoji: "🧑🏻"
+                )
+                avatar(
+                    color: Color(red: 0.13, green: 0.18, blue: 0.61),
+                    assetName: "Avatar_Elon",
+                    fallbackEmoji: "👩🏻"
+                )
+                avatar(
+                    color: Color(red: 1.00, green: 0.41, blue: 0.00),
+                    assetName: "Avatar_Leijun",
+                    fallbackEmoji: "🧑🏽"
+                )
+                avatar(
+                    color: Color(red: 0.06, green: 0.12, blue: 0.22),
+                    assetName: "Avatar_Sam Altman",
+                    fallbackEmoji: "👩🏼"
+                )
+                avatar(
+                    color: Color(red: 0.88, green: 0.11, blue: 0.55),
+                    assetName: "Avatar_Kim",
+                    fallbackEmoji: "👩🏽"
+                )
             }
 
             bubble(text: "假新闻！🗣️", textColor: Color(red: 0.85, green: 0.24, blue: 0.30))
@@ -194,6 +216,7 @@ struct Onboarding: View {
                 .foregroundStyle(Color(red: 0.12, green: 0.13, blue: 0.15))
 
             HStack(spacing: 16) {
+                interestChip(.politics)
                 interestChip(.entertainment)
                 interestChip(.sports)
             }
@@ -235,14 +258,22 @@ struct Onboarding: View {
         }
     }
 
-    private func avatar(color: Color, emoji: String) -> some View {
+    private func avatar(color: Color, assetName: String, fallbackEmoji: String) -> some View {
         Circle()
             .fill(color)
             .frame(width: 72, height: 72)
-            .overlay(
-                Text(emoji)
-                    .font(.system(size: 40))
-            )
+            .overlay {
+                if UIImage(named: assetName) != nil {
+                    Image(assetName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 72, height: 72)
+                        .clipShape(Circle())
+                } else {
+                    Text(fallbackEmoji)
+                        .font(.system(size: 40))
+                }
+            }
     }
 
     private func bubble(text: String, textColor: Color) -> some View {
@@ -251,7 +282,7 @@ struct Onboarding: View {
             .foregroundStyle(textColor)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(Color.white.opacity(0.62))
+            .background(Color.white.opacity(0.86))
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
@@ -330,6 +361,17 @@ struct Onboarding: View {
     private func completeOnboarding() {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
+
+        let sortedInterestIds = selectedInterests
+            .map(\.rawValue)
+            .sorted()
+
+        CurrentUserProfileStore.updateSelectedInterests(sortedInterestIds, in: modelContext)
+        CurrentUserProfileStore.completeOnboardingProfile(
+            displayName: trimmedName,
+            avatarImageData: profileImage?.jpegData(compressionQuality: 0.85),
+            in: modelContext
+        )
         onComplete()
     }
 }
