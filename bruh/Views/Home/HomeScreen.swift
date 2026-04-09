@@ -63,16 +63,18 @@ struct HomeScreen: View {
     }
 
     private var dateTimePanel: some View {
-        VStack(spacing: 4) {
-            Text("星期三，4月8日")
-                .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(Color.black.opacity(0.50))
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            VStack(spacing: 4) {
+                Text(homeDateString(from: context.date))
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(Color.black.opacity(0.50))
 
-            Text("11:30")
-                .font(.system(size: 90, weight: .black, design: .rounded))
-                .foregroundStyle(Color.black.opacity(0.92))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                Text(homeTimeString(from: context.date))
+                    .font(.system(size: 90, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.black.opacity(0.92))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -310,6 +312,22 @@ struct HomeScreen: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
+    }
+
+    private func homeDateString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.calendar = .current
+        formatter.setLocalizedDateFormatFromTemplate("EEEE MMMMd")
+        return formatter.string(from: date)
+    }
+
+    private func homeTimeString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.calendar = .current
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
     }
 }
 
