@@ -254,9 +254,6 @@ private struct AlbumView: View {
                 .foregroundStyle(Color.black.opacity(0.9))
 
             Spacer()
-
-            CircleButton(symbol: "plus")
-            CircleButton(symbol: "ellipsis")
         }
     }
 
@@ -285,9 +282,6 @@ private struct AlbumView: View {
                         Text("No Album Yet")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(Color.black.opacity(0.84))
-                        Text("AI 图片回复会自动收进这里。")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
                     }
                 }
         }
@@ -433,22 +427,6 @@ private struct AlbumPreviewView: View {
                 .padding(.bottom, 28)
             }
         }
-    }
-}
-
-private struct CircleButton: View {
-    let symbol: String
-
-    var body: some View {
-        Button {} label: {
-            Image(systemName: symbol)
-                .font(.system(size: 18, weight: .regular))
-                .foregroundStyle(Color.black.opacity(0.58))
-                .frame(width: 56, height: 56)
-                .background(Color.white.opacity(0.45))
-                .clipShape(Circle())
-        }
-        .buttonStyle(.plain)
     }
 }
 

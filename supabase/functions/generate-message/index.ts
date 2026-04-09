@@ -63,6 +63,8 @@ type TTSResponse = {
   duration?: number | null
 }
 
+const MAX_GENERATION_RETRIES = 3
+
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
@@ -73,6 +75,10 @@ function countRegexMatches(text: string, pattern: RegExp) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
+}
+
+async function delay(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function normalizeConversation(value: unknown): ConversationTurn[] {
@@ -239,124 +245,6 @@ async function generateWithAnthropic(
   }
 
   return content
-}
-
-async function generateWithOpenAICompatible(
-  apiKey: string,
-  baseUrl: string,
-  model: string,
-  system: string,
-  styleGuide: string,
-  conversation: ConversationTurn[],
-  userMessage: string,
-) {
-  const messages = buildProviderMessages(styleGuide, conversation, userMessage)
-
-  const tryChatCompletion = async (): Promise<string | null> => {
-    try {
-      const chatResponse = await fetch(`${baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: system },
-            ...messages,
-          ],
-          max_tokens: 70,
-          temperature: 0.85,
-        }),
-      })
-
-      if (!chatResponse.ok) {
-        const detail = await chatResponse.text()
-        console.warn("Chat completions request failed", detail)
-        return null
-      }
-
-      const payload = await chatResponse.json()
-      const content = asString(payload.choices?.[0]?.message?.content)
-      return content || null
-    } catch (error) {
-      console.warn("Chat completions request error", error)
-      return null
-    }
-  }
-
-  const tryResponses = async (): Promise<string | null> => {
-    try {
-      const responsesRequest = await fetch(`${baseUrl}/responses`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          instructions: system,
-          input: messages.map((message) => ({
-            role: message.role,
-            content: [{ type: "input_text", text: message.content }],
-          })),
-          max_output_tokens: 70,
-          temperature: 0.85,
-        }),
-      })
-
-      if (!responsesRequest.ok) {
-        const detail = await responsesRequest.text()
-        console.warn("Responses API request failed", detail)
-        return null
-      }
-
-      const payload = await responsesRequest.json()
-      const content = Array.isArray(payload.output)
-        ? payload.output
-          .flatMap((item: Record<string, unknown>) => Array.isArray(item.content) ? item.content : [])
-          .filter((item: Record<string, unknown>) => item.type === "output_text")
-          .map((item: Record<string, unknown>) => asString(item.text))
-          .join("\n")
-          .trim()
-        : ""
-
-      return content || null
-    } catch (error) {
-      console.warn("Responses API request error", error)
-      return null
-    }
-  }
-
-  const preferChat = !baseUrl.includes("openai.com")
-  const primary = preferChat ? await tryChatCompletion() : await tryResponses()
-  if (primary) return primary
-
-  const secondary = preferChat ? await tryResponses() : await tryChatCompletion()
-  if (secondary) return secondary
-
-  throw new Error("OpenAI-compatible provider returned empty content")
-}
-
-function fallbackReply(personaId: string, userMessage: string) {
-  const trimmed = userMessage.trim()
-  switch (personaId) {
-    case "musk":
-      return trimmed
-        ? `Interesting. Let's sanity-check the assumptions behind "${trimmed}".`
-        : "Interesting. What is the constraint you are optimizing for?"
-    case "trump":
-      return trimmed
-        ? `Strong point. "${trimmed}" is exactly the kind of leverage we need.`
-        : "Big moment. Tell me what you want to focus on."
-    case "zuckerberg":
-      return trimmed
-        ? `I get it. The real question is how this changes behavior and distribution for "${trimmed}".`
-        : "What is the concrete user behavior you want to change?"
-    default:
-      return trimmed ? `Got it: "${trimmed}".` : "Got it. What should we focus on?"
-  }
 }
 
 function cleanPersonaReply(text: string) {
@@ -706,9 +594,6 @@ Deno.serve(async (request) => {
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY")
     const anthropicBaseUrl = (Deno.env.get("ANTHROPIC_BASE_URL") ?? "https://api.anthropic.com").replace(/\/$/, "")
     const anthropicModel = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-5-20250929"
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY")
-    const openaiBaseUrl = (Deno.env.get("OPENAI_BASE_URL") ?? "https://api.codexzh.com/v1").replace(/\/$/, "")
-    const openaiModel = Deno.env.get("OPENAI_MODEL") ?? "gpt-5.2"
     const nanoBananaApiKey = Deno.env.get("NANO_BANANA_API_KEY")
     const nanoBananaBaseUrl = (Deno.env.get("NANO_BANANA_BASE_URL") ?? "https://ccodezh.com/v1").replace(/\/$/, "")
     const nanoBananaModel = Deno.env.get("NANO_BANANA_MODEL") ?? "nano-banana"
@@ -718,7 +603,7 @@ Deno.serve(async (request) => {
       "https://uu36540-775678b2e148.bjb2.seetacloud.com:8443/api"
     ).replace(/\/$/, "")
 
-    if (!url || !serviceRoleKey || (!anthropicApiKey && !openaiApiKey)) {
+    if (!url || !serviceRoleKey || !anthropicApiKey) {
       return Response.json(
         { error: "Missing environment variables" },
         { status: 500, headers: corsHeaders },
@@ -732,6 +617,7 @@ Deno.serve(async (request) => {
     const newsContext = asString(body.newsContext)
     const userInterests = normalizeInterests(body.userInterests)
     const requestImage = normalizeBoolean(body.requestImage)
+    const debugProviders = normalizeBoolean(body.debugProviders)
 
     if (!personaId) {
       return Response.json({ error: "personaId is required" }, { status: 400, headers: corsHeaders })
@@ -829,11 +715,12 @@ Deno.serve(async (request) => {
 
     const system = buildSystemPrompt(persona, selected, combinedNewsContext, requestImage)
     let content = ""
-    try {
-      const providers: Array<() => Promise<string>> = []
+    const providerErrors: string[] = []
+    let lastError: Error | null = null
 
-      if (anthropicApiKey) {
-        providers.push(() => generateWithAnthropic(
+    for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES && !content; attempt += 1) {
+      try {
+        const candidate = cleanPersonaReply(await generateWithAnthropic(
           anthropicApiKey,
           anthropicBaseUrl,
           anthropicModel,
@@ -842,42 +729,32 @@ Deno.serve(async (request) => {
           conversation,
           userMessage,
         ))
-      }
-
-      if (openaiApiKey) {
-        providers.push(() => generateWithOpenAICompatible(
-          openaiApiKey,
-          openaiBaseUrl,
-          openaiModel,
-          system,
-          styleGuide,
-          conversation,
-          userMessage,
-        ))
-      }
-
-      let lastError: Error | null = null
-
-      for (const generate of providers) {
-        try {
-          const candidate = cleanPersonaReply(await generate())
-          if (candidate) {
-            content = candidate
-            break
-          }
-
-          lastError = new Error("Persona reply empty after cleanup")
-        } catch (error) {
-          lastError = error instanceof Error ? error : new Error(String(error))
+        if (candidate) {
+          content = candidate
+          break
         }
+
+        lastError = new Error("Persona reply empty after cleanup")
+        providerErrors.push(`[attempt ${attempt}] anthropic: Provider returned empty content after cleanup`)
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error))
+        providerErrors.push(`[attempt ${attempt}] anthropic: ${lastError.message}`)
       }
 
-      if (!content) {
-        throw lastError ?? new Error("No valid model provider configured")
+      if (!content && attempt < MAX_GENERATION_RETRIES) {
+        await delay(200 * attempt)
       }
-    } catch (error) {
-      console.error("Model provider request failed", error)
-      content = fallbackReply(persona.personaId, userMessage)
+    }
+
+    if (!content) {
+      console.error("Model provider request failed after retries", lastError)
+      return Response.json(
+        {
+          error: "Message generation failed after retries",
+          ...(debugProviders ? { debug: { providerErrors } } : {}),
+        },
+        { status: 502, headers: corsHeaders },
+      )
     }
     let imageUrl: string | null = null
     if (requestImage && nanoBananaApiKey) {
@@ -929,6 +806,7 @@ Deno.serve(async (request) => {
         audioOnly,
         sourcePostIds: [...selected.map((row) => row.id), ...relevantNews.map((row) => row.id)],
         generatedAt,
+        ...(debugProviders ? { debug: { providerErrors } } : {}),
       },
       { headers: corsHeaders },
     )

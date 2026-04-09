@@ -204,29 +204,39 @@ private func fetchEngagedPersonaIds(from context: ModelContext) -> Set<String> {
 }
 
 private func defaultPhoneNumber(for personaId: String) -> String {
-    switch personaId {
-    case "musk":
-        return "+1 310 555 0142"
-    case "trump":
-        return "+1 561 555 0145"
-    case "zuckerberg":
-        return "+1 650 555 0108"
-    default:
-        return "+1 555 0100"
-    }
+    let directory: [String: String] = [
+        "musk": "+1 310 555 0142",
+        "trump": "+1 561 555 0145",
+        "zuckerberg": "+1 650 555 0108",
+        "sam_altman": "+1 415 555 0112",
+        "zhang_peng": "+86 10 5555 0188",
+        "lei_jun": "+86 10 5555 0168",
+        "liu_jingkang": "+86 755 5555 0136",
+        "luo_yonghao": "+86 10 5555 0127",
+        "justin_sun": "+852 5550 0133",
+        "kim_kardashian": "+1 323 555 0199",
+        "papi": "+86 21 5555 0126",
+    ]
+
+    return directory[personaId] ?? "+1 555 0100"
 }
 
 private func defaultEmail(for personaId: String) -> String {
-    switch personaId {
-    case "musk":
-        return "elon@x.ai"
-    case "trump":
-        return "donald@truthsocial.com"
-    case "zuckerberg":
-        return "mark@meta.com"
-    default:
-        return "bruh@contact.local"
-    }
+    let directory: [String: String] = [
+        "musk": "elon@x.ai",
+        "trump": "donald@truthsocial.com",
+        "zuckerberg": "mark@meta.com",
+        "sam_altman": "sam@openai.com",
+        "zhang_peng": "peng@geekpark.net",
+        "lei_jun": "jun@xiaomi.com",
+        "liu_jingkang": "jk@insta360.com",
+        "luo_yonghao": "laoluo@smartisan.com",
+        "justin_sun": "justin@tron.network",
+        "kim_kardashian": "kim@skims.com",
+        "papi": "papi@papitube.com",
+    ]
+
+    return directory[personaId] ?? "bruh@contact.local"
 }
 
 private func legacyInviteStateByPersonaId(userDefaults: UserDefaults = .standard) -> [String: ContactRelationshipStatus] {

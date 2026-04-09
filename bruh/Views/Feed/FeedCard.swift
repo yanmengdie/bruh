@@ -185,6 +185,14 @@ struct FeedCard: View {
         case "trump": .orange
         case "musk": Color(red: 0.12, green: 0.15, blue: 0.35)
         case "zuckerberg": .purple
+        case "sam_altman": Color(red: 0.06, green: 0.12, blue: 0.22)
+        case "zhang_peng": Color(red: 0.15, green: 0.39, blue: 0.92)
+        case "lei_jun": Color(red: 1.00, green: 0.41, blue: 0.00)
+        case "liu_jingkang": Color(red: 0.06, green: 0.62, blue: 0.58)
+        case "luo_yonghao": Color(red: 0.50, green: 0.11, blue: 0.11)
+        case "justin_sun": Color(red: 0.11, green: 0.74, blue: 0.63)
+        case "kim_kardashian": Color(red: 0.72, green: 0.54, blue: 0.42)
+        case "papi": Color(red: 0.88, green: 0.11, blue: 0.55)
         default: .gray
         }
     }
@@ -374,6 +382,14 @@ struct FeedCard: View {
         case "trump": return "海湖庄园"
         case "musk": return "X HQ"
         case "zuckerberg": return "Meta Park"
+        case "sam_altman": return "San Francisco"
+        case "zhang_peng": return "北京"
+        case "lei_jun": return "北京"
+        case "liu_jingkang": return "深圳"
+        case "luo_yonghao": return "北京"
+        case "justin_sun": return "Hong Kong"
+        case "kim_kardashian": return "Los Angeles"
+        case "papi": return "上海"
         default: return "中国"
         }
     }

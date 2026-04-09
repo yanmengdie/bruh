@@ -49,6 +49,22 @@ struct BruhInvitation: Identifiable, Hashable {
             return "👨‍🚀"
         case "zuckerberg":
             return "🧑‍💻"
+        case "sam_altman":
+            return "🤖"
+        case "zhang_peng":
+            return "🎙️"
+        case "lei_jun":
+            return "📱"
+        case "liu_jingkang":
+            return "📷"
+        case "luo_yonghao":
+            return "🎤"
+        case "justin_sun":
+            return "🪙"
+        case "kim_kardashian":
+            return "✨"
+        case "papi":
+            return "🎬"
         default:
             return "👤"
         }

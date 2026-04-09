@@ -46,6 +46,14 @@ const entityKeywords: Record<string, string[]> = {
   musk: ["elon", "musk", "tesla", "spacex", "xai", "openai", "grok", "x.com", "starlink", "neuralink"],
   trump: ["trump", "white house", "republican", "election", "tariff", "china", "trade", "washington"],
   zuckerberg: ["meta", "zuckerberg", "instagram", "facebook", "threads", "llama", "quest"],
+  sam_altman: ["sam altman", "altman", "openai", "chatgpt", "gpt", "sora", "agi"],
+  zhang_peng: ["张鹏", "geekpark", "极客公园"],
+  lei_jun: ["雷军", "lei jun", "xiaomi", "redmi", "su7", "yu7", "xiaomi auto"],
+  liu_jingkang: ["刘靖康", "jk liu", "insta360", "影石"],
+  luo_yonghao: ["罗永浩", "luo yonghao", "smartisan", "锤子"],
+  justin_sun: ["justin sun", "孙宇晨", "tron", "trx", "htx", "stablecoin"],
+  kim_kardashian: ["kim kardashian", "kimkardashian", "skims", "hollywood"],
+  papi: ["papi酱", "papijiang", "姜逸磊"],
 }
 
 export const defaultNewsFeeds: FeedDefinition[] = [
@@ -257,6 +265,22 @@ export function defaultStarterMessage(personaId: string, title: string) {
       return `${title} is what weak leadership looks like when a problem gets completely out of hand.`
     case "zuckerberg":
       return `${title} is really an incentives and distribution story once you look past the headline.`
+    case "sam_altman":
+      return `${title} matters because it changes what AI products are actually possible in the next cycle.`
+    case "zhang_peng":
+      return `${title} 不是一条普通新闻，更像是技术周期又往前走了一格。`
+    case "lei_jun":
+      return `${title} 背后一定不只是热度，产品、供应链和节奏都在一起变化。`
+    case "liu_jingkang":
+      return `${title} 这种消息我会先看它到底解决了什么真实用户问题。`
+    case "luo_yonghao":
+      return `${title} 听着像新闻，实际上更值得看的是它到底有没有把事做对。`
+    case "justin_sun":
+      return `${title} is the kind of move that changes sentiment before most people price it in.`
+    case "kim_kardashian":
+      return `${title} is not just a headline. It is a culture-and-brand signal if you read it correctly.`
+    case "papi":
+      return `${title} 这种事我第一反应不是热度，而是大家到底在情绪上共鸣了什么。`
     default:
       return title
   }

@@ -37,10 +37,8 @@ struct HomeScreen: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
-                statusHeader
-                    .padding(.top, 8)
-
                 dateTimePanel
+                    .padding(.top, 6)
 
                 messagesWidget
 
@@ -55,35 +53,6 @@ struct HomeScreen: View {
             .padding(.bottom, 18)
         }
         .background(AppTheme.messagesBackground.ignoresSafeArea())
-    }
-
-    private var statusHeader: some View {
-        HStack {
-            Text("11:30")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.black.opacity(0.88))
-
-            Spacer()
-
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.black)
-                .frame(width: 120, height: 34)
-
-            Spacer()
-
-            HStack(spacing: 4) {
-                ForEach(0..<4, id: \.self) { _ in
-                    Circle()
-                        .fill(Color.black.opacity(0.9))
-                        .frame(width: 8, height: 8)
-                }
-                Text("WiFi")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.black.opacity(0.88))
-                Text("🔋")
-                    .font(.system(size: 14))
-            }
-        }
     }
 
     private var dateTimePanel: some View {

@@ -7,8 +7,12 @@ struct Onboarding: View {
     @State private var name = ""
     @State private var selectedInterests: Set<OnboardingInterest> = OnboardingInterestStore.load()
     @State private var profileImage: UIImage?
-    @State private var isPresentingCamera = false
-    @State private var isShowingCameraAlert = false
+    @State private var isPresentingImagePicker = false
+    @State private var isShowingImageSourceOptions = false
+    @State private var imagePickerSourceType: UIImagePickerController.SourceType = .photoLibrary
+    @State private var pickerAlertTitle = ""
+    @State private var pickerAlertMessage = ""
+    @State private var isShowingPickerAlert = false
     @FocusState private var isNameFieldFocused: Bool
 
     init(onComplete: @escaping () -> Void = {}) {
@@ -55,14 +59,28 @@ struct Onboarding: View {
         .onChange(of: selectedInterests) { _, newValue in
             OnboardingInterestStore.save(newValue)
         }
-        .sheet(isPresented: $isPresentingCamera) {
-            OnboardingCameraPicker(image: $profileImage)
+        .confirmationDialog("选择头像", isPresented: $isShowingImageSourceOptions, titleVisibility: .visible) {
+            Button("拍照") {
+                presentImagePicker(sourceType: .camera)
+            }
+
+            Button("从相册选择") {
+                presentImagePicker(sourceType: .photoLibrary)
+            }
+
+            Button("取消", role: .cancel) {}
+        }
+        .sheet(isPresented: $isPresentingImagePicker) {
+            OnboardingImagePicker(
+                image: $profileImage,
+                sourceType: imagePickerSourceType
+            )
                 .ignoresSafeArea()
         }
-        .alert("当前设备无法打开相机", isPresented: $isShowingCameraAlert) {
+        .alert(pickerAlertTitle, isPresented: $isShowingPickerAlert) {
             Button("知道了", role: .cancel) {}
         } message: {
-            Text("请在支持相机的设备上重试。")
+            Text(pickerAlertMessage)
         }
     }
 
@@ -130,7 +148,7 @@ struct Onboarding: View {
 
     private var avatarPickerButton: some View {
         Button {
-            openCamera()
+            isShowingImageSourceOptions = true
         } label: {
             ZStack(alignment: .bottomTrailing) {
                 Circle()
@@ -165,7 +183,7 @@ struct Onboarding: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("拍摄头像")
+        .accessibilityLabel("选择头像")
     }
 
     private var interestsSection: some View {
@@ -288,13 +306,25 @@ struct Onboarding: View {
         }
     }
 
-    private func openCamera() {
-        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
-            isShowingCameraAlert = true
+    private func presentImagePicker(sourceType: UIImagePickerController.SourceType) {
+        guard UIImagePickerController.isSourceTypeAvailable(sourceType) else {
+            switch sourceType {
+            case .camera:
+                pickerAlertTitle = "当前设备无法打开相机"
+                pickerAlertMessage = "请在支持相机的设备上重试，或改为从相册选择。"
+            case .photoLibrary, .savedPhotosAlbum:
+                pickerAlertTitle = "当前设备无法访问相册"
+                pickerAlertMessage = "请检查系统权限后重试。"
+            @unknown default:
+                pickerAlertTitle = "当前设备无法选择图片"
+                pickerAlertMessage = "请稍后重试。"
+            }
+            isShowingPickerAlert = true
             return
         }
 
-        isPresentingCamera = true
+        imagePickerSourceType = sourceType
+        isPresentingImagePicker = true
     }
 
     private func completeOnboarding() {
@@ -366,9 +396,10 @@ enum OnboardingInterestStore {
     }
 }
 
-private struct OnboardingCameraPicker: UIViewControllerRepresentable {
+private struct OnboardingImagePicker: UIViewControllerRepresentable {
     @Environment(\.dismiss) private var dismiss
     @Binding var image: UIImage?
+    let sourceType: UIImagePickerController.SourceType
 
     func makeCoordinator() -> Coordinator {
         Coordinator(image: $image, dismiss: dismiss)
@@ -376,7 +407,7 @@ private struct OnboardingCameraPicker: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let controller = UIImagePickerController()
-        controller.sourceType = .camera
+        controller.sourceType = sourceType
         controller.allowsEditing = true
         controller.delegate = context.coordinator
         return controller

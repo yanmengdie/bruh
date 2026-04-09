@@ -168,8 +168,22 @@ struct MessagesScreen: View {
             return .blue
         case "zuckerberg":
             return .purple
+        case "sam_altman":
+            return Color(red: 0.06, green: 0.12, blue: 0.22)
+        case "zhang_peng":
+            return Color(red: 0.15, green: 0.39, blue: 0.92)
+        case "lei_jun":
+            return Color(red: 1.00, green: 0.41, blue: 0.00)
+        case "liu_jingkang":
+            return Color(red: 0.06, green: 0.62, blue: 0.58)
+        case "luo_yonghao":
+            return Color(red: 0.50, green: 0.11, blue: 0.11)
         case "justin_sun":
             return Color(red: 0.11, green: 0.74, blue: 0.63)
+        case "kim_kardashian":
+            return Color(red: 0.72, green: 0.54, blue: 0.42)
+        case "papi":
+            return Color(red: 0.88, green: 0.11, blue: 0.55)
         default:
             return .gray
         }
@@ -529,8 +543,22 @@ private struct MessageDetailView: View {
             return .blue
         case "zuckerberg":
             return .purple
+        case "sam_altman":
+            return Color(red: 0.06, green: 0.12, blue: 0.22)
+        case "zhang_peng":
+            return Color(red: 0.15, green: 0.39, blue: 0.92)
+        case "lei_jun":
+            return Color(red: 1.00, green: 0.41, blue: 0.00)
+        case "liu_jingkang":
+            return Color(red: 0.06, green: 0.62, blue: 0.58)
+        case "luo_yonghao":
+            return Color(red: 0.50, green: 0.11, blue: 0.11)
         case "justin_sun":
             return Color(red: 0.11, green: 0.74, blue: 0.63)
+        case "kim_kardashian":
+            return Color(red: 0.72, green: 0.54, blue: 0.42)
+        case "papi":
+            return Color(red: 0.88, green: 0.11, blue: 0.55)
         default:
             return .gray
         }
@@ -595,16 +623,6 @@ private struct MessageDetailView: View {
             return errorMessage
         }
         return audioPlayback.lastErrorMessage
-    }
-
-    private func resolvedVoiceLabel(for message: PersonaMessage) -> String {
-        let trimmed = message.voiceLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !trimmed.isEmpty {
-            return trimmed
-        }
-
-        let name = persona(for: message.personaId).name
-        return name.hasSuffix("s") ? "\(name)' voice" : "\(name)'s voice"
     }
 
     private func resolveAudioDurationIfNeeded(
@@ -696,11 +714,10 @@ private struct MessageDetailView: View {
                 deliveryState: deliveryState,
                 themeColor: themeColor
             )
-        case .audio(let url, let duration, let label, let messageId):
+        case .audio(let url, let duration, let messageId):
             voiceMessageCard(
                 url: url,
                 duration: duration,
-                label: label,
                 messageId: messageId,
                 isIncoming: isIncoming,
                 deliveryState: deliveryState,
@@ -716,7 +733,6 @@ private struct MessageDetailView: View {
             return .audio(
                 audioUrl,
                 duration: resolvedDuration,
-                label: resolvedVoiceLabel(for: message),
                 messageId: message.id
             )
         }
@@ -825,7 +841,6 @@ private struct MessageDetailView: View {
     private func voiceMessageCard(
         url: URL,
         duration: TimeInterval?,
-        label: String,
         messageId: String,
         isIncoming: Bool,
         deliveryState: String,
@@ -845,8 +860,7 @@ private struct MessageDetailView: View {
                     isPlaying: isActive && audioPlayback.isPlaying,
                     isLoading: isLoading,
                     progress: progress,
-                    duration: effectiveDuration,
-                    label: label
+                    duration: effectiveDuration
                 )
             }
             .buttonStyle(.plain)
@@ -1050,7 +1064,7 @@ private struct MessageDetailView: View {
 private enum MessageContent {
     case text(String, imageUrl: URL?)
     case webPreview(URL)
-    case audio(URL, duration: TimeInterval?, label: String, messageId: String)
+    case audio(URL, duration: TimeInterval?, messageId: String)
 }
 
 private struct TypingIndicatorBubble: View {
@@ -1091,7 +1105,6 @@ private struct VoiceMessageBubbleView: View {
     let isLoading: Bool
     let progress: Double
     let duration: TimeInterval?
-    let label: String
 
     private let waveformHeights: [CGFloat] = [10, 15, 21, 13, 19, 25, 15, 11, 18, 24, 16, 12, 20, 27, 17, 12, 18]
 
@@ -1128,16 +1141,6 @@ private struct VoiceMessageBubbleView: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Color.black.opacity(0.42))
                     .monospacedDigit()
-            }
-
-            HStack(spacing: 4) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(themeColor.opacity(0.82))
-
-                Text("voice · \(label)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 14)
