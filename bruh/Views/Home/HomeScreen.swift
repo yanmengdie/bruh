@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum AppDestination: Hashable {
     case feed
@@ -15,24 +16,28 @@ struct HomeScreen: View {
     let hasNewAlbumBadge: Bool
 
     private let quickApps: [HomeQuickApp] = [
-        .init(name: "消息", icon: "message.fill", colors: [Color.black.opacity(0.88), Color.black.opacity(0.72)], destination: .imessage, badgeCount: 8),
-        .init(name: "日常", icon: "flame.fill", colors: [Color(red: 1.0, green: 0.41, blue: 0.42), Color(red: 0.85, green: 0.14, blue: 0.28)], destination: .feed),
-        .init(name: "鸽们", icon: "ellipsis.bubble.fill", colors: [Color(red: 0.61, green: 0.60, blue: 0.98), Color(red: 0.43, green: 0.40, blue: 0.90)], destination: .contacts),
-        .init(name: "相册", icon: "newspaper.fill", colors: [Color(red: 0.94, green: 0.80, blue: 0.37), Color(red: 0.85, green: 0.66, blue: 0.15)], destination: .album),
-        .init(name: "小红书", icon: "mic.fill", colors: [Color(red: 0.27, green: 0.86, blue: 0.74), Color(red: 0.08, green: 0.72, blue: 0.58)], destination: nil),
-        .init(name: "影石", icon: "chart.bar.fill", colors: [Color(red: 0.39, green: 0.64, blue: 0.98), Color(red: 0.18, green: 0.43, blue: 0.84)], destination: nil),
-        .init(name: "设置", icon: "gearshape.fill", colors: [Color(red: 1.0, green: 0.62, blue: 0.42), Color(red: 0.96, green: 0.41, blue: 0.23)], destination: .settings),
-        .init(name: "极客公园", icon: "music.note", colors: [Color(red: 0.97, green: 0.39, blue: 0.65), Color(red: 0.83, green: 0.15, blue: 0.43)], destination: nil),
+        .init(name: "鸽们", imageAsset: "Icon_contacts", destination: .contacts),
+        .init(name: "消息", imageAsset: "Icon_message", destination: .imessage, badgeCount: 8),
+        .init(name: "日常", imageAsset: "Icon_moments", destination: .feed),
+        .init(name: "相册", imageAsset: "Icon_album", destination: .album),
+        .init(name: "小红书", imageAsset: "Icon_xhs", destination: nil),
+        .init(name: "影石", imageAsset: "Icon_insta", destination: nil),
+        .init(name: "鸿蒙", placeholderText: "鸿", placeholderColors: [Color(red: 0.95, green: 0.60, blue: 0.36), Color(red: 0.90, green: 0.38, blue: 0.22)], destination: nil),
+        .init(name: "极客公园", placeholderText: "极", placeholderColors: [Color(red: 0.95, green: 0.45, blue: 0.67), Color(red: 0.79, green: 0.20, blue: 0.46)], destination: nil),
     ]
 
     private var dockApps: [HomeQuickApp] {
         [
-            .init(name: "鸽们", icon: "person.crop.circle.fill", colors: [.green.opacity(0.92), .green.opacity(0.72)], destination: .contacts),
-            .init(name: "消息", icon: "message.fill", colors: [.green.opacity(0.92), .green.opacity(0.72)], destination: .imessage, badgeCount: messageUnreadCount),
-            .init(name: "日常", icon: "globe", colors: [Color(red: 1.0, green: 0.72, blue: 0.62), Color(red: 1.0, green: 0.55, blue: 0.55)], destination: .feed, badgeCount: momentsUnreadCount),
-            .init(name: "相册", icon: "photo.on.rectangle.angled", colors: [.red.opacity(0.92), .red.opacity(0.72)], destination: .album, badgeText: hasNewAlbumBadge ? "新" : nil),
+            .init(name: "鸽们", imageAsset: "Icon_contacts", destination: .contacts),
+            .init(name: "消息", imageAsset: "Icon_message", destination: .imessage, badgeCount: messageUnreadCount),
+            .init(name: "日常", imageAsset: "Icon_moments", destination: .feed, badgeCount: momentsUnreadCount),
+            .init(name: "相册", imageAsset: "Icon_album", destination: .album, badgeText: hasNewAlbumBadge ? "新" : nil),
         ]
     }
+
+    private let iconTileSize: CGFloat = 64
+    private let iconCornerRadius: CGFloat = 16
+    private let fourColumnLayout: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 14), count: 4)
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -137,7 +142,7 @@ struct HomeScreen: View {
     }
 
     private var quickAppsGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 4), spacing: 14) {
+        LazyVGrid(columns: fourColumnLayout, spacing: 14) {
             ForEach(quickApps) { app in
                 Button {
                     guard let destination = app.destination else { return }
@@ -145,19 +150,7 @@ struct HomeScreen: View {
                 } label: {
                     VStack(spacing: 7) {
                         ZStack(alignment: .topTrailing) {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: app.colors,
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(height: 76)
-
-                            Image(systemName: app.icon)
-                                .font(.system(size: 30, weight: .medium))
-                                .foregroundStyle(.white)
+                            appIconTile(app)
 
                             if let badgeText = app.badgeText {
                                 badgeLabel(text: badgeText)
@@ -292,7 +285,7 @@ struct HomeScreen: View {
     }
 
     private var dock: some View {
-        HStack(spacing: 20) {
+        LazyVGrid(columns: fourColumnLayout, spacing: 14) {
             ForEach(dockApps) { app in
                 Button {
                     guard let destination = app.destination else { return }
@@ -300,19 +293,7 @@ struct HomeScreen: View {
                 } label: {
                     VStack(spacing: 6) {
                         ZStack(alignment: .topTrailing) {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: app.colors,
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 60, height: 60)
-
-                            Image(systemName: app.icon)
-                                .font(.system(size: 24, weight: .medium))
-                                .foregroundStyle(.white)
+                            appIconTile(app)
 
                             if let badgeText = app.badgeText {
                                 badgeLabel(text: badgeText)
@@ -332,19 +313,47 @@ struct HomeScreen: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.65))
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private func appIconTile(_ app: HomeQuickApp) -> some View {
+        RoundedRectangle(cornerRadius: iconCornerRadius, style: .continuous)
+            .fill(iconBackground(for: app))
+            .frame(width: iconTileSize, height: iconTileSize)
+            .overlay {
+                if let imageAsset = app.imageAsset, UIImage(named: imageAsset) != nil {
+                    Image(imageAsset)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: iconTileSize, height: iconTileSize)
+                        .clipShape(RoundedRectangle(cornerRadius: iconCornerRadius, style: .continuous))
+                } else if let placeholderText = app.placeholderText {
+                    Text(placeholderText)
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: iconCornerRadius, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 0.8)
+            }
+    }
+
+    private func iconBackground(for app: HomeQuickApp) -> some ShapeStyle {
+        LinearGradient(
+            colors: app.placeholderColors ?? [Color.black.opacity(0.86), Color.black.opacity(0.68)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }
 
 private struct HomeQuickApp: Identifiable {
     let id = UUID()
     let name: String
-    let icon: String
-    let colors: [Color]
+    var imageAsset: String? = nil
+    var placeholderText: String? = nil
+    var placeholderColors: [Color]? = nil
     let destination: AppDestination?
     var badgeCount: Int? = nil
     var badgeText: String? = nil
