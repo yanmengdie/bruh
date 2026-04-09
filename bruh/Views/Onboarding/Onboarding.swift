@@ -179,8 +179,15 @@ struct Onboarding: View {
                                 .frame(width: 62, height: 62)
                                 .clipShape(Circle())
                         } else {
-                            Text("📸")
-                                .font(.system(size: 30))
+                            if UIImage(named: "Camera") != nil {
+                                Image("Camera")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 34, height: 34)
+                            } else {
+                                Text("📸")
+                                    .font(.system(size: 30))
+                            }
                         }
                     }
 
