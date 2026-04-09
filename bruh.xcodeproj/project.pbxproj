@@ -37,6 +37,7 @@
 		A100001C000000000000001C /* Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001C000000000000001C /* Onboarding.swift */; };
 		A100001D000000000000001D /* trump_joy.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = B100001D000000000000001D /* trump_joy.mp4 */; };
 		A100001E000000000000001E /* AddBruhView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001E000000000000001E /* AddBruhView.swift */; };
+		A10000200000000000000020 /* ContactTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000200000000000000020 /* ContactTagsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -70,6 +71,7 @@
 		B100001C000000000000001C /* Onboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Onboarding.swift; sourceTree = "<group>"; };
 		B100001D000000000000001D /* trump_joy.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = trump_joy.mp4; sourceTree = SOURCE_ROOT; };
 		B100001E000000000000001E /* AddBruhView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBruhView.swift; sourceTree = "<group>"; };
+		B10000200000000000000020 /* ContactTagsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactTagsView.swift; sourceTree = "<group>"; };
 		C1000001000000000000001 /* bruh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bruh.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -205,6 +207,7 @@
 			children = (
 				B100001E000000000000001E /* AddBruhView.swift */,
 				B100001B000000000000001B /* NewBruhView.swift */,
+				B10000200000000000000020 /* ContactTagsView.swift */,
 			);
 			path = Contacts;
 			sourceTree = "<group>";
@@ -304,6 +307,7 @@
 				A10000170000000000000017 /* MessagesScreen.swift in Sources */,
 				A100001E000000000000001E /* AddBruhView.swift in Sources */,
 				A100001B000000000000001B /* NewBruhView.swift in Sources */,
+				A10000200000000000000020 /* ContactTagsView.swift in Sources */,
 				A100001C000000000000001C /* Onboarding.swift in Sources */,
 				A10000180000000000000018 /* AppTheme.swift in Sources */,
 				A10000190000000000000019 /* AppBackIcon.swift in Sources */,
@@ -449,7 +453,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MW8MKZLVY6;
+				DEVELOPMENT_TEAM = 7GDL23J8X9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -476,7 +480,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MW8MKZLVY6;
+				DEVELOPMENT_TEAM = 7GDL23J8X9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
