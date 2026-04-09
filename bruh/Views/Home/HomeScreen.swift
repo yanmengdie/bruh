@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import AVFoundation
 
 enum AppDestination: Hashable {
     case feed
@@ -9,63 +11,107 @@ enum AppDestination: Hashable {
 }
 
 struct HomeScreen: View {
+    @Environment(\.openURL) private var openURL
     let onNavigate: (AppDestination) -> Void
     let messageUnreadCount: Int
     let momentsUnreadCount: Int
     let hasNewAlbumBadge: Bool
+    @State private var isVoiceBubblePlaying = false
+    @State private var voicePlayer: AVAudioPlayer?
+    @State private var voiceDurationLabel = "--:--"
+    @State private var voicePlayerDelegate: HomeVoicePlayerDelegate?
 
-    private let quickApps: [HomeQuickApp] = [
-        .init(name: "消息", icon: "message.fill", colors: [Color.black.opacity(0.88), Color.black.opacity(0.72)], destination: .imessage, badgeCount: 8),
-        .init(name: "日常", icon: "flame.fill", colors: [Color(red: 1.0, green: 0.41, blue: 0.42), Color(red: 0.85, green: 0.14, blue: 0.28)], destination: .feed),
-        .init(name: "鸽们", icon: "ellipsis.bubble.fill", colors: [Color(red: 0.61, green: 0.60, blue: 0.98), Color(red: 0.43, green: 0.40, blue: 0.90)], destination: .contacts),
-        .init(name: "相册", icon: "newspaper.fill", colors: [Color(red: 0.94, green: 0.80, blue: 0.37), Color(red: 0.85, green: 0.66, blue: 0.15)], destination: .album),
-        .init(name: "小红书", icon: "mic.fill", colors: [Color(red: 0.27, green: 0.86, blue: 0.74), Color(red: 0.08, green: 0.72, blue: 0.58)], destination: nil),
-        .init(name: "影石", icon: "chart.bar.fill", colors: [Color(red: 0.39, green: 0.64, blue: 0.98), Color(red: 0.18, green: 0.43, blue: 0.84)], destination: nil),
-        .init(name: "设置", icon: "gearshape.fill", colors: [Color(red: 1.0, green: 0.62, blue: 0.42), Color(red: 0.96, green: 0.41, blue: 0.23)], destination: .settings),
-        .init(name: "极客公园", icon: "music.note", colors: [Color(red: 0.97, green: 0.39, blue: 0.65), Color(red: 0.83, green: 0.15, blue: 0.43)], destination: nil),
-    ]
-
-    private var dockApps: [HomeQuickApp] {
+    private var quickApps: [HomeQuickApp] {
         [
-            .init(name: "鸽们", icon: "person.crop.circle.fill", colors: [.green.opacity(0.92), .green.opacity(0.72)], destination: .contacts),
-            .init(name: "消息", icon: "message.fill", colors: [.green.opacity(0.92), .green.opacity(0.72)], destination: .imessage, badgeCount: messageUnreadCount),
-            .init(name: "日常", icon: "globe", colors: [Color(red: 1.0, green: 0.72, blue: 0.62), Color(red: 1.0, green: 0.55, blue: 0.55)], destination: .feed, badgeCount: momentsUnreadCount),
-            .init(name: "相册", icon: "photo.on.rectangle.angled", colors: [.red.opacity(0.92), .red.opacity(0.72)], destination: .album, badgeText: hasNewAlbumBadge ? "新" : nil),
+            .init(name: "鸽们", imageAsset: "Icon_contacts", destination: .contacts),
+            .init(name: "消息", imageAsset: "Icon_message", destination: .imessage, badgeCount: messageUnreadCount),
+            .init(name: "日常", imageAsset: "Icon_moments", destination: .feed, badgeCount: momentsUnreadCount),
+            .init(name: "相册", imageAsset: "Icon_album", destination: .album, badgeText: hasNewAlbumBadge ? "新" : nil),
+        .init(
+            name: "小红书",
+            imageAsset: "Icon_xhs",
+            destination: nil,
+            deepLinkURL: URL(string: "xhsdiscover://home"),
+            fallbackWebURL: URL(string: "https://www.xiaohongshu.com")
+        ),
+        .init(
+            name: "影石",
+            imageAsset: "Icon_insta",
+            destination: nil,
+            deepLinkURL: URL(string: "insta360://"),
+            fallbackWebURL: URL(string: "https://www.insta360.com")
+        ),
+        .init(
+            name: "鸿蒙",
+            imageAsset: "Icon_harmony",
+            destination: nil,
+            fallbackWebURL: URL(string: "https://www.harmonyos.com/")
+        ),
+        .init(
+            name: "极客公园",
+            imageAsset: "Icon_geek",
+            destination: nil,
+            fallbackWebURL: URL(string: "https://www.geekpark.net/")
+        ),
         ]
     }
 
+    private var dockApps: [HomeQuickApp] {
+        [
+            .init(name: "鸽们", imageAsset: "Icon_contacts", destination: .contacts),
+            .init(name: "消息", imageAsset: "Icon_message", destination: .imessage, badgeCount: messageUnreadCount),
+            .init(name: "日常", imageAsset: "Icon_moments", destination: .feed, badgeCount: momentsUnreadCount),
+            .init(name: "相册", imageAsset: "Icon_album", destination: .album, badgeText: hasNewAlbumBadge ? "新" : nil),
+        ]
+    }
+
+    private let iconTileSize: CGFloat = 64
+    private let iconCornerRadius: CGFloat = 16
+    private let fourColumnLayout: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 14), count: 4)
+    private let homeBackgroundColor = Color(red: 0.93, green: 0.89, blue: 0.82)
+
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 16) {
-                dateTimePanel
-                    .padding(.top, 6)
+        VStack(spacing: 16) {
+            dateTimePanel
+                .padding(.top, 6)
 
-                messagesWidget
+            messagesWidget
 
+            VStack(spacing: 0) {
                 quickAppsGrid
-
-                marketAndMusicWidgets
-
+                Spacer(minLength: 0)
+                voiceBubbleWidget
+                Spacer(minLength: 0)
                 dock
-                    .padding(.top, 6)
             }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(AppTheme.messagesBackground.ignoresSafeArea())
+        .padding(.horizontal, 14)
+        .padding(.bottom, 18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(homeBackgroundColor.ignoresSafeArea())
+        .onAppear {
+            prepareVoiceIfNeeded()
+        }
+        .onDisappear {
+            voicePlayer?.stop()
+            isVoiceBubblePlaying = false
+        }
     }
 
     private var dateTimePanel: some View {
-        VStack(spacing: 4) {
-            Text("星期三，4月8日")
-                .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(Color.black.opacity(0.50))
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            VStack(spacing: 4) {
+                Text(homeDateString(from: context.date))
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(Color.black.opacity(0.50))
 
-            Text("11:30")
-                .font(.system(size: 90, weight: .black, design: .rounded))
-                .foregroundStyle(Color.black.opacity(0.92))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                Text(homeTimeString(from: context.date))
+                    .font(.system(size: 90, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.black.opacity(0.92))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -96,8 +142,8 @@ struct HomeScreen: View {
             }
 
             VStack(spacing: 10) {
-                messageSnippet(name: "Donald Trump", text: "FAKE NEWS 鸽们！我们的经济要起飞了。", time: "2分")
-                messageSnippet(name: "Elon Musk", text: "火星计划更新：节奏比预期还快。", time: "15分")
+                messageSnippet(name: "罗浩安", text: "不是鸽们，你不应该在台上Demo吗？", time: "2分", avatarAsset: "Avatar_LuoHaoan", avatarBackground: Color(red: 0.84, green: 0.76, blue: 0.64))
+                messageSnippet(name: "Hera", text: "欢迎关注小红书@欢崽（Ai版）", time: "15分", avatarAsset: "Avatar_Hera", avatarBackground: Color(red: 0.97, green: 0.82, blue: 0.87))
             }
         }
         .padding(.horizontal, 14)
@@ -106,15 +152,23 @@ struct HomeScreen: View {
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func messageSnippet(name: String, text: String, time: String) -> some View {
+    private func messageSnippet(name: String, text: String, time: String, avatarAsset: String? = nil, avatarBackground: Color = Color.black.opacity(0.85)) -> some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(Color.black.opacity(0.85))
+                .fill(avatarBackground)
                 .frame(width: 42, height: 42)
                 .overlay {
-                    Text(String(name.prefix(1)))
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.white)
+                    if let avatarAsset, UIImage(named: avatarAsset) != nil {
+                        Image(avatarAsset)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 42, height: 42)
+                            .clipShape(Circle())
+                    } else {
+                        Text(String(name.prefix(1)))
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
                 }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -136,28 +190,74 @@ struct HomeScreen: View {
         }
     }
 
+    private var voiceBubbleWidget: some View {
+        Button {
+            toggleVoicePlayback()
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.black.opacity(0.10))
+                        .frame(width: 34, height: 34)
+
+                    Image(systemName: isVoiceBubblePlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.black.opacity(0.76))
+                        .offset(x: isVoiceBubblePlaying ? 0 : 1)
+                }
+
+                HStack(spacing: 4) {
+                    ForEach(0..<16, id: \.self) { index in
+                        Capsule()
+                            .fill(Color.black.opacity(isVoiceBubblePlaying ? 0.44 : 0.30))
+                            .frame(
+                                width: 3,
+                                height: isVoiceBubblePlaying
+                                    ? CGFloat(8 + ((index * 7) % 14))
+                                    : CGFloat(8 + ((index * 5) % 10))
+                            )
+                    }
+                }
+                .frame(height: 24, alignment: .center)
+
+                Spacer(minLength: 0)
+
+                Text(isVoiceBubblePlaying ? "播放中" : "语音消息")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.black.opacity(0.56))
+
+                Text(voiceDurationLabel)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.black.opacity(0.38))
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 68)
+            .frame(maxWidth: 360)
+            .background(Color.white.opacity(0.72))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
     private var quickAppsGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 4), spacing: 14) {
+        LazyVGrid(columns: fourColumnLayout, spacing: 14) {
             ForEach(quickApps) { app in
                 Button {
-                    guard let destination = app.destination else { return }
-                    onNavigate(destination)
+                    if let destination = app.destination {
+                        onNavigate(destination)
+                        return
+                    }
+
+                    openExternalApp(for: app)
                 } label: {
                     VStack(spacing: 7) {
                         ZStack(alignment: .topTrailing) {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: app.colors,
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(height: 76)
-
-                            Image(systemName: app.icon)
-                                .font(.system(size: 30, weight: .medium))
-                                .foregroundStyle(.white)
+                            appIconTile(app)
 
                             if let badgeText = app.badgeText {
                                 badgeLabel(text: badgeText)
@@ -192,127 +292,23 @@ struct HomeScreen: View {
             }
     }
 
-    private var marketAndMusicWidgets: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("股市")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Color.black.opacity(0.88))
-
-                marketRow(symbol: "AAPL", change: "+2.41%", isUp: true)
-                marketRow(symbol: "TSLA", change: "-1.82%", isUp: false)
-                marketRow(symbol: "NVDA", change: "+5.12%", isUp: true)
-
-                Spacer(minLength: 0)
-
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.green.opacity(0.14))
-                    .frame(height: 56)
-                    .overlay(alignment: .leading) {
-                        Path { path in
-                            path.move(to: CGPoint(x: 8, y: 50))
-                            path.addLine(to: CGPoint(x: 44, y: 42))
-                            path.addLine(to: CGPoint(x: 84, y: 34))
-                            path.addLine(to: CGPoint(x: 126, y: 24))
-                            path.addLine(to: CGPoint(x: 164, y: 14))
-                        }
-                        .stroke(Color.green, lineWidth: 2.5)
-                    }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 190, maxHeight: 190, alignment: .topLeading)
-            .background(Color.white.opacity(0.72))
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white)
-                    .frame(width: 58, height: 58)
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 22))
-                            .foregroundStyle(Color.pink)
-                    }
-
-                Text("正在播放")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.pink.opacity(0.88))
-
-                Text("Shake It Off")
-                    .font(.system(size: 21, weight: .bold))
-                    .foregroundStyle(Color.black.opacity(0.88))
-                    .lineLimit(1)
-
-                Text("Taylor Swift")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.black.opacity(0.36))
-
-                HStack(spacing: 22) {
-                    Text("⏮")
-                    Text("▶")
-                    Text("⏭")
-                }
-                .font(.system(size: 20))
-                .foregroundStyle(Color.pink.opacity(0.88))
-
-                Rectangle()
-                    .fill(Color.black.opacity(0.10))
-                    .frame(height: 4)
-                    .overlay(alignment: .leading) {
-                        Rectangle()
-                            .fill(Color.pink.opacity(0.92))
-                            .frame(width: 84, height: 4)
-                    }
-                    .clipShape(Capsule())
-            }
-            .padding(12)
-            .frame(width: 150)
-            .frame(minHeight: 190, maxHeight: 190, alignment: .topLeading)
-            .background(Color.white.opacity(0.72))
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        }
-    }
-
-    private func marketRow(symbol: String, change: String, isUp: Bool) -> some View {
-        HStack {
-            Text(symbol)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color.black.opacity(0.85))
-
-            Spacer()
-
-            Text(change)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 8)
-                .frame(height: 24)
-                .background(isUp ? Color.green : Color.red)
-                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        }
-    }
-
     private var dock: some View {
-        HStack(spacing: 20) {
-            ForEach(dockApps) { app in
-                Button {
-                    guard let destination = app.destination else { return }
-                    onNavigate(destination)
-                } label: {
-                    VStack(spacing: 6) {
-                        ZStack(alignment: .topTrailing) {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: app.colors,
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 60, height: 60)
+        ZStack {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(Color.white.opacity(0.55))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.white.opacity(0.35), lineWidth: 0.8)
+                }
 
-                            Image(systemName: app.icon)
-                                .font(.system(size: 24, weight: .medium))
-                                .foregroundStyle(.white)
+            LazyVGrid(columns: fourColumnLayout, spacing: 14) {
+                ForEach(dockApps) { app in
+                    Button {
+                        guard let destination = app.destination else { return }
+                        onNavigate(destination)
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            appIconTile(app)
 
                             if let badgeText = app.badgeText {
                                 badgeLabel(text: badgeText)
@@ -322,30 +318,176 @@ struct HomeScreen: View {
                                     .offset(x: 8, y: -8)
                             }
                         }
-
-                        Text(app.name)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.black.opacity(0.62))
-                            .lineLimit(1)
+                        .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10)
+        }
+        .frame(height: 96)
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private func appIconTile(_ app: HomeQuickApp) -> some View {
+        RoundedRectangle(cornerRadius: iconCornerRadius, style: .continuous)
+            .fill(iconBackground(for: app))
+            .frame(width: iconTileSize, height: iconTileSize)
+            .overlay {
+                if let imageAsset = app.imageAsset, UIImage(named: imageAsset) != nil {
+                    Image(imageAsset)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: iconTileSize, height: iconTileSize)
+                        .clipShape(RoundedRectangle(cornerRadius: iconCornerRadius, style: .continuous))
+                } else if let placeholderText = app.placeholderText {
+                    Text(placeholderText)
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: iconCornerRadius, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 0.8)
+            }
+    }
+
+    private func iconBackground(for app: HomeQuickApp) -> some ShapeStyle {
+        LinearGradient(
+            colors: app.placeholderColors ?? [Color.black.opacity(0.86), Color.black.opacity(0.68)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private func toggleVoicePlayback() {
+        prepareVoiceIfNeeded()
+        guard let voicePlayer else { return }
+
+        withAnimation(.easeInOut(duration: 0.18)) {
+            if voicePlayer.isPlaying {
+                voicePlayer.pause()
+                isVoiceBubblePlaying = false
+            } else {
+                if !voicePlayer.play() {
+                    // Retry once with a fresh player/session in case session state changed.
+                    self.voicePlayer = nil
+                    prepareVoiceIfNeeded()
+                    if let retryPlayer = self.voicePlayer {
+                        isVoiceBubblePlaying = retryPlayer.play()
+                    } else {
+                        isVoiceBubblePlaying = false
+                    }
+                } else {
+                    isVoiceBubblePlaying = true
+                }
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.65))
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+
+    private func prepareVoiceIfNeeded() {
+        if let existing = voicePlayer {
+            voiceDurationLabel = formatDuration(existing.duration)
+            if !existing.isPlaying {
+                isVoiceBubblePlaying = false
+            }
+            return
+        }
+
+        configureAudioSessionIfNeeded()
+
+        guard let url = Bundle.main.url(forResource: "ending", withExtension: "wav") else {
+            voiceDurationLabel = "--:--"
+            return
+        }
+
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            let delegate = HomeVoicePlayerDelegate {
+                isVoiceBubblePlaying = false
+            }
+            player.delegate = delegate
+            player.prepareToPlay()
+            player.volume = 1
+            voicePlayer = player
+            voicePlayerDelegate = delegate
+            voiceDurationLabel = formatDuration(player.duration)
+        } catch {
+            voiceDurationLabel = "--:--"
+        }
+    }
+
+    private func configureAudioSessionIfNeeded() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true, options: [])
+        } catch {
+            return
+        }
+    }
+
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let total = max(0, Int(duration.rounded()))
+        let minutes = total / 60
+        let seconds = total % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    private func openExternalApp(for app: HomeQuickApp) {
+        guard let deepLinkURL = app.deepLinkURL else {
+            guard let fallbackWebURL = app.fallbackWebURL else { return }
+            openURL(fallbackWebURL)
+            return
+        }
+        openURL(deepLinkURL) { accepted in
+            guard !accepted, let fallbackWebURL = app.fallbackWebURL else { return }
+            openURL(fallbackWebURL)
+        }
+    }
+
+    private func homeDateString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.calendar = .current
+        formatter.setLocalizedDateFormatFromTemplate("EEEE MMMMd")
+        return formatter.string(from: date)
+    }
+
+    private func homeTimeString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.calendar = .current
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+}
+
+private final class HomeVoicePlayerDelegate: NSObject, AVAudioPlayerDelegate {
+    private let onFinish: () -> Void
+
+    init(onFinish: @escaping () -> Void) {
+        self.onFinish = onFinish
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        onFinish()
+    }
+
+    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        onFinish()
     }
 }
 
 private struct HomeQuickApp: Identifiable {
     let id = UUID()
     let name: String
-    let icon: String
-    let colors: [Color]
+    var imageAsset: String? = nil
+    var placeholderText: String? = nil
+    var placeholderColors: [Color]? = nil
     let destination: AppDestination?
+    var deepLinkURL: URL? = nil
+    var fallbackWebURL: URL? = nil
     var badgeCount: Int? = nil
     var badgeText: String? = nil
 }

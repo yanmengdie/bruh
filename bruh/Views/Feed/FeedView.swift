@@ -133,13 +133,7 @@ struct FeedView: View {
                 .padding(.bottom, 12)
 
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.orange.opacity(0.92), Color.pink.opacity(0.82)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(Color(red: 0.84, green: 0.81, blue: 0.73))
                 .frame(width: 72, height: 72)
                 .overlay {
                     if let avatar = currentProfileAvatarImage {
@@ -149,7 +143,7 @@ struct FeedView: View {
                             .frame(width: 72, height: 72)
                             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     } else {
-                        Text("📸")
+                        Text("😎")
                             .font(.system(size: 34))
                     }
                 }

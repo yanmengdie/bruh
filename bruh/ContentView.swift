@@ -44,31 +44,36 @@ struct ContentView: View {
             .navigationDestination(for: AppDestination.self) { destination in
                 switch destination {
                 case .contacts:
-                    ContactsView()
-                        .enableUnifiedSwipeBack()
+                    HomeRoutedScreen {
+                        ContactsView()
+                    }
                 case .imessage:
-                    MessagesScreen(
-                        threads: threads,
-                        contacts: contacts,
-                        service: messageService,
-                        backgroundColor: messagesScreenBackground
-                    )
-                    .enableUnifiedSwipeBack()
+                    HomeRoutedScreen {
+                        MessagesScreen(
+                            threads: threads,
+                            contacts: contacts,
+                            service: messageService,
+                            backgroundColor: messagesScreenBackground
+                        )
+                    }
                 case .feed:
-                    FeedView()
-                        .enableUnifiedSwipeBack()
-                        .onAppear {
-                            lastViewedFeedAtInterval = Date().timeIntervalSince1970
-                        }
+                    HomeRoutedScreen {
+                        FeedView()
+                            .onAppear {
+                                lastViewedFeedAtInterval = Date().timeIntervalSince1970
+                            }
+                    }
                 case .album:
-                    AlbumView()
-                        .enableUnifiedSwipeBack()
-                        .onAppear {
-                            lastViewedAlbumAtInterval = Date().timeIntervalSince1970
-                        }
+                    HomeRoutedScreen {
+                        AlbumView()
+                            .onAppear {
+                                lastViewedAlbumAtInterval = Date().timeIntervalSince1970
+                            }
+                    }
                 case .settings:
-                    SettingsScreen()
-                        .enableUnifiedSwipeBack()
+                    HomeRoutedScreen {
+                        SettingsScreen()
+                    }
                 }
             }
         }
@@ -235,6 +240,24 @@ struct ContentView: View {
         appearance.shadowColor = UIColor.black.withAlphaComponent(0.05)
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+}
+
+private struct HomeRoutedScreen<Content: View>: View {
+    @Environment(\.dismiss) private var dismiss
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .navigationBarBackButtonHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    AppBackButton {
+                        dismiss()
+                    }
+                }
+            }
+            .enableUnifiedSwipeBack()
     }
 }
 
