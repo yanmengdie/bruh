@@ -39,6 +39,8 @@
 		A100001E000000000000001E /* AddBruhView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001E000000000000001E /* AddBruhView.swift */; };
 		A10000200000000000000020 /* ContactTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000200000000000000020 /* ContactTagsView.swift */; };
 		A10000210000000000000021 /* ending.wav in Resources */ = {isa = PBXBuildFile; fileRef = B10000210000000000000021 /* ending.wav */; };
+		A10000220000000000000022 /* en.lproj/InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10000220000000000000022 /* en.lproj/InfoPlist.strings */; };
+		A10000230000000000000023 /* zh-Hans.lproj/InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10000230000000000000023 /* zh-Hans.lproj/InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -74,6 +76,8 @@
 		B100001E000000000000001E /* AddBruhView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBruhView.swift; sourceTree = "<group>"; };
 		B10000200000000000000020 /* ContactTagsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactTagsView.swift; sourceTree = "<group>"; };
 		B10000210000000000000021 /* ending.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ending.wav; sourceTree = SOURCE_ROOT; };
+		B10000220000000000000022 /* en.lproj/InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		B10000230000000000000023 /* zh-Hans.lproj/InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		C1000001000000000000001 /* bruh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bruh.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -109,6 +113,8 @@
 				B100000F00000000000000F /* LaunchScreen.storyboard */,
 				B100001D000000000000001D /* trump_joy.mp4 */,
 				B10000210000000000000021 /* ending.wav */,
+				B10000220000000000000022 /* en.lproj/InfoPlist.strings */,
+				B10000230000000000000023 /* zh-Hans.lproj/InfoPlist.strings */,
 			);
 			path = bruh;
 			sourceTree = "<group>";
@@ -265,6 +271,7 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
 			);
 			mainGroup = E1000001000000000000001;
 			productRefGroup = E100000A00000000000000A /* Products */;
@@ -285,6 +292,8 @@
 				A100000F00000000000000F /* LaunchScreen.storyboard in Resources */,
 				A100001D000000000000001D /* trump_joy.mp4 in Resources */,
 				A10000210000000000000021 /* ending.wav in Resources */,
+				A10000220000000000000022 /* en.lproj/InfoPlist.strings in Resources */,
+				A10000230000000000000023 /* zh-Hans.lproj/InfoPlist.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
