@@ -256,17 +256,17 @@ struct Onboarding: View {
     private func avatar(color: Color, assetName: String, fallbackEmoji: String) -> some View {
         Circle()
             .fill(color)
-            .frame(width: 72, height: 72)
+            .frame(width: 60, height: 60)
             .overlay {
                 if UIImage(named: assetName) != nil {
                     Image(assetName)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 72, height: 72)
+                        .frame(width: 60, height: 60)
                         .clipShape(Circle())
                 } else {
                     Text(fallbackEmoji)
-                        .font(.system(size: 40))
+                        .font(.system(size: 32))
                 }
             }
     }
@@ -287,35 +287,35 @@ struct Onboarding: View {
         return Button {
             toggleInterest(interest)
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Text(interest.emoji)
-                    .font(.system(size: 18))
+                    .font(.system(size: 16))
 
                 Text(interest.title)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .lineLimit(1)
 
                 if interest.isHot {
                     Text("热门")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Color(red: 0.86, green: 0.23, blue: 0.28))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
                         .background(Color(red: 0.96, green: 0.87, blue: 0.88))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .padding(.leading, 10)
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        .padding(.leading, 6)
                 }
             }
             .foregroundStyle(isSelected ? Color(red: 0.12, green: 0.13, blue: 0.15) : Color(red: 0.43, green: 0.43, blue: 0.45))
-            .padding(.horizontal, 20)
-            .frame(height: 57)
+            .padding(.horizontal, 16)
+            .frame(height: 49)
             .fixedSize(horizontal: true, vertical: false)
             .background(Color.white.opacity(isSelected ? 0.72 : 0.45))
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .stroke(Color(red: 0.13, green: 0.14, blue: 0.16), lineWidth: 2.5)
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(Color(red: 0.13, green: 0.14, blue: 0.16), lineWidth: 2.0)
                 }
             }
         }
