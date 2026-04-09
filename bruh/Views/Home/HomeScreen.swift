@@ -132,7 +132,7 @@ struct HomeScreen: View {
 
             VStack(spacing: 10) {
                 messageSnippet(name: "罗浩安", text: "不是鸽们，你不应该在台上Demo吗？", time: "2分", avatarAsset: "Avatar_LuoHaoan", avatarBackground: Color(red: 0.84, green: 0.76, blue: 0.64))
-                messageSnippet(name: "Elon Musk", text: "火星计划更新：节奏比预期还快。", time: "15分")
+                messageSnippet(name: "Hera", text: "欢迎关注小红书@欢崽（Ai版）", time: "15分", avatarAsset: "Avatar_Hera", avatarBackground: Color(red: 0.97, green: 0.82, blue: 0.87))
             }
         }
         .padding(.horizontal, 14)

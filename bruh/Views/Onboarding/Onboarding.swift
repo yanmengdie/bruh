@@ -246,8 +246,8 @@ struct Onboarding: View {
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)
-            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .opacity(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.55 : 1)
+            .disabled(!canContinue)
+            .opacity(canContinue ? 1 : 0.55)
 
             Text("继续即表示你同意 bruh 的服务条款")
                 .font(.system(size: 10, weight: .regular))
@@ -256,6 +256,10 @@ struct Onboarding: View {
                 .lineLimit(2)
                 .padding(.horizontal, 10)
         }
+    }
+
+    private var canContinue: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !selectedInterests.isEmpty
     }
 
     private func avatar(color: Color, assetName: String, fallbackEmoji: String) -> some View {
