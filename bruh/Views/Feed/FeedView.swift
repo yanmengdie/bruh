@@ -188,3 +188,20 @@ private struct FeedEntry: Identifiable {
 
     var id: String { delivery.id }
 }
+
+#Preview {
+    NavigationStack {
+        FeedView()
+    }
+    .modelContainer(
+        for: [
+            ContentDelivery.self,
+            ContentEvent.self,
+            SourceItem.self,
+            Contact.self,
+            FeedLike.self,
+            FeedComment.self,
+        ],
+        inMemory: true
+    )
+}
