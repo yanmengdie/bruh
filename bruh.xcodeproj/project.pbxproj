@@ -38,6 +38,7 @@
 		A100001D000000000000001D /* trump_joy.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = B100001D000000000000001D /* trump_joy.mp4 */; };
 		A100001E000000000000001E /* AddBruhView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001E000000000000001E /* AddBruhView.swift */; };
 		A10000200000000000000020 /* ContactTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000200000000000000020 /* ContactTagsView.swift */; };
+		A10000210000000000000021 /* ending.wav in Resources */ = {isa = PBXBuildFile; fileRef = B10000210000000000000021 /* ending.wav */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -72,6 +73,7 @@
 		B100001D000000000000001D /* trump_joy.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = trump_joy.mp4; sourceTree = SOURCE_ROOT; };
 		B100001E000000000000001E /* AddBruhView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBruhView.swift; sourceTree = "<group>"; };
 		B10000200000000000000020 /* ContactTagsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactTagsView.swift; sourceTree = "<group>"; };
+		B10000210000000000000021 /* ending.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ending.wav; sourceTree = SOURCE_ROOT; };
 		C1000001000000000000001 /* bruh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bruh.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -106,6 +108,7 @@
 				B100000C00000000000000C /* Assets.xcassets */,
 				B100000F00000000000000F /* LaunchScreen.storyboard */,
 				B100001D000000000000001D /* trump_joy.mp4 */,
+				B10000210000000000000021 /* ending.wav */,
 			);
 			path = bruh;
 			sourceTree = "<group>";
@@ -281,6 +284,7 @@
 				A100000C00000000000000C /* Assets.xcassets in Resources */,
 				A100000F00000000000000F /* LaunchScreen.storyboard in Resources */,
 				A100001D000000000000001D /* trump_joy.mp4 in Resources */,
+				A10000210000000000000021 /* ending.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

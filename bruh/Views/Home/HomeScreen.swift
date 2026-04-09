@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import AVFoundation
 
 enum AppDestination: Hashable {
     case feed
@@ -16,6 +17,9 @@ struct HomeScreen: View {
     let momentsUnreadCount: Int
     let hasNewAlbumBadge: Bool
     @State private var isVoiceBubblePlaying = false
+    @State private var voicePlayer: AVAudioPlayer?
+    @State private var voiceDurationLabel = "--:--"
+    @State private var voicePlayerDelegate: HomeVoicePlayerDelegate?
 
     private var quickApps: [HomeQuickApp] {
         [
@@ -86,6 +90,13 @@ struct HomeScreen: View {
         .padding(.bottom, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(homeBackgroundColor.ignoresSafeArea())
+        .onAppear {
+            prepareVoiceIfNeeded()
+        }
+        .onDisappear {
+            voicePlayer?.stop()
+            isVoiceBubblePlaying = false
+        }
     }
 
     private var dateTimePanel: some View {
@@ -181,10 +192,7 @@ struct HomeScreen: View {
 
     private var voiceBubbleWidget: some View {
         Button {
-            // Audio placeholder: toggle visual state only.
-            withAnimation(.easeInOut(duration: 0.18)) {
-                isVoiceBubblePlaying.toggle()
-            }
+            toggleVoicePlayback()
         } label: {
             HStack(spacing: 10) {
                 ZStack {
@@ -218,7 +226,7 @@ struct HomeScreen: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.black.opacity(0.56))
 
-                Text("--:--")
+                Text(voiceDurationLabel)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.black.opacity(0.38))
             }
@@ -352,6 +360,80 @@ struct HomeScreen: View {
         )
     }
 
+    private func toggleVoicePlayback() {
+        prepareVoiceIfNeeded()
+        guard let voicePlayer else { return }
+
+        withAnimation(.easeInOut(duration: 0.18)) {
+            if voicePlayer.isPlaying {
+                voicePlayer.pause()
+                isVoiceBubblePlaying = false
+            } else {
+                if !voicePlayer.play() {
+                    // Retry once with a fresh player/session in case session state changed.
+                    self.voicePlayer = nil
+                    prepareVoiceIfNeeded()
+                    if let retryPlayer = self.voicePlayer {
+                        isVoiceBubblePlaying = retryPlayer.play()
+                    } else {
+                        isVoiceBubblePlaying = false
+                    }
+                } else {
+                    isVoiceBubblePlaying = true
+                }
+            }
+        }
+    }
+
+    private func prepareVoiceIfNeeded() {
+        if let existing = voicePlayer {
+            voiceDurationLabel = formatDuration(existing.duration)
+            if !existing.isPlaying {
+                isVoiceBubblePlaying = false
+            }
+            return
+        }
+
+        configureAudioSessionIfNeeded()
+
+        guard let url = Bundle.main.url(forResource: "ending", withExtension: "wav") else {
+            voiceDurationLabel = "--:--"
+            return
+        }
+
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            let delegate = HomeVoicePlayerDelegate {
+                isVoiceBubblePlaying = false
+            }
+            player.delegate = delegate
+            player.prepareToPlay()
+            player.volume = 1
+            voicePlayer = player
+            voicePlayerDelegate = delegate
+            voiceDurationLabel = formatDuration(player.duration)
+        } catch {
+            voiceDurationLabel = "--:--"
+        }
+    }
+
+    private func configureAudioSessionIfNeeded() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true, options: [])
+        } catch {
+            return
+        }
+    }
+
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let total = max(0, Int(duration.rounded()))
+        let minutes = total / 60
+        let seconds = total % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+
     private func openExternalApp(for app: HomeQuickApp) {
         guard let deepLinkURL = app.deepLinkURL else {
             guard let fallbackWebURL = app.fallbackWebURL else { return }
@@ -378,6 +460,22 @@ struct HomeScreen: View {
         formatter.calendar = .current
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
+    }
+}
+
+private final class HomeVoicePlayerDelegate: NSObject, AVAudioPlayerDelegate {
+    private let onFinish: () -> Void
+
+    init(onFinish: @escaping () -> Void) {
+        self.onFinish = onFinish
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        onFinish()
+    }
+
+    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        onFinish()
     }
 }
 
