@@ -8,7 +8,7 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @AppStorage("useHomeScreenMode") private var useHomeScreenMode = false
+    @AppStorage("useHomeScreenMode") private var useHomeScreenMode = true
     @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
     @AppStorage("lastViewedAlbumAt") private var lastViewedAlbumAtInterval: Double = 0
 
@@ -45,6 +45,7 @@ struct ContentView: View {
                 switch destination {
                 case .contacts:
                     ContactsView()
+                        .enableUnifiedSwipeBack()
                 case .imessage:
                     MessagesScreen(
                         threads: threads,
@@ -52,18 +53,22 @@ struct ContentView: View {
                         service: messageService,
                         backgroundColor: messagesScreenBackground
                     )
+                    .enableUnifiedSwipeBack()
                 case .feed:
                     FeedView()
+                        .enableUnifiedSwipeBack()
                         .onAppear {
                             lastViewedFeedAtInterval = Date().timeIntervalSince1970
                         }
                 case .album:
                     AlbumView()
+                        .enableUnifiedSwipeBack()
                         .onAppear {
                             lastViewedAlbumAtInterval = Date().timeIntervalSince1970
                         }
                 case .settings:
                     SettingsScreen()
+                        .enableUnifiedSwipeBack()
                 }
             }
         }
@@ -133,7 +138,10 @@ struct ContentView: View {
         .task {
             await bootstrapApp()
         }
-        .onAppear(perform: configureTabBarAppearance)
+        .onAppear {
+            configureTabBarAppearance()
+            configureNavigationAppearance()
+        }
     }
 
     private var totalUnreadMessages: Int {
@@ -216,6 +224,8 @@ struct ContentView: View {
     private func configureNavigationAppearance() {
         let backColor = UIColor(red: 0.52, green: 0.54, blue: 0.57, alpha: 1.0)
         UINavigationBar.appearance().tintColor = backColor
+        UIBarButtonItem.appearance().setTitleTextAttributes([.foregroundColor: backColor], for: .normal)
+        UIBarButtonItem.appearance().setTitleTextAttributes([.foregroundColor: backColor], for: .highlighted)
     }
 
     private func configureTabBarAppearance() {
@@ -614,6 +624,7 @@ private struct ContactsView: View {
                 guard contact.isPendingInvitation,
                       let personaId = contact.linkedPersonaId else { return false }
                 return invitePersonaAllowlist.contains(personaId)
+                    && personaMatchesSelectedInterests(personaId: personaId)
             }
             .sorted { inviteSortKey(for: $0) < inviteSortKey(for: $1) }
             .compactMap { contact in
@@ -1130,10 +1141,22 @@ private struct ContactsView: View {
     }
 
     private func normalizeInviteFrontier() {
+        for contact in contacts {
+            guard let personaId = contact.linkedPersonaId,
+                  invitePersonaAllowlist.contains(personaId) else { continue }
+
+            if !personaMatchesSelectedInterests(personaId: personaId),
+               contact.relationshipStatusValue == .pending {
+                contact.relationshipStatusValue = .locked
+                contact.updatedAt = .now
+            }
+        }
+
         let personaContacts = contacts
             .filter { contact in
                 guard let personaId = contact.linkedPersonaId else { return false }
                 return invitePersonaAllowlist.contains(personaId)
+                    && personaMatchesSelectedInterests(personaId: personaId)
             }
             .sorted { inviteSortKey(for: $0) < inviteSortKey(for: $1) }
 
@@ -1174,6 +1197,7 @@ private struct ContactsView: View {
             .filter { contact in
                 guard let linkedPersonaId = contact.linkedPersonaId else { return false }
                 return invitePersonaAllowlist.contains(linkedPersonaId)
+                    && personaMatchesSelectedInterests(personaId: linkedPersonaId)
                     && contact.relationshipStatusValue == .locked
             }
             .filter { $0.linkedPersonaId != personaId }
@@ -1192,6 +1216,16 @@ private struct ContactsView: View {
         return NewsInterest.defaultSelection
             .map(\.rawValue)
             .filter { supported.contains($0) }
+    }
+
+    private var inviteInterestSet: Set<String> {
+        Set(inviteInterestOrder)
+    }
+
+    private func personaMatchesSelectedInterests(personaId: String) -> Bool {
+        guard !inviteInterestSet.isEmpty else { return true }
+        guard let persona = personas.first(where: { $0.id == personaId }) else { return false }
+        return !Set(persona.domains).isDisjoint(with: inviteInterestSet)
     }
 
     private var invitePriorityByPersonaId: [String: Int] {

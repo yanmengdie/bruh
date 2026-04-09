@@ -96,7 +96,7 @@ struct HomeScreen: View {
             }
 
             VStack(spacing: 10) {
-                messageSnippet(name: "Donald Trump", text: "FAKE NEWS bro！我们的经济要起飞了。", time: "2分")
+                messageSnippet(name: "Donald Trump", text: "FAKE NEWS 鸽们！我们的经济要起飞了。", time: "2分")
                 messageSnippet(name: "Elon Musk", text: "火星计划更新：节奏比预期还快。", time: "15分")
             }
         }

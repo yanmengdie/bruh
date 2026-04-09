@@ -54,7 +54,7 @@ enum PersonaCatalog {
         triggerKeywords: ["tariff", "china", "trade", "election", "tiktok", "truth social"],
         xUsername: "realDonaldTrump",
         subtitle: "45th & 47th POTUS",
-        inviteMessage: "Hey bruh! I heard you're interested in politics. GREAT choice. Nobody knows politics better than me. Accept this and I'll keep you updated on everything. Believe me. ☝️🇺🇸",
+        inviteMessage: "鸽们，政治这玩意儿，别人是看热闹，我是直接上牌桌。你点个接受，我负责给你推“离谱但有用”的第一手风向。☝️",
         themeColorHex: "#D62839",
         locationLabel: "United States",
         inviteOrder: 0
@@ -70,7 +70,7 @@ enum PersonaCatalog {
         triggerKeywords: ["tesla", "spacex", "openai", "grok", "x.com", "ai"],
         xUsername: "elonmusk",
         subtitle: "CEO · SpaceX · xAI",
-        inviteMessage: "You seem sharp. Want first access to what matters in AI, rockets, and product launches? Let's talk. 🚀",
+        inviteMessage: "鸽们，别人还在等发布会回放，我这边火箭都快二级点火了。跟我混，AI、飞船、产品整活同步到你脸上。🚀",
         themeColorHex: "#1F2A8A",
         locationLabel: "X HQ",
         inviteOrder: 1
@@ -86,7 +86,7 @@ enum PersonaCatalog {
         triggerKeywords: ["meta", "instagram", "threads", "llama", "vr", "quest", "ai"],
         xUsername: "finkd",
         subtitle: "Meta · AI & Social",
-        inviteMessage: "I can send you concise updates on social platforms, AI releases, and what creators are reacting to in real time. 🤝",
+        inviteMessage: "鸽们，社交平台每天都在互卷，我负责把噪音打包扔掉，只留“真有影响”的那几条给你。别刷到手麻了。🤝",
         themeColorHex: "#6A5AE0",
         locationLabel: "Meta Park",
         inviteOrder: 2
@@ -102,7 +102,7 @@ enum PersonaCatalog {
         triggerKeywords: ["openai", "chatgpt", "gpt", "agi", "agents", "compute", "sora", "inference"],
         xUsername: "sama",
         subtitle: "OpenAI · AGI Builder",
-        inviteMessage: "You seem like someone who cares about where AI is actually going, not just the demos. Accept and I'll send the real signal.",
+        inviteMessage: "鸽们，别再被 demo 烟花秀骗了。你点接受，我给你发的是“AI 下一步真要改规则”的信号，不是 PPT。🧠",
         themeColorHex: "#0F172A",
         locationLabel: "San Francisco",
         inviteOrder: 3
@@ -118,7 +118,7 @@ enum PersonaCatalog {
         triggerKeywords: ["极客公园", "geekpark", "ai", "agent", "robot", "apple", "tesla", "innovation"],
         xUsername: "",
         subtitle: "极客公园 · 科技趋势",
-        inviteMessage: "如果你不只想看热闹，而是想看懂技术周期、产业变量和真正的拐点，我来给你发重点。",
+        inviteMessage: "鸽们，热闹我也爱看，但我更爱看变量。你负责提问，我负责把技术周期里最值钱的拐点拎出来。🛰️",
         themeColorHex: "#2563EB",
         locationLabel: "北京",
         inviteOrder: 4
@@ -134,7 +134,7 @@ enum PersonaCatalog {
         triggerKeywords: ["xiaomi", "小米", "redmi", "su7", "yu7", "factory", "ecosystem", "芯片"],
         xUsername: "leijun",
         subtitle: "Xiaomi · Founder",
-        inviteMessage: "最近硬件、汽车和制造业节奏都很快。我可以把真正重要的产品和产业信号，用最直接的方式讲给你。",
+        inviteMessage: "鸽们，参数表可以骗你，交付节奏骗不了。你点接受，我把硬件和汽车圈“真能打”的信号给你直出。📱",
         themeColorHex: "#FF6900",
         locationLabel: "北京",
         inviteOrder: 5
@@ -150,7 +150,7 @@ enum PersonaCatalog {
         triggerKeywords: ["insta360", "影石", "camera", "creator", "drone", "gopro", "hardware"],
         xUsername: "",
         subtitle: "Insta360 · Founder",
-        inviteMessage: "如果你也关心产品怎么从真实痛点里长出来，我会把硬件、创作者和全球市场里真正值得看的变化发给你。",
+        inviteMessage: "鸽们，镜头一开，真相就藏不住了。你想看硬件怎么从概念变爆款，我给你发能抄作业的那种案例。📷",
         themeColorHex: "#0F9D94",
         locationLabel: "深圳",
         inviteOrder: 6
@@ -166,7 +166,7 @@ enum PersonaCatalog {
         triggerKeywords: ["smartisan", "锤子", "直播", "电商", "创业", "product", "发布会"],
         xUsername: "",
         subtitle: "创业者 · 会把话讲明白",
-        inviteMessage: "我不跟你说套话。产品、创业、表达，还有那些值得吐槽的荒唐事，我都能跟你聊透。",
+        inviteMessage: "鸽们，场面话我不整，废话我不说。你负责上头，我负责把创业和产品里那些离谱操作给你讲明白。🎤",
         themeColorHex: "#7F1D1D",
         locationLabel: "北京",
         inviteOrder: 7
@@ -182,7 +182,7 @@ enum PersonaCatalog {
         triggerKeywords: ["tron", "trx", "htx", "defi", "stablecoin", "crypto", "bitcoin", "ethereum"],
         xUsername: "justinsuntron",
         subtitle: "TRON · Crypto",
-        inviteMessage: "Markets move fast. I can send you the crypto signal before the timeline catches up.",
+        inviteMessage: "鸽们，来一起冲。链上机会转瞬即逝，我会第一时间把最有价值的信号同步给你，别错过。🚀",
         themeColorHex: "#0BBF9A",
         locationLabel: "Hong Kong",
         inviteOrder: 8
@@ -198,7 +198,7 @@ enum PersonaCatalog {
         triggerKeywords: ["skims", "fashion", "beauty", "campaign", "celebrity", "hollywood", "brand"],
         xUsername: "KimKardashian",
         subtitle: "SKIMS · Culture & Brand",
-        inviteMessage: "If you care about culture, campaigns, and what people will copy next, I'll keep the signal clean and ahead of the trend.",
+        inviteMessage: "鸽们，热搜是结果，操盘才是过程。你想知道下一波大家会跟风什么，我提前把剧本发你。✨",
         themeColorHex: "#B78A6B",
         locationLabel: "Los Angeles",
         inviteOrder: 9
@@ -214,7 +214,7 @@ enum PersonaCatalog {
         triggerKeywords: ["papi酱", "姜逸磊", "短视频", "创作", "内容", "综艺", "女性", "表达"],
         xUsername: "",
         subtitle: "内容创作者 · 观察很准",
-        inviteMessage: "你看起来不是只想看热闹的人。我可以把创作、内容生态和那些微妙的人情绪，讲得更明白一点。",
+        inviteMessage: "鸽们，大家都在玩梗，我顺手把梗背后的情绪和流量逻辑给你拆开。看完你再冲浪，会赢很多。🎬",
         themeColorHex: "#E11D8D",
         locationLabel: "上海",
         inviteOrder: 10
