@@ -7,7 +7,7 @@ struct AddBruhView: View {
     @State private var pendingNames: Set<String> = []
 
     @State private var selectedTag = "全部"
-    private let featuredNames = ["马云", "Tim Cook", "影视飓风 Tim", "吴京", "Barack Obama"]
+    private let featuredNames = ["马云", "Tim Cook", "吴京", "Kanye West", "Warren Buffett"]
 
     private let candidates: [AddBruhCandidate] = [
         // US (10)
