@@ -10,6 +10,7 @@ enum AppDestination: Hashable {
 }
 
 struct HomeScreen: View {
+    @Environment(\.openURL) private var openURL
     let onNavigate: (AppDestination) -> Void
     let messageUnreadCount: Int
     let momentsUnreadCount: Int
@@ -22,7 +23,13 @@ struct HomeScreen: View {
             .init(name: "消息", imageAsset: "Icon_message", destination: .imessage, badgeCount: messageUnreadCount),
             .init(name: "日常", imageAsset: "Icon_moments", destination: .feed, badgeCount: momentsUnreadCount),
             .init(name: "相册", imageAsset: "Icon_album", destination: .album, badgeText: hasNewAlbumBadge ? "新" : nil),
-            .init(name: "小红书", imageAsset: "Icon_xhs", destination: nil),
+        .init(
+            name: "小红书",
+            imageAsset: "Icon_xhs",
+            destination: nil,
+            deepLinkURL: URL(string: "xhsdiscover://home"),
+            fallbackWebURL: URL(string: "https://www.xiaohongshu.com")
+        ),
             .init(name: "影石", imageAsset: "Icon_insta", destination: nil),
             .init(name: "鸿蒙", imageAsset: "Icon_harmony", destination: nil),
             .init(name: "极客公园", imageAsset: "Icon_geek", destination: nil),
@@ -217,8 +224,12 @@ struct HomeScreen: View {
         LazyVGrid(columns: fourColumnLayout, spacing: 14) {
             ForEach(quickApps) { app in
                 Button {
-                    guard let destination = app.destination else { return }
-                    onNavigate(destination)
+                    if let destination = app.destination {
+                        onNavigate(destination)
+                        return
+                    }
+
+                    openExternalApp(for: app)
                 } label: {
                     VStack(spacing: 7) {
                         ZStack(alignment: .topTrailing) {
@@ -325,6 +336,14 @@ struct HomeScreen: View {
         )
     }
 
+    private func openExternalApp(for app: HomeQuickApp) {
+        guard let deepLinkURL = app.deepLinkURL else { return }
+        openURL(deepLinkURL) { accepted in
+            guard !accepted, let fallbackWebURL = app.fallbackWebURL else { return }
+            openURL(fallbackWebURL)
+        }
+    }
+
     private func homeDateString(from date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = .current
@@ -349,6 +368,8 @@ private struct HomeQuickApp: Identifiable {
     var placeholderText: String? = nil
     var placeholderColors: [Color]? = nil
     let destination: AppDestination?
+    var deepLinkURL: URL? = nil
+    var fallbackWebURL: URL? = nil
     var badgeCount: Int? = nil
     var badgeText: String? = nil
 }
