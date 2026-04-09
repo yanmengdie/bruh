@@ -42,19 +42,9 @@ const stopWords = new Set([
   "with", "after", "amid", "over", "under", "up", "down",
 ])
 
-const entityKeywords: Record<string, string[]> = {
-  musk: ["elon", "musk", "tesla", "spacex", "xai", "openai", "grok", "x.com", "starlink", "neuralink"],
-  trump: ["trump", "white house", "republican", "election", "tariff", "china", "trade", "washington"],
-  zuckerberg: ["meta", "zuckerberg", "instagram", "facebook", "threads", "llama", "quest"],
-  sam_altman: ["sam altman", "altman", "openai", "chatgpt", "gpt", "sora", "agi"],
-  zhang_peng: ["张鹏", "geekpark", "极客公园"],
-  lei_jun: ["雷军", "lei jun", "xiaomi", "redmi", "su7", "yu7", "xiaomi auto"],
-  liu_jingkang: ["刘靖康", "jk liu", "insta360", "影石"],
-  luo_yonghao: ["罗永浩", "luo yonghao", "smartisan", "锤子"],
-  justin_sun: ["justin sun", "孙宇晨", "tron", "trx", "htx", "stablecoin"],
-  kim_kardashian: ["kim kardashian", "kimkardashian", "skims", "hollywood"],
-  papi: ["papi酱", "papijiang", "姜逸磊"],
-}
+const entityKeywords: Record<string, string[]> = Object.fromEntries(
+  Object.values(personaMap).map((persona) => [persona.personaId, persona.entityKeywords]),
+)
 
 export const defaultNewsFeeds: FeedDefinition[] = [
   {
@@ -263,8 +253,6 @@ export function defaultStarterMessage(personaId: string, title: string) {
       return `${title} and people still focus on the surface instead of the underlying system.`
     case "trump":
       return `${title} is what weak leadership looks like when a problem gets completely out of hand.`
-    case "zuckerberg":
-      return `${title} is really an incentives and distribution story once you look past the headline.`
     case "sam_altman":
       return `${title} matters because it changes what AI products are actually possible in the next cycle.`
     case "zhang_peng":
@@ -281,6 +269,10 @@ export function defaultStarterMessage(personaId: string, title: string) {
       return `${title} is not just a headline. It is a culture-and-brand signal if you read it correctly.`
     case "papi":
       return `${title} 这种事我第一反应不是热度，而是大家到底在情绪上共鸣了什么。`
+    case "kobe_bryant":
+      return `${title} is about standards. Pressure only exposes whether the work was really there.`
+    case "cristiano_ronaldo":
+      return `${title} is the kind of moment where mentality, discipline, and pressure decide everything.`
     default:
       return title
   }

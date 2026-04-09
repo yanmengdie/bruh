@@ -266,7 +266,7 @@ enum ContentGraphStore {
             audioUrl: message.audioUrl,
             audioOnly: message.audioOnly
         )
-        let articleURL = firstURL(in: message.text)
+        let articleURL = firstURL(in: message.text) ?? normalizedValue(message.sourceUrl)
 
         let event = fetchContentEvent(id: eventId, in: context) ?? {
             let item = ContentEvent(

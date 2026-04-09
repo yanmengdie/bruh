@@ -31,6 +31,64 @@ func seedPersonas(into context: ModelContext) {
 }
 
 @MainActor
+func purgeRetiredPersonaData(into context: ModelContext) {
+    let validPersonaIds = Set(Persona.all.map(\.id))
+
+    let personas: [Persona] = (try? context.fetch(FetchDescriptor<Persona>())) ?? []
+    for persona in personas where !validPersonaIds.contains(persona.id) {
+        context.delete(persona)
+    }
+
+    let contacts: [Contact] = (try? context.fetch(FetchDescriptor<Contact>())) ?? []
+    for contact in contacts {
+        guard let personaId = contact.linkedPersonaId else { continue }
+        if !validPersonaIds.contains(personaId) {
+            context.delete(contact)
+        }
+    }
+
+    let threads: [MessageThread] = (try? context.fetch(FetchDescriptor<MessageThread>())) ?? []
+    for thread in threads where !validPersonaIds.contains(thread.personaId) {
+        context.delete(thread)
+    }
+
+    let messages: [PersonaMessage] = (try? context.fetch(FetchDescriptor<PersonaMessage>())) ?? []
+    for message in messages where !validPersonaIds.contains(message.personaId) {
+        context.delete(message)
+    }
+
+    let posts: [PersonaPost] = (try? context.fetch(FetchDescriptor<PersonaPost>())) ?? []
+    for post in posts where !validPersonaIds.contains(post.personaId) {
+        context.delete(post)
+    }
+
+    let deliveries: [ContentDelivery] = (try? context.fetch(FetchDescriptor<ContentDelivery>())) ?? []
+    for delivery in deliveries {
+        guard let personaId = delivery.personaId else { continue }
+        if !validPersonaIds.contains(personaId) {
+            context.delete(delivery)
+        }
+    }
+
+    let events: [ContentEvent] = (try? context.fetch(FetchDescriptor<ContentEvent>())) ?? []
+    for event in events {
+        guard let personaId = event.primaryPersonaId else { continue }
+        if !validPersonaIds.contains(personaId) {
+            context.delete(event)
+        }
+    }
+
+    let sourceItems: [SourceItem] = (try? context.fetch(FetchDescriptor<SourceItem>())) ?? []
+    for item in sourceItems where !item.sourceName.isEmpty && !validPersonaIds.contains(item.sourceName) && item.id.hasPrefix("source:") {
+        context.delete(item)
+    }
+
+    if context.hasChanges {
+        try? context.save()
+    }
+}
+
+@MainActor
 func seedCurrentUserProfile(into context: ModelContext) {
     _ = CurrentUserProfileStore.fetchOrCreate(in: context)
 }
@@ -57,8 +115,12 @@ func seedSystemContacts(into context: ModelContext) {
 
     let engagedPersonaIds = fetchEngagedPersonaIds(from: context)
     let legacyInviteState = legacyInviteStateByPersonaId()
+    let selectedInterestIds = CurrentUserProfileStore.selectedInterests(in: context)
+    let inviteOrderMap = PersonaCatalog.inviteOrderMap(for: selectedInterestIds)
+    let firstPendingPersonaId = inviteOrderMap.sorted(by: { $0.value < $1.value }).first?.key
 
-    for persona in personas.sorted(by: { $0.inviteOrder < $1.inviteOrder }) {
+    for persona in personas.sorted(by: { (inviteOrderMap[$0.id] ?? $0.inviteOrder) < (inviteOrderMap[$1.id] ?? $1.inviteOrder) }) {
+        let effectiveInviteOrder = inviteOrderMap[persona.id] ?? persona.inviteOrder
         if let contact = existingByPersonaId[persona.id] {
             let previousStatus = contact.relationshipStatusValue
             contact.name = persona.displayName
@@ -67,7 +129,7 @@ func seedSystemContacts(into context: ModelContext) {
             contact.avatarName = persona.avatarName
             contact.themeColorHex = persona.themeColorHex
             contact.locationLabel = persona.locationLabel
-            contact.inviteOrder = persona.inviteOrder
+            contact.inviteOrder = effectiveInviteOrder
 
             if previousStatus == .custom || previousStatus == .accepted {
                 contact.relationshipStatusValue = ContactRelationshipStatus.accepted
@@ -78,7 +140,8 @@ func seedSystemContacts(into context: ModelContext) {
                 let migratedStatus = resolvedInviteStatus(
                     for: persona.id,
                     legacyInviteState: legacyInviteState,
-                    engagedPersonaIds: engagedPersonaIds
+                    engagedPersonaIds: engagedPersonaIds,
+                    firstPendingPersonaId: firstPendingPersonaId
                 )
                 contact.relationshipStatusValue = migratedStatus
                 if migratedStatus == .accepted {
@@ -96,7 +159,8 @@ func seedSystemContacts(into context: ModelContext) {
         let status = resolvedInviteStatus(
             for: persona.id,
             legacyInviteState: legacyInviteState,
-            engagedPersonaIds: engagedPersonaIds
+            engagedPersonaIds: engagedPersonaIds,
+            firstPendingPersonaId: firstPendingPersonaId
         )
         context.insert(
             Contact(
@@ -109,7 +173,7 @@ func seedSystemContacts(into context: ModelContext) {
                 locationLabel: persona.locationLabel,
                 isFavorite: status == .accepted,
                 relationshipStatus: status.rawValue,
-                inviteOrder: persona.inviteOrder,
+                inviteOrder: effectiveInviteOrder,
                 acceptedAt: status == .accepted ? .now : nil,
                 ignoredAt: status == .ignored ? .now : nil,
                 affinityScore: status == .accepted ? 0.72 : 0.5
@@ -160,22 +224,6 @@ func seedPosts(into context: ModelContext) {
          "X平台的算法推荐已经全面转向开源。没有什么需要隐藏的。如果你想知道代码怎么运作，直接去看。透明度才是王道。",
          "x", "https://x.com/elonmusk/status/example3", "社交", 0.80, 14),
 
-        // Zuckerberg posts
-        ("zuckerberg",
-         "Llama 4 的开源版本即将发布。我们相信开放AI才能让每个人受益。Meta将继续引领开源AI革命。",
-         "news", "https://techcrunch.com/example-llama4", "AI", 0.90, 3),
-        ("zuckerberg",
-         "Quest 4 的销量超出了我们的预期。VR社交正在成为现实。想象一下，未来你可以在元宇宙里和朋友面对面聊天。",
-         "x", "https://x.com/finkd/status/example1", "VR", 0.82, 6),
-        ("zuckerberg",
-         "Threads月活突破2亿。我们证明了社交媒体可以更健康、更开放。感谢每一位用户的支持！",
-         "x", "https://x.com/finkd/status/example2", "社交", 0.87, 10),
-        ("zuckerberg",
-         "Meta AI助手现在已经集成到所有产品中。从Instagram到WhatsApp，AI将无处不在。这是下一个平台转变。",
-         "news", "https://theverge.com/example-meta-ai", "AI", 0.91, 15),
-        ("zuckerberg",
-         "刚刚和团队完成了新一季的产品路线图。AR眼镜的原型机已经可以连续佩戴4小时了。下一代计算平台即将到来。",
-         "x", "https://x.com/finkd/status/example3", "AR", 0.78, 18),
     ]
 
     for mock in mockPosts {
@@ -207,7 +255,6 @@ private func defaultPhoneNumber(for personaId: String) -> String {
     let directory: [String: String] = [
         "musk": "+1 310 555 0142",
         "trump": "+1 561 555 0145",
-        "zuckerberg": "+1 650 555 0108",
         "sam_altman": "+1 415 555 0112",
         "zhang_peng": "+86 10 5555 0188",
         "lei_jun": "+86 10 5555 0168",
@@ -216,6 +263,8 @@ private func defaultPhoneNumber(for personaId: String) -> String {
         "justin_sun": "+852 5550 0133",
         "kim_kardashian": "+1 323 555 0199",
         "papi": "+86 21 5555 0126",
+        "kobe_bryant": "+1 213 555 0824",
+        "cristiano_ronaldo": "+351 21 555 0107",
     ]
 
     return directory[personaId] ?? "+1 555 0100"
@@ -225,7 +274,6 @@ private func defaultEmail(for personaId: String) -> String {
     let directory: [String: String] = [
         "musk": "elon@x.ai",
         "trump": "donald@truthsocial.com",
-        "zuckerberg": "mark@meta.com",
         "sam_altman": "sam@openai.com",
         "zhang_peng": "peng@geekpark.net",
         "lei_jun": "jun@xiaomi.com",
@@ -234,6 +282,8 @@ private func defaultEmail(for personaId: String) -> String {
         "justin_sun": "justin@tron.network",
         "kim_kardashian": "kim@skims.com",
         "papi": "papi@papitube.com",
+        "kobe_bryant": "kobe@mamba.local",
+        "cristiano_ronaldo": "cr7@cr7.com",
     ]
 
     return directory[personaId] ?? "bruh@contact.local"
@@ -245,21 +295,18 @@ private func legacyInviteStateByPersonaId(userDefaults: UserDefaults = .standard
     let muskAccepted = userDefaults.bool(forKey: "invite_musk_accepted")
     let muskIgnored = userDefaults.bool(forKey: "invite_musk_ignored")
     let muskUnlocked = userDefaults.bool(forKey: "invite_musk_unlocked")
-    let zuckerbergAccepted = userDefaults.bool(forKey: "invite_zuckerberg_accepted")
-    let zuckerbergIgnored = userDefaults.bool(forKey: "invite_zuckerberg_ignored")
-    let zuckerbergUnlocked = userDefaults.bool(forKey: "invite_zuckerberg_unlocked")
 
     var result: [String: ContactRelationshipStatus] = [:]
     result["trump"] = trumpAccepted ? .accepted : (trumpIgnored ? .ignored : .pending)
     result["musk"] = muskAccepted ? .accepted : (muskIgnored ? .ignored : (muskUnlocked ? .pending : .locked))
-    result["zuckerberg"] = zuckerbergAccepted ? .accepted : (zuckerbergIgnored ? .ignored : (zuckerbergUnlocked ? .pending : .locked))
     return result
 }
 
 private func resolvedInviteStatus(
     for personaId: String,
     legacyInviteState: [String: ContactRelationshipStatus],
-    engagedPersonaIds: Set<String>
+    engagedPersonaIds: Set<String>,
+    firstPendingPersonaId: String?
 ) -> ContactRelationshipStatus {
     if engagedPersonaIds.contains(personaId) {
         return .accepted
@@ -269,7 +316,7 @@ private func resolvedInviteStatus(
         return status
     }
 
-    if let entry = PersonaCatalog.entry(for: personaId), entry.inviteOrder == 0 {
+    if firstPendingPersonaId == personaId {
         return .pending
     }
 

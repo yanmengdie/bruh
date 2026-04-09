@@ -1,11 +1,11 @@
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
+import { buildImagePrompt } from "../_shared/image_prompt.ts"
 import { topNewsSummaryBlock } from "../_shared/news.ts"
 import { resolvePersonaById } from "../_shared/personas.ts"
 import {
   personaDistilledChatPrompt,
   personaFewShotExamples,
-  personaImageStyle,
   personaRolePrompt,
 } from "../_shared/persona_skills.ts"
 
@@ -29,6 +29,7 @@ type NewsEventRow = {
   summary: string
   category: string
   interest_tags: string[]
+  representative_url: string | null
   importance_score: number
   published_at: string
 }
@@ -77,8 +78,240 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
 
+function hashString(value: string) {
+  let hash = 2166136261
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+
+  return hash >>> 0
+}
+
+function seededUnitInterval(seed: string) {
+  return hashString(seed) / 4294967295
+}
+
 async function delay(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function logGenerationEvent(event: string, details: Record<string, unknown>) {
+  console.log(JSON.stringify({
+    scope: "generate-message",
+    event,
+    ...details,
+    loggedAt: new Date().toISOString(),
+  }))
+}
+
+function isLikelyEnglishText(text: string) {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  if (/[\u4e00-\u9fff]/.test(trimmed)) return false
+  return /[a-z]/i.test(trimmed)
+}
+
+function isIdentityQuestion(text: string) {
+  const lower = text.toLowerCase()
+  return [
+    "who are you",
+    "what should i call you",
+    "introduce yourself",
+    "你是谁",
+    "怎么称呼",
+    "自我介绍",
+  ].some((pattern) => lower.includes(pattern))
+}
+
+function fallbackTopicHint(newsContext: string, contextRows: ContextRow[]) {
+  const quotedNews = newsContext
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.length > 0 && !line.startsWith("Here are"))
+
+  if (quotedNews) {
+    return quotedNews.replace(/^"+|"+$/g, "").slice(0, 90)
+  }
+
+  const contextTopic = contextRows.find((row) => (row.topic ?? "").trim().length > 0)?.topic
+  if (contextTopic) return contextTopic
+
+  const contextContent = contextRows[0]?.content?.trim()
+  return contextContent ? contextContent.slice(0, 90) : ""
+}
+
+function fallbackPersonaReply(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+  userMessage: string,
+  contextRows: ContextRow[],
+  newsContext: string,
+) {
+  const english = isLikelyEnglishText(userMessage)
+  const topic = fallbackTopicHint(newsContext, contextRows)
+
+  if (isIdentityQuestion(userMessage)) {
+    return english
+      ? `${persona.displayName}. Text me the concrete question and we'll skip the fluff.`
+      : `我是${persona.displayName}。你直接问具体问题，我们别绕。`
+  }
+
+  switch (persona.personaId) {
+    case "musk":
+      return english
+        ? (topic ? `${topic} mostly comes down to execution and constraints. What's the real bottleneck?` : "Start with the bottleneck. Most people optimize the wrong layer.")
+        : (topic ? `${topic} 这事先看约束和瓶颈，别先看热闹。` : "先找真正的瓶颈，别在错的那层优化。")
+    case "trump":
+      return english
+        ? (topic ? `${topic} is what weak leadership looks like. Say the strongest move.` : "Lead with strength. Everything else is noise.")
+        : (topic ? `${topic} 这就是弱领导力的结果。直接说最强的动作。` : "先讲强弱，不要先讲废话。")
+    case "sam_altman":
+      return english
+        ? (topic ? `${topic} matters if it changes what builders can actually ship next. What's the concrete unlock?` : "Tell me the concrete unlock, not the slogan.")
+        : (topic ? `${topic} 真正有意义，是因为它可能改变下一步能做成什么。你先说具体 unlock。` : "先说具体 unlock，不要先喊口号。")
+    case "zhang_peng":
+      return english
+        ? (topic ? `${topic} is more interesting as a signal than as a headline. Which variable changed underneath it?` : "先看变量，再看热闹。")
+        : (topic ? `${topic} 更值得看的不是 headline，而是下面哪个变量变了。` : "先看变量，再看热闹。")
+    case "lei_jun":
+      return english
+        ? (topic ? `${topic} only matters if it lands in product, delivery, and user value. Which one are you asking about?` : "Directly tell me the product point.")
+        : (topic ? `${topic} 真正有价值，得落到产品、交付和用户价值上。你想问哪一层？` : "直接说产品点。")
+    case "liu_jingkang":
+      return english
+        ? (topic ? `${topic} is only worth discussing if it maps to a real user pain point. Which one?` : "Tell me the actual pain point.")
+        : (topic ? `${topic} 值不值得聊，先看它是不是打到了真实痛点。你说哪一个？` : "先说真实痛点。")
+    case "luo_yonghao":
+      return english
+        ? (topic ? `${topic} sounds big, but I care whether the thing is actually done right. Say it like a person.` : "Say it like a person, not like a deck.")
+        : (topic ? `${topic} 听着挺大，但我更关心事情到底有没有做对。说人话。` : "说人话，别像在念稿。")
+    case "justin_sun":
+      return english
+        ? (topic ? `${topic} matters because sentiment moves before consensus does. What's your actual trade?` : "What's the actual trade?")
+        : (topic ? `${topic} 真正关键的是情绪和价格谁先动。你想表达什么交易判断？` : "你直接说交易判断。")
+    case "kim_kardashian":
+      return english
+        ? (topic ? `${topic} only gets interesting when it becomes culture, brand, and imitation. Which signal do you care about?` : "Tell me whether you mean culture, brand, or attention.")
+        : (topic ? `${topic} 值得聊，是因为它会变成文化、品牌和模仿。你在看哪一层？` : "你先说你在看文化、品牌还是关注度。")
+    case "papi":
+      return english
+        ? (topic ? `${topic} gets real only when you can point to an actual scene or emotion. Give me that part.` : "Give me a real scene, not a label.")
+        : (topic ? `${topic} 真正有意思，要落到一个具体场景或者情绪上。你把那部分说出来。` : "给我一个具体场景，别只给标签。")
+    case "kobe_bryant":
+      return english
+        ? (topic ? `${topic} only matters if the standard held under pressure. Where did the work show up?` : "Tell me where the standard held or broke.")
+        : (topic ? `${topic} 真正关键，是压力上来之后标准有没有守住。你先说工作体现在哪。` : "先说这里的标准是守住了，还是掉下来了。")
+    default:
+      return english
+        ? "Say the concrete part first."
+        : "先说具体一点。"
+  }
+}
+
+function personaSourceShareBase(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+) {
+  let probability = 0.12
+  const domains = new Set(persona.domains)
+
+  if (domains.has("world")) probability += 0.14
+  if (domains.has("business")) probability += 0.1
+  if (domains.has("technology")) probability += 0.08
+  if (domains.has("ai")) probability += 0.08
+  if (domains.has("sports")) probability -= 0.02
+  if (domains.has("entertainment")) probability -= 0.03
+
+  switch (persona.personaId) {
+    case "sam_altman":
+    case "zhang_peng":
+    case "liu_jingkang":
+      probability += 0.14
+      break
+    case "musk":
+    case "trump":
+    case "lei_jun":
+    case "luo_yonghao":
+      probability += 0.08
+      break
+    case "kim_kardashian":
+    case "papi":
+    case "kobe_bryant":
+    case "cristiano_ronaldo":
+      probability -= 0.03
+      break
+    default:
+      break
+  }
+
+  return clamp(probability, 0.08, 0.52)
+}
+
+function newsEventKeywords(event: NewsEventRow) {
+  const tokenPattern = /[\p{Letter}\p{Number}]{2,}/gu
+  const titleTokens = event.title.match(tokenPattern) ?? []
+  const summaryTokens = event.summary.match(tokenPattern) ?? []
+
+  return [
+    ...event.interest_tags,
+    ...titleTokens,
+    ...summaryTokens,
+  ]
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => item.length >= 3 || /[\u4e00-\u9fff]/.test(item))
+}
+
+function seemsNewsDrivenReply(
+  userMessage: string,
+  newsContext: string,
+  relevantNews: NewsEventRow[],
+) {
+  if (newsContext.trim().length > 0) return true
+
+  const lower = userMessage.toLowerCase()
+  if ([
+    "news",
+    "headline",
+    "what happened",
+    "what's going on",
+    "today",
+    "latest",
+    "breaking",
+    "新闻",
+    "头条",
+    "今天",
+    "最新",
+    "发生了什么",
+    "怎么回事",
+  ].some((pattern) => lower.includes(pattern))) {
+    return true
+  }
+
+  return relevantNews.some((event) => keywordOverlapScore(lower, newsEventKeywords(event)) > 0)
+}
+
+function resolveSharedSourceUrl(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+  userMessage: string,
+  newsContext: string,
+  relevantNews: NewsEventRow[],
+) {
+  const candidate = relevantNews.find((event) => asString(event.representative_url))
+  if (!candidate) return null
+  if (!seemsNewsDrivenReply(userMessage, newsContext, relevantNews)) return null
+
+  let probability = personaSourceShareBase(persona)
+  if (candidate.interest_tags.includes("global")) probability += 0.08
+  if (keywordOverlapScore(userMessage.toLowerCase(), newsEventKeywords(candidate)) > 0) probability += 0.1
+  if (newsContext.trim().length > 0) probability += 0.12
+
+  const randomness = seededUnitInterval(
+    `message-source:${persona.personaId}:${candidate.id}:${userMessage.trim().toLowerCase()}:${newsContext.trim().toLowerCase()}:v1`,
+  )
+
+  return randomness < clamp(probability, 0.08, 0.7)
+    ? asString(candidate.representative_url)
+    : null
 }
 
 function normalizeConversation(value: unknown): ConversationTurn[] {
@@ -508,28 +741,6 @@ async function synthesizeVoiceReply(
   }
 }
 
-function buildImagePrompt(
-  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
-  userMessage: string,
-  conversation: ConversationTurn[],
-) {
-  const recentConversation = conversation
-    .slice(-4)
-    .map((item) => `${item.role}: ${item.content}`)
-    .join("\n")
-
-  return [
-    `Create an image that ${persona.displayName} would share.`,
-    `Persona style: ${personaImageStyle(persona.personaId)}`,
-    `User request: ${userMessage}`,
-    recentConversation ? `Recent chat context:\n${recentConversation}` : "",
-    "Make the image visually specific, modern, and coherent.",
-    "Ignore any mentions of chat UIs or devices unless the user explicitly asked for them.",
-    "Avoid phones, UI mockups, chat bubbles, screenshots, device frames, or text overlays.",
-    "Do not add text unless the user explicitly asked for text inside the image.",
-  ].filter((item) => item.length > 0).join("\n\n")
-}
-
 function extractImageUrl(payload: Record<string, unknown>) {
   const collectionCandidates = [payload.data, payload.images, payload.output, payload.results]
 
@@ -603,7 +814,7 @@ Deno.serve(async (request) => {
       "https://uu36540-775678b2e148.bjb2.seetacloud.com:8443/api"
     ).replace(/\/$/, "")
 
-    if (!url || !serviceRoleKey || !anthropicApiKey) {
+    if (!url || !serviceRoleKey) {
       return Response.json(
         { error: "Missing environment variables" },
         { status: 500, headers: corsHeaders },
@@ -669,6 +880,7 @@ Deno.serve(async (request) => {
           summary,
           category,
           interest_tags,
+          representative_url,
           importance_score,
           published_at
         )
@@ -716,47 +928,69 @@ Deno.serve(async (request) => {
     const system = buildSystemPrompt(persona, selected, combinedNewsContext, requestImage)
     let content = ""
     const providerErrors: string[] = []
+    let usedFallback = false
     let lastError: Error | null = null
 
-    for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES && !content; attempt += 1) {
-      try {
-        const candidate = cleanPersonaReply(await generateWithAnthropic(
-          anthropicApiKey,
-          anthropicBaseUrl,
-          anthropicModel,
-          system,
-          styleGuide,
-          conversation,
-          userMessage,
-        ))
-        if (candidate) {
-          content = candidate
-          break
+    if (!anthropicApiKey) {
+      providerErrors.push("[config] anthropic: ANTHROPIC_API_KEY missing")
+      logGenerationEvent("anthropic_missing_config", {
+        personaId,
+        selectedContextIds: selected.map((row) => row.id),
+        relevantNewsIds: relevantNews.map((row) => row.id),
+      })
+    } else {
+      for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES && !content; attempt += 1) {
+        try {
+          const candidate = cleanPersonaReply(await generateWithAnthropic(
+            anthropicApiKey,
+            anthropicBaseUrl,
+            anthropicModel,
+            system,
+            styleGuide,
+            conversation,
+            userMessage,
+          ))
+          if (candidate) {
+            content = candidate
+            logGenerationEvent("anthropic_success", {
+              personaId,
+              attempt,
+              selectedContextIds: selected.map((row) => row.id),
+              relevantNewsIds: relevantNews.map((row) => row.id),
+            })
+            break
+          }
+
+          lastError = new Error("Persona reply empty after cleanup")
+          providerErrors.push(`[attempt ${attempt}] anthropic: Provider returned empty content after cleanup`)
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error))
+          providerErrors.push(`[attempt ${attempt}] anthropic: ${lastError.message}`)
+          logGenerationEvent("anthropic_failure", {
+            personaId,
+            attempt,
+            error: lastError.message,
+          })
         }
 
-        lastError = new Error("Persona reply empty after cleanup")
-        providerErrors.push(`[attempt ${attempt}] anthropic: Provider returned empty content after cleanup`)
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error))
-        providerErrors.push(`[attempt ${attempt}] anthropic: ${lastError.message}`)
-      }
-
-      if (!content && attempt < MAX_GENERATION_RETRIES) {
-        await delay(200 * attempt)
+        if (!content && attempt < MAX_GENERATION_RETRIES) {
+          await delay(200 * attempt)
+        }
       }
     }
 
     if (!content) {
-      console.error("Model provider request failed after retries", lastError)
-      return Response.json(
-        {
-          error: "Message generation failed after retries",
-          ...(debugProviders ? { debug: { providerErrors } } : {}),
-        },
-        { status: 502, headers: corsHeaders },
-      )
+      content = fallbackPersonaReply(persona, userMessage, selected, combinedNewsContext)
+      usedFallback = true
+      logGenerationEvent("message_fallback_used", {
+        personaId,
+        lastError: lastError?.message ?? null,
+        selectedContextIds: selected.map((row) => row.id),
+        relevantNewsIds: relevantNews.map((row) => row.id),
+      })
     }
     let imageUrl: string | null = null
+    const sourceUrl = resolveSharedSourceUrl(persona, userMessage, newsContext, relevantNews)
     if (requestImage && nanoBananaApiKey) {
       try {
         imageUrl = await generateImageWithNanoBanana(
@@ -804,9 +1038,17 @@ Deno.serve(async (request) => {
         audioDuration,
         voiceLabel,
         audioOnly,
+        sourceUrl,
         sourcePostIds: [...selected.map((row) => row.id), ...relevantNews.map((row) => row.id)],
         generatedAt,
-        ...(debugProviders ? { debug: { providerErrors } } : {}),
+        ...(debugProviders ? {
+          debug: {
+            providerErrors,
+            usedFallback,
+            selectedContextIds: selected.map((row) => row.id),
+            relevantNewsIds: relevantNews.map((row) => row.id),
+          },
+        } : {}),
       },
       { headers: corsHeaders },
     )

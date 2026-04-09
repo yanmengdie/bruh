@@ -47,8 +47,6 @@ struct BruhInvitation: Identifiable, Hashable {
             return "🧑‍💼"
         case "musk":
             return "👨‍🚀"
-        case "zuckerberg":
-            return "🧑‍💻"
         case "sam_altman":
             return "🤖"
         case "zhang_peng":
@@ -65,6 +63,10 @@ struct BruhInvitation: Identifiable, Hashable {
             return "✨"
         case "papi":
             return "🎬"
+        case "kobe_bryant":
+            return "🏀"
+        case "cristiano_ronaldo":
+            return "⚽️"
         default:
             return "👤"
         }
@@ -272,7 +274,7 @@ struct NewBruhView: View {
                     inviteOrder: 0
                 )
             ),
-            lockedCandidateNames: ["Elon Musk", "Mark Zuckerberg"],
+            lockedCandidateNames: ["Elon Musk", "Sam Altman"],
             onAccept: { _ in },
             onIgnore: { _ in }
         )

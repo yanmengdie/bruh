@@ -15,6 +15,8 @@ struct FeedCard: View {
     @State private var likes: [FeedLike] = []
     @State private var comments: [FeedComment] = []
     @State private var commentDraft = ""
+    @State private var replyTargetCommentId: String?
+    @State private var replyTargetAuthorName: String?
     @State private var isLoadingInteractions = false
     @State private var isSendingComment = false
     @State private var isUpdatingLike = false
@@ -184,7 +186,6 @@ struct FeedCard: View {
         switch resolvedPersonaId {
         case "trump": .orange
         case "musk": Color(red: 0.12, green: 0.15, blue: 0.35)
-        case "zuckerberg": .purple
         case "sam_altman": Color(red: 0.06, green: 0.12, blue: 0.22)
         case "zhang_peng": Color(red: 0.15, green: 0.39, blue: 0.92)
         case "lei_jun": Color(red: 1.00, green: 0.41, blue: 0.00)
@@ -193,6 +194,8 @@ struct FeedCard: View {
         case "justin_sun": Color(red: 0.11, green: 0.74, blue: 0.63)
         case "kim_kardashian": Color(red: 0.72, green: 0.54, blue: 0.42)
         case "papi": Color(red: 0.88, green: 0.11, blue: 0.55)
+        case "kobe_bryant": Color(red: 0.99, green: 0.73, blue: 0.15)
+        case "cristiano_ronaldo": Color(red: 0.05, green: 0.58, blue: 0.53)
         default: .gray
         }
     }
@@ -321,7 +324,7 @@ struct FeedCard: View {
 
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(comments, id: \.id) { comment in
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 (
                                     Text(commentPrefix(for: comment))
                                         .fontWeight(.semibold)
@@ -330,10 +333,22 @@ struct FeedCard: View {
                                 .font(.system(size: 15))
                                 .foregroundStyle(.primary)
 
-                                if comment.deliveryState == "failed" {
-                                    Text("发送失败，请重试")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.red)
+                                HStack(spacing: 10) {
+                                    if !comment.isViewer {
+                                        Button("回复") {
+                                            beginReply(to: comment)
+                                        }
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(Color(red: 0.24, green: 0.34, blue: 0.56))
+                                        .buttonStyle(.plain)
+                                        .disabled(isSendingComment)
+                                    }
+
+                                    if comment.deliveryState == "failed" {
+                                        Text("发送失败，请重试")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(.red)
+                                    }
                                 }
                             }
                         }
@@ -345,9 +360,30 @@ struct FeedCard: View {
                             .foregroundStyle(.red)
                     }
 
+                    if let replyTargetAuthorName {
+                        HStack(spacing: 8) {
+                            Text("回复 \(replyTargetAuthorName)")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color(red: 0.24, green: 0.34, blue: 0.56))
+
+                            Spacer()
+
+                            Button {
+                                clearReplyTarget()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isSendingComment)
+                        }
+                    }
+
                     HStack(spacing: 8) {
-                        TextField("评论一下...", text: $commentDraft, axis: .vertical)
+                        TextField(replyPlaceholder, text: $commentDraft, axis: .vertical)
                             .lineLimit(1...3)
+                            .disabled(isSendingComment)
 
                         if isSendingComment {
                             ProgressView()
@@ -381,7 +417,6 @@ struct FeedCard: View {
         switch resolvedPersonaId {
         case "trump": return "海湖庄园"
         case "musk": return "X HQ"
-        case "zuckerberg": return "Meta Park"
         case "sam_altman": return "San Francisco"
         case "zhang_peng": return "北京"
         case "lei_jun": return "北京"
@@ -390,6 +425,8 @@ struct FeedCard: View {
         case "justin_sun": return "Hong Kong"
         case "kim_kardashian": return "Los Angeles"
         case "papi": return "上海"
+        case "kobe_bryant": return "Los Angeles"
+        case "cristiano_ronaldo": return "Europe"
         default: return "中国"
         }
     }
@@ -408,9 +445,40 @@ struct FeedCard: View {
         return "♥ \(likeNames.joined(separator: ", "))"
     }
 
+    private var commentsById: [String: FeedComment] {
+        Dictionary(uniqueKeysWithValues: comments.map { ($0.id, $0) })
+    }
+
+    private var replyPlaceholder: String {
+        guard let replyTargetAuthorName else {
+            return "评论一下..."
+        }
+        return "回复 \(replyTargetAuthorName)..."
+    }
+
     private func commentPrefix(for comment: FeedComment) -> String {
-        let base = "\(comment.authorDisplayName): "
-        return comment.inReplyToCommentId == nil ? base : "↳ \(base)"
+        guard let parent = parentComment(for: comment) else {
+            return "\(comment.authorDisplayName): "
+        }
+        return "\(comment.authorDisplayName) 回复 \(parent.authorDisplayName): "
+    }
+
+    private func parentComment(for comment: FeedComment) -> FeedComment? {
+        guard let parentId = comment.inReplyToCommentId else {
+            return nil
+        }
+        return commentsById[parentId]
+    }
+
+    private func beginReply(to comment: FeedComment) {
+        replyTargetCommentId = comment.id
+        replyTargetAuthorName = comment.authorDisplayName
+        showComments = true
+    }
+
+    private func clearReplyTarget() {
+        replyTargetCommentId = nil
+        replyTargetAuthorName = nil
     }
 
     private func loadInteractionsIfNeeded() async {
@@ -438,24 +506,29 @@ struct FeedCard: View {
         let text = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isSendingComment, let interactionTarget else { return }
 
-        commentDraft = ""
+        let replyToCommentId = replyTargetCommentId
         interactionError = nil
         isSendingComment = true
+        showComments = true
+        commentDraft = ""
 
         Task {
             do {
                 let state = try await interactionService.sendViewerComment(
                     for: interactionTarget,
                     text: text,
+                    replyToCommentId: replyToCommentId,
                     modelContext: modelContext
                 )
                 likes = state.likes
                 comments = state.comments
                 isLiked = state.likes.contains(where: { $0.authorId == "viewer" })
+                clearReplyTarget()
             } catch {
                 if !shouldIgnoreInteractionError(error) {
                     interactionError = error.localizedDescription
                 }
+                commentDraft = text
                 if let state = try? interactionService.interactionState(for: interactionTarget.id, modelContext: modelContext) {
                     likes = state.likes
                     comments = state.comments

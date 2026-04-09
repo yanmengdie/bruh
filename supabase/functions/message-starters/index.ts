@@ -2,7 +2,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 import { allPersonaIds, asString, defaultStarterMessage, topNewsSummaryBlock } from "../_shared/news.ts"
 import { resolvePersonaById } from "../_shared/personas.ts"
-import { personaFewShotExamples, personaRolePrompt } from "../_shared/persona_skills.ts"
+import { personaFewShotExamples, personaImageStyle, personaRolePrompt } from "../_shared/persona_skills.ts"
 
 type StarterEventRow = {
   id: string
@@ -38,6 +38,25 @@ type SelectedStarter = {
   selectionReasons: string[]
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function hashString(value: string) {
+  let hash = 2166136261
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+
+  return hash >>> 0
+}
+
+function seededUnitInterval(seed: string) {
+  return hashString(seed) / 4294967295
+}
+
 function normalizeInterests(value: unknown) {
   if (!Array.isArray(value)) return []
   return [...new Set(value.map((item) => asString(item)).filter((item) => item.length > 0))]
@@ -46,26 +65,6 @@ function normalizeInterests(value: unknown) {
 function normalizeStringArray(value: unknown) {
   if (!Array.isArray(value)) return []
   return [...new Set(value.map((item) => asString(item)).filter((item) => item.length > 0))]
-}
-
-function extractOutputText(payload: Record<string, unknown>) {
-  return Array.isArray(payload.output)
-    ? payload.output
-      .flatMap((item: Record<string, unknown>) => Array.isArray(item.content) ? item.content : [])
-      .filter((item: Record<string, unknown>) => item.type === "output_text")
-      .map((item: Record<string, unknown>) => asString(item.text))
-      .join(" ")
-      .trim()
-    : ""
-}
-
-function stripCodeFence(value: string) {
-  const trimmed = value.trim()
-  if (!trimmed.startsWith("```")) return trimmed
-  return trimmed
-    .replace(/^```[a-zA-Z0-9_-]*\s*/, "")
-    .replace(/\s*```$/, "")
-    .trim()
 }
 
 function cleanStarterText(text: string) {
@@ -89,6 +88,273 @@ function cleanStarterText(text: string) {
     .join(" ")
     .replace(/\s+/g, " ")
     .trim()
+}
+
+function personaVisualShareBase(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+) {
+  let probability = 0.12
+  const domains = new Set(persona.domains)
+
+  if (domains.has("entertainment")) probability += 0.14
+  if (domains.has("sports")) probability += 0.1
+  if (domains.has("creator")) probability += 0.08
+  if (domains.has("world")) probability += 0.06
+  if (domains.has("business")) probability += 0.04
+
+  switch (persona.personaId) {
+    case "trump":
+    case "kim_kardashian":
+    case "kobe_bryant":
+    case "cristiano_ronaldo":
+    case "musk":
+    case "justin_sun":
+      probability += 0.08
+      break
+    case "sam_altman":
+    case "zhang_peng":
+    case "liu_jingkang":
+      probability -= 0.03
+      break
+    default:
+      break
+  }
+
+  return clamp(probability, 0.08, 0.52)
+}
+
+function personaSourceShareBase(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+) {
+  let probability = 0.14
+  const domains = new Set(persona.domains)
+
+  if (domains.has("world")) probability += 0.14
+  if (domains.has("business")) probability += 0.08
+  if (domains.has("technology")) probability += 0.08
+  if (domains.has("ai")) probability += 0.08
+  if (domains.has("entertainment")) probability -= 0.02
+  if (domains.has("sports")) probability -= 0.02
+
+  switch (persona.personaId) {
+    case "sam_altman":
+    case "zhang_peng":
+    case "liu_jingkang":
+      probability += 0.14
+      break
+    case "musk":
+    case "trump":
+    case "lei_jun":
+    case "luo_yonghao":
+      probability += 0.08
+      break
+    case "kim_kardashian":
+    case "papi":
+    case "kobe_bryant":
+    case "cristiano_ronaldo":
+      probability -= 0.04
+      break
+    default:
+      break
+  }
+
+  return clamp(probability, 0.08, 0.58)
+}
+
+function starterImageProbability(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+  item: SelectedStarter,
+) {
+  let probability = personaVisualShareBase(persona)
+
+  if (item.selectionReasons.includes("persona_related")) probability += 0.12
+  if (item.selectionReasons.includes("global_top")) probability += 0.06
+  if (item.event.is_global_top) probability += 0.06
+  if (item.event.representative_url) probability += 0.04
+
+  switch (item.event.category) {
+    case "sports":
+    case "entertainment":
+    case "world":
+      probability += 0.08
+      break
+    case "technology":
+    case "business":
+    case "ai":
+    case "crypto":
+      probability += 0.04
+      break
+    default:
+      break
+  }
+
+  return clamp(probability, 0.08, 0.68)
+}
+
+function pickStarterImageEventIds(selected: SelectedStarter[]) {
+  const ranked = selected
+    .map((item) => {
+      const persona = resolvePersonaById(item.personaId)
+      if (!persona) return null
+
+      const probability = starterImageProbability(persona, item)
+      const randomness = seededUnitInterval(`starter-image:${item.personaId}:${item.event.id}:v1`)
+
+      if (randomness >= probability) return null
+
+      return {
+        eventId: item.event.id,
+        personaId: item.personaId,
+        priority:
+          probability - randomness +
+          (item.selectionReasons.includes("persona_related") ? 0.08 : 0) +
+          (item.event.is_global_top ? 0.04 : 0),
+      }
+    })
+    .filter((candidate): candidate is { eventId: string; personaId: string; priority: number } => candidate !== null)
+    .sort((left, right) => right.priority - left.priority || left.personaId.localeCompare(right.personaId))
+
+  const eventIds = new Set<string>()
+  const seenPersonaIds = new Set<string>()
+
+  for (const candidate of ranked) {
+    if (seenPersonaIds.has(candidate.personaId)) continue
+    eventIds.add(candidate.eventId)
+    seenPersonaIds.add(candidate.personaId)
+    if (eventIds.size >= 1) break
+  }
+
+  return eventIds
+}
+
+function resolveStarterSourceUrl(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+  item: CandidateStarter,
+) {
+  const url = asString(item.event.representative_url)
+  if (!url) return null
+
+  let probability = personaSourceShareBase(persona)
+  if (item.selectionReasons.includes("global_top")) probability += 0.08
+  if (item.selectionReasons.includes("persona_related")) probability += 0.06
+  if (item.event.is_global_top) probability += 0.04
+
+  switch (item.event.category) {
+    case "world":
+    case "business":
+    case "technology":
+    case "ai":
+    case "crypto":
+      probability += 0.08
+      break
+    case "sports":
+    case "entertainment":
+      probability -= 0.02
+      break
+    default:
+      break
+  }
+
+  const randomness = seededUnitInterval(`starter-source:${persona.personaId}:${item.event.id}:v1`)
+  return randomness < clamp(probability, 0.08, 0.76) ? url : null
+}
+
+function extractImageUrl(payload: Record<string, unknown>) {
+  const collectionCandidates = [payload.data, payload.images, payload.output, payload.results]
+
+  for (const candidate of collectionCandidates) {
+    if (!Array.isArray(candidate)) continue
+
+    for (const item of candidate) {
+      const row = item as Record<string, unknown>
+      const imageUrl = asString(row.url ?? row.image_url ?? row.imageUrl)
+      if (imageUrl) return imageUrl
+    }
+  }
+
+  return asString(payload.url ?? payload.image_url ?? payload.imageUrl)
+}
+
+function buildStarterImagePrompt(
+  persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
+  item: CandidateStarter,
+  starterText: string,
+) {
+  return [
+    `Create the image ${persona.displayName} would casually attach while texting a friend about this news.`,
+    "This is a contextual image attached to a chat message, not a UI screenshot, not a meme template, and not a poster.",
+    `Persona visual taste: ${personaImageStyle(persona.personaId)}`,
+    `Message text: ${starterText}`,
+    `Headline: ${item.event.title}`,
+    `Summary: ${item.event.summary}`,
+    `Category: ${item.event.category}`,
+    "Show one concrete real-world scene, object, location, or moment implied by the message and the news.",
+    "If the message implies a place, meeting, stage, locker room, office, arena, rally, product, or travel scene, visualize that directly.",
+    "Prefer a candid editorial or documentary feel over generic concept art.",
+    "No text overlays, captions, watermarks, screenshots, phone frames, chat bubbles, or split panels.",
+  ].join("\n\n")
+}
+
+async function generateStarterImageWithNanoBanana(
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  prompt: string,
+) {
+  const response = await fetch(`${baseUrl}/images/generations`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      prompt,
+      aspect_ratio: "1:1",
+      image_size: "1k",
+      response_format: "url",
+    }),
+    signal: AbortSignal.timeout(12_000),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Nano Banana request failed: ${await response.text()}`)
+  }
+
+  const payload = await response.json()
+  const imageUrl = extractImageUrl(payload)
+  if (!imageUrl) {
+    throw new Error("Nano Banana returned no image URL")
+  }
+
+  return imageUrl
+}
+
+async function maybeGenerateStarterImage(
+  nanoBananaApiKey: string | undefined,
+  nanoBananaBaseUrl: string,
+  nanoBananaModel: string,
+  personaId: string,
+  item: CandidateStarter,
+  starterText: string,
+) {
+  const persona = resolvePersonaById(personaId)
+  if (!persona) return null
+
+  if (!nanoBananaApiKey) {
+    return null
+  }
+
+  try {
+    return await generateStarterImageWithNanoBanana(
+      nanoBananaApiKey,
+      nanoBananaBaseUrl,
+      nanoBananaModel,
+      buildStarterImagePrompt(persona, item, starterText),
+    )
+  } catch (_) {
+    return null
+  }
 }
 
 function pickPersonaForEvent(scores: PersonaScoreRow[], selectionReasons: string[]) {
@@ -194,9 +460,6 @@ async function generateSingleStarterText(
   anthropicApiKey: string | undefined,
   anthropicBaseUrl: string,
   anthropicModel: string,
-  apiKey: string | undefined,
-  baseUrl: string,
-  model: string,
   personaId: string,
   item: CandidateStarter,
   topSummary: string,
@@ -263,67 +526,13 @@ async function generateSingleStarterText(
     }
   }
 
-  if (!apiKey) {
-    return fallback
-  }
-
-  const responsesRequest = await fetch(`${baseUrl}/responses`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      instructions: system,
-      input: [{
-        role: "user",
-        content: [{ type: "input_text", text: prompt }],
-      }],
-      max_output_tokens: 80,
-    }),
-  })
-
-  if (responsesRequest.ok) {
-    const payload = await responsesRequest.json()
-    const content = cleanStarterText(stripCodeFence(extractOutputText(payload)))
-    if (content) {
-      return content
-    }
-  }
-
-  const chatResponse = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 80,
-    }),
-  })
-
-  if (!chatResponse.ok) {
-    return fallback
-  }
-
-  const chatPayload = await chatResponse.json()
-  const content = cleanStarterText(asString(chatPayload.choices?.[0]?.message?.content))
-  return content || fallback
+  return fallback
 }
 
 async function generateStarterTexts(
   anthropicApiKey: string | undefined,
   anthropicBaseUrl: string,
   anthropicModel: string,
-  apiKey: string | undefined,
-  baseUrl: string,
-  model: string,
   personaId: string,
   items: CandidateStarter[],
   topSummary: string,
@@ -331,13 +540,11 @@ async function generateStarterTexts(
   if (items.length === 0) return new Map<string, string>()
 
   const fallbackTexts = new Map(items.map((item) => [item.event.id, defaultStarterMessage(personaId, item.event.title)]))
-  if (!anthropicApiKey && !apiKey) return fallbackTexts
+  if (!anthropicApiKey) return fallbackTexts
 
   const generatedEntries = await Promise.all(items.map(async (item) => [
     item.event.id,
-    (anthropicApiKey || apiKey)
-      ? await generateSingleStarterText(anthropicApiKey, anthropicBaseUrl, anthropicModel, apiKey, baseUrl, model, personaId, item, topSummary)
-      : fallbackTexts.get(item.event.id) ?? defaultStarterMessage(personaId, item.event.title),
+    await generateSingleStarterText(anthropicApiKey, anthropicBaseUrl, anthropicModel, personaId, item, topSummary),
   ] as const))
 
   return new Map(generatedEntries)
@@ -358,9 +565,9 @@ Deno.serve(async (request) => {
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY")
     const anthropicBaseUrl = (Deno.env.get("ANTHROPIC_BASE_URL") ?? "https://api.anthropic.com").replace(/\/$/, "")
     const anthropicModel = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-5-20250929"
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY")
-    const openaiBaseUrl = (Deno.env.get("OPENAI_BASE_URL") ?? "https://api.codexzh.com/v1").replace(/\/$/, "")
-    const openaiModel = Deno.env.get("OPENAI_MODEL") ?? "gpt-5.2"
+    const nanoBananaApiKey = Deno.env.get("NANO_BANANA_API_KEY")
+    const nanoBananaBaseUrl = (Deno.env.get("NANO_BANANA_BASE_URL") ?? "https://ccodezh.com/v1").replace(/\/$/, "")
+    const nanoBananaModel = Deno.env.get("NANO_BANANA_MODEL") ?? "nano-banana"
 
     if (!projectUrl || !serviceRoleKey) {
       return Response.json({ error: "Missing Supabase environment variables" }, { status: 500, headers: corsHeaders })
@@ -410,6 +617,7 @@ Deno.serve(async (request) => {
     }
 
     const selected = collectSelectedStarters(events, scoresByEvent, userInterests)
+    const selectedStarterImageEventIds = pickStarterImageEventIds(selected)
     const starters = []
 
     for (const personaId of [...new Set(selected.map((item) => item.personaId))].sort()) {
@@ -426,24 +634,39 @@ Deno.serve(async (request) => {
         anthropicApiKey ?? undefined,
         anthropicBaseUrl,
         anthropicModel,
-        openaiApiKey ?? undefined,
-        openaiBaseUrl,
-        openaiModel,
         personaId,
         items,
         topSummary,
       )
+      const generatedImages = new Map(await Promise.all(
+        items
+          .filter((item) => selectedStarterImageEventIds.has(item.event.id))
+          .map(async (item) => [
+            item.event.id,
+            await maybeGenerateStarterImage(
+              nanoBananaApiKey ?? undefined,
+              nanoBananaBaseUrl,
+              nanoBananaModel,
+              personaId,
+              item,
+              generatedTexts.get(item.event.id) ?? defaultStarterMessage(personaId, item.event.title),
+            ),
+          ] as const),
+      ))
 
       for (const item of items) {
+        const persona = resolvePersonaById(personaId)
+        const sourceUrl = persona ? resolveStarterSourceUrl(persona, item) : null
         starters.push({
           id: `starter-news-${personaId}-${item.event.id}`,
           personaId,
           text: generatedTexts.get(item.event.id) ?? defaultStarterMessage(personaId, item.event.title),
+          imageUrl: generatedImages.get(item.event.id) ?? null,
+          sourceUrl,
           sourcePostIds: [item.event.id],
           createdAt: item.event.published_at,
           category: item.event.category,
           headline: item.event.title,
-          articleUrl: item.event.representative_url,
           isGlobalTop: item.event.is_global_top,
           selectionReasons: item.selectionReasons,
         })

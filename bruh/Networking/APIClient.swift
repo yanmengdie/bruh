@@ -139,33 +139,26 @@ actor APIClient {
         }
     }
 
-    func generatePostInteractions(
-        postId: String,
-        personaId: String,
-        postContent: String,
-        topic: String?,
-        viewerComment: String? = nil,
-        viewerCommentId: String? = nil,
-        viewerLikeAction: String? = nil
-    ) async throws -> FeedInteractionReplyDTO {
-        guard let url = URL(string: "\(baseURL)/generate-post-interactions") else {
+    func generateAvatar(
+        referenceImageBase64: String,
+        referenceImageMimeType: String = "image/jpeg",
+        displayName: String? = nil
+    ) async throws -> AvatarGenerationReplyDTO {
+        guard let url = URL(string: "\(baseURL)/generate-avatar") else {
             throw NetworkError.invalidURL
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 90
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(
-            FeedInteractionRequestDTO(
-                postId: postId,
-                personaId: personaId,
-                postContent: postContent,
-                topic: topic,
-                viewerComment: viewerComment,
-                viewerCommentId: viewerCommentId,
-                viewerLikeAction: viewerLikeAction
+            AvatarGenerationRequestDTO(
+                referenceImageBase64: referenceImageBase64,
+                referenceImageMimeType: referenceImageMimeType,
+                displayName: displayName
             )
         )
 
@@ -177,11 +170,12 @@ actor APIClient {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         do {
-            return try decoder.decode(FeedInteractionReplyDTO.self, from: data)
+            return try decoder.decode(AvatarGenerationReplyDTO.self, from: data)
         } catch {
             throw NetworkError.decodingError
         }
     }
+
 }
 
 // MARK: - DTO
@@ -212,63 +206,29 @@ struct SendMessageRequestDTO: Codable {
     let requestImage: Bool
 }
 
+struct AvatarGenerationRequestDTO: Codable {
+    let referenceImageBase64: String
+    let referenceImageMimeType: String
+    let displayName: String?
+}
+
+struct AvatarGenerationReplyDTO: Codable {
+    let imageBase64: String
+    let mimeType: String
+    let generatedAt: Date
+}
+
 struct MessageReplyDTO: Codable, Identifiable {
     let id: String
     let personaId: String
     let content: String
     let imageUrl: String?
+    let sourceUrl: String?
     let audioUrl: String?
     let audioDuration: TimeInterval?
     let voiceLabel: String?
     let audioOnly: Bool?
     let sourcePostIds: [String]
-    let generatedAt: Date
-}
-
-struct FeedCommentTurnDTO: Codable {
-    let id: String
-    let authorId: String
-    let authorDisplayName: String
-    let content: String
-    let isViewer: Bool
-    let inReplyToCommentId: String?
-}
-
-struct FeedInteractionRequestDTO: Codable {
-    let postId: String
-    let personaId: String
-    let postContent: String
-    let topic: String?
-    let viewerComment: String?
-    let viewerCommentId: String?
-    let viewerLikeAction: String?
-}
-
-struct FeedInteractionLikeDTO: Codable, Identifiable {
-    let id: String
-    let postId: String
-    let authorId: String
-    let authorDisplayName: String
-    let reasonCode: String
-    let createdAt: Date
-}
-
-struct FeedInteractionCommentDTO: Codable, Identifiable {
-    let id: String
-    let postId: String
-    let authorId: String
-    let authorDisplayName: String
-    let content: String
-    let reasonCode: String
-    let inReplyToCommentId: String?
-    let isViewer: Bool
-    let createdAt: Date
-}
-
-struct FeedInteractionReplyDTO: Codable {
-    let postId: String
-    let likes: [FeedInteractionLikeDTO]
-    let comments: [FeedInteractionCommentDTO]
     let generatedAt: Date
 }
 
@@ -280,11 +240,13 @@ struct MessageStarterDTO: Codable, Identifiable {
     let id: String
     let personaId: String
     let text: String
+    let imageUrl: String?
+    let sourceUrl: String?
+    let articleUrl: String?
     let sourcePostIds: [String]
     let createdAt: Date
     let category: String
     let headline: String
-    let articleUrl: String?
     let isGlobalTop: Bool
 }
 

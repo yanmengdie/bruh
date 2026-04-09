@@ -88,6 +88,7 @@ final class MessageService {
                 personaId: personaId,
                 text: reply.content,
                 imageUrl: reply.imageUrl,
+                sourceUrl: reply.sourceUrl,
                 audioUrl: reply.audioUrl,
                 audioDuration: reply.audioDuration,
                 voiceLabel: reply.voiceLabel,
@@ -165,6 +166,7 @@ final class MessageService {
         for starter in sortedStarters {
             guard acceptedPersonaIds.contains(starter.personaId) else { continue }
             let thread = try ensureThread(for: starter.personaId, modelContext: modelContext)
+            let starterSourceUrl = starter.sourceUrl ?? starter.articleUrl
             let messageId = starter.id
             var descriptor = FetchDescriptor<PersonaMessage>(
                 predicate: #Predicate { $0.id == messageId }
@@ -179,24 +181,30 @@ final class MessageService {
                 existing.threadId = starter.personaId
                 existing.personaId = starter.personaId
                 existing.text = starter.text
+                existing.imageUrl = starter.imageUrl
+                existing.sourceUrl = starterSourceUrl
                 existing.createdAt = starter.createdAt
                 existing.deliveryState = "sent"
                 existing.sourcePostIds = starter.sourcePostIds
                 ContentGraphStore.syncIncomingMessage(existing, in: modelContext)
+                let starterPreview = messagePreview(text: starter.text, imageUrl: starter.imageUrl)
 
                 let shouldRefreshPreview =
                     (thread.lastMessagePreview == previousText && thread.lastMessageAt == previousCreatedAt) ||
                     thread.lastMessageAt < starter.createdAt
 
                 if shouldRefreshPreview {
-                    updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: thread.unreadCount)
+                    updateThread(thread, preview: starterPreview, at: starter.createdAt, unreadCount: thread.unreadCount)
                 }
             } else {
+                let starterPreview = messagePreview(text: starter.text, imageUrl: starter.imageUrl)
                 let message = PersonaMessage(
                     id: starter.id,
                     threadId: starter.personaId,
                     personaId: starter.personaId,
                     text: starter.text,
+                    imageUrl: starter.imageUrl,
+                    sourceUrl: starterSourceUrl,
                     isIncoming: true,
                     createdAt: starter.createdAt,
                     deliveryState: "sent",
@@ -206,7 +214,7 @@ final class MessageService {
                 modelContext.insert(message)
                 ContentGraphStore.syncIncomingMessage(message, in: modelContext)
                 let nextUnreadCount = thread.unreadCount + 1
-                updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: nextUnreadCount)
+                updateThread(thread, preview: starterPreview, at: starter.createdAt, unreadCount: nextUnreadCount)
             }
         }
 
@@ -293,32 +301,7 @@ final class MessageService {
     }
 
     private func starterMessage(for personaId: String) -> String {
-        switch personaId {
-        case "musk":
-            return "今天有几条很有意思的 AI 和航天动态。你最关注哪条？"
-        case "trump":
-            return "今天有不少大新闻，贸易和政治都很热闹。你想先聊哪一个？"
-        case "zuckerberg":
-            return "AI 和社交平台这边今天信息很多。你要简版还是深挖版？"
-        case "sam_altman":
-            return "今天 AI 这边有几条真正影响产品方向的消息。你想先听哪条？"
-        case "zhang_peng":
-            return "今天科技圈有几条不只是热点、而是变量本身的新闻。你想先看哪一个？"
-        case "lei_jun":
-            return "今天硬件和汽车线都有值得看的更新。我可以直接讲重点。"
-        case "liu_jingkang":
-            return "今天有几条和产品、创作者设备有关的信号。我先给你讲最重要的一条？"
-        case "luo_yonghao":
-            return "今天有几条消息挺值得吐槽，也挺值得认真聊。你想从哪条开始？"
-        case "justin_sun":
-            return "今天 crypto 这边节奏不慢。我可以先给你讲最会影响市场情绪的那条。"
-        case "kim_kardashian":
-            return "今天文化和品牌这边有几条很会发酵的消息。你想看趋势版还是八卦版？"
-        case "papi":
-            return "今天内容圈和社交平台上有几条很有情绪张力的事。你想先聊哪一个？"
-        default:
-            return "今天你想聊什么？"
-        }
+        PersonaCatalog.friendGreeting(for: personaId)
     }
 
     private func ensureTrumpWebPreviewExample(modelContext: ModelContext) throws {

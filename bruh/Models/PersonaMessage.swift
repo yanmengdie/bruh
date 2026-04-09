@@ -9,6 +9,7 @@ final class PersonaMessage {
     var contentEventId: String?
     var text: String
     var imageUrl: String?
+    var sourceUrl: String?
     var audioUrl: String?
     var audioDuration: TimeInterval?
     var voiceLabel: String?
@@ -26,6 +27,7 @@ final class PersonaMessage {
         contentEventId: String? = nil,
         text: String,
         imageUrl: String? = nil,
+        sourceUrl: String? = nil,
         audioUrl: String? = nil,
         audioDuration: TimeInterval? = nil,
         voiceLabel: String? = nil,
@@ -42,6 +44,7 @@ final class PersonaMessage {
         self.contentEventId = contentEventId
         self.text = text
         self.imageUrl = imageUrl
+        self.sourceUrl = sourceUrl
         self.audioUrl = audioUrl
         self.audioDuration = audioDuration
         self.voiceLabel = voiceLabel

@@ -166,8 +166,6 @@ struct MessagesScreen: View {
             return .orange
         case "musk":
             return .blue
-        case "zuckerberg":
-            return .purple
         case "sam_altman":
             return Color(red: 0.06, green: 0.12, blue: 0.22)
         case "zhang_peng":
@@ -184,6 +182,10 @@ struct MessagesScreen: View {
             return Color(red: 0.72, green: 0.54, blue: 0.42)
         case "papi":
             return Color(red: 0.88, green: 0.11, blue: 0.55)
+        case "kobe_bryant":
+            return Color(red: 0.99, green: 0.73, blue: 0.15)
+        case "cristiano_ronaldo":
+            return Color(red: 0.05, green: 0.58, blue: 0.53)
         default:
             return .gray
         }
@@ -541,8 +543,6 @@ private struct MessageDetailView: View {
             return .orange
         case "musk":
             return .blue
-        case "zuckerberg":
-            return .purple
         case "sam_altman":
             return Color(red: 0.06, green: 0.12, blue: 0.22)
         case "zhang_peng":
@@ -559,6 +559,10 @@ private struct MessageDetailView: View {
             return Color(red: 0.72, green: 0.54, blue: 0.42)
         case "papi":
             return Color(red: 0.88, green: 0.11, blue: 0.55)
+        case "kobe_bryant":
+            return Color(red: 0.99, green: 0.73, blue: 0.15)
+        case "cristiano_ronaldo":
+            return Color(red: 0.05, green: 0.58, blue: 0.53)
         default:
             return .gray
         }
@@ -648,6 +652,7 @@ private struct MessageDetailView: View {
 
     private func messageRow(for message: PersonaMessage) -> some View {
         let content = parseContent(from: message)
+        let sourceURL = resolvedSourceURL(for: message)
         let personaTheme = persona(for: thread.personaId).tint
         let reaction = reaction(for: message.id)
 
@@ -658,6 +663,8 @@ private struct MessageDetailView: View {
                         incomingAvatar
                         messageContentView(
                             content: content,
+                            sourceURL: sourceURL,
+                            personaId: message.personaId,
                             isIncoming: true,
                             deliveryState: message.deliveryState,
                             themeColor: personaTheme
@@ -673,6 +680,8 @@ private struct MessageDetailView: View {
                     Spacer(minLength: 40)
                     messageContentView(
                         content: content,
+                        sourceURL: sourceURL,
+                        personaId: message.personaId,
                         isIncoming: false,
                         deliveryState: message.deliveryState,
                         themeColor: personaTheme
@@ -694,35 +703,43 @@ private struct MessageDetailView: View {
     @ViewBuilder
     private func messageContentView(
         content: MessageContent,
+        sourceURL: URL?,
+        personaId: String,
         isIncoming: Bool,
         deliveryState: String,
         themeColor: Color
     ) -> some View {
-        switch content {
-        case .text(let text, let imageUrl):
-            bubble(
-                text: text,
-                imageURL: imageUrl,
-                isIncoming: isIncoming,
-                deliveryState: deliveryState,
-                themeColor: themeColor
-            )
-        case .webPreview(let url):
-            webPreviewCard(
-                url: url,
-                isIncoming: isIncoming,
-                deliveryState: deliveryState,
-                themeColor: themeColor
-            )
-        case .audio(let url, let duration, let messageId):
-            voiceMessageCard(
-                url: url,
-                duration: duration,
-                messageId: messageId,
-                isIncoming: isIncoming,
-                deliveryState: deliveryState,
-                themeColor: themeColor
-            )
+        VStack(alignment: isIncoming ? .leading : .trailing, spacing: 6) {
+            switch content {
+            case .text(let text, let imageUrl):
+                bubble(
+                    text: text,
+                    imageURL: imageUrl,
+                    isIncoming: isIncoming,
+                    deliveryState: deliveryState,
+                    themeColor: themeColor
+                )
+            case .webPreview(let url):
+                webPreviewCard(
+                    url: url,
+                    isIncoming: isIncoming,
+                    deliveryState: deliveryState,
+                    themeColor: themeColor
+                )
+            case .audio(let url, let duration, let messageId):
+                voiceMessageCard(
+                    url: url,
+                    duration: duration,
+                    messageId: messageId,
+                    isIncoming: isIncoming,
+                    deliveryState: deliveryState,
+                    themeColor: themeColor
+                )
+            }
+
+            if let sourceURL {
+                sourceLinkChip(url: sourceURL, personaId: personaId, isIncoming: isIncoming)
+            }
         }
     }
 
@@ -760,6 +777,16 @@ private struct MessageDetailView: View {
         }
 
         return URL(string: String(text[resultRange]))
+    }
+
+    private func resolvedSourceURL(for message: PersonaMessage) -> URL? {
+        guard firstURL(in: message.text) == nil,
+              let source = message.sourceUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !source.isEmpty else {
+            return nil
+        }
+
+        return URL(string: source)
     }
 
     private var incomingAvatar: some View {
@@ -965,6 +992,57 @@ private struct MessageDetailView: View {
                     .foregroundStyle(.red)
             }
         }
+    }
+
+    private func sourceLinkChip(url: URL, personaId: String, isIncoming: Bool) -> some View {
+        Button {
+            presentedSourceURL = url
+            isPresentingSafari = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "link")
+                    .font(.system(size: 11, weight: .semibold))
+
+                Text(sourceLabel(for: url, personaId: personaId))
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color.white.opacity(0.7))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: isIncoming ? .leading : .trailing)
+    }
+
+    private func sourceLabel(for url: URL, personaId: String) -> String {
+        let prefix: String
+        switch personaId {
+        case "trump":
+            prefix = "Receipts"
+        case "musk":
+            prefix = "Link"
+        case "sam_altman", "kobe_bryant":
+            prefix = "Source"
+        case "zhang_peng", "liu_jingkang", "papi":
+            prefix = "原文"
+        case "lei_jun":
+            prefix = "看来源"
+        case "luo_yonghao":
+            prefix = "看这个"
+        case "justin_sun":
+            prefix = "Market context"
+        case "kim_kardashian", "cristiano_ronaldo":
+            prefix = "Story"
+        default:
+            prefix = "Source"
+        }
+
+        let host = (url.host ?? url.absoluteString)
+            .replacingOccurrences(of: "^www\\.", with: "", options: .regularExpression)
+        return "\(prefix) · \(host)"
     }
 
     private func heroFallback() -> some View {

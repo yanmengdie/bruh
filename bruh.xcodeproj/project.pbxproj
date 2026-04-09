@@ -37,6 +37,7 @@
 		A100001C000000000000001C /* Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001C000000000000001C /* Onboarding.swift */; };
 		A100001D000000000000001D /* trump_joy.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = B100001D000000000000001D /* trump_joy.mp4 */; };
 		A100001E000000000000001E /* AddBruhView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001E000000000000001E /* AddBruhView.swift */; };
+		A100001F000000000000001F /* SharedPersonas.json in Resources */ = {isa = PBXBuildFile; fileRef = B100001F000000000000001F /* SharedPersonas.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -70,6 +71,7 @@
 		B100001C000000000000001C /* Onboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Onboarding.swift; sourceTree = "<group>"; };
 		B100001D000000000000001D /* trump_joy.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = trump_joy.mp4; sourceTree = SOURCE_ROOT; };
 		B100001E000000000000001E /* AddBruhView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBruhView.swift; sourceTree = "<group>"; };
+		B100001F000000000000001F /* SharedPersonas.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = SharedPersonas.json; sourceTree = "<group>"; };
 		C1000001000000000000001 /* bruh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bruh.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -104,6 +106,7 @@
 				B100000C00000000000000C /* Assets.xcassets */,
 				B100000F00000000000000F /* LaunchScreen.storyboard */,
 				B100001D000000000000001D /* trump_joy.mp4 */,
+				B100001F000000000000001F /* SharedPersonas.json */,
 			);
 			path = bruh;
 			sourceTree = "<group>";
@@ -278,6 +281,7 @@
 				A100000C00000000000000C /* Assets.xcassets in Resources */,
 				A100000F00000000000000F /* LaunchScreen.storyboard in Resources */,
 				A100001D000000000000001D /* trump_joy.mp4 in Resources */,
+				A100001F000000000000001F /* SharedPersonas.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -448,12 +452,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MW8MKZLVY6;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+					CURRENT_PROJECT_VERSION = 1;
+					DEVELOPMENT_TEAM = MW8MKZLVY6;
+					GENERATE_INFOPLIST_FILE = YES;
+					INFOPLIST_KEY_NSCameraUsageDescription = "用于拍摄你的头像照片。";
+					INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于从相册选择你的头像照片。";
+					INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+					INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+					INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -475,12 +481,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MW8MKZLVY6;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+					CURRENT_PROJECT_VERSION = 1;
+					DEVELOPMENT_TEAM = MW8MKZLVY6;
+					GENERATE_INFOPLIST_FILE = YES;
+					INFOPLIST_KEY_NSCameraUsageDescription = "用于拍摄你的头像照片。";
+					INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于从相册选择你的头像照片。";
+					INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+					INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+					INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (

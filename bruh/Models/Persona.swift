@@ -9,6 +9,14 @@ enum ContactRelationshipStatus: String, CaseIterable {
     case custom
 }
 
+struct PersonaPlatformAccount: Codable, Hashable {
+    let platform: String
+    let handle: String
+    let profileUrl: String?
+    let isPrimary: Bool
+    let isActive: Bool
+}
+
 struct PersonaCatalogEntry {
     let id: String
     let displayName: String
@@ -17,12 +25,22 @@ struct PersonaCatalogEntry {
     let domains: [String]
     let stance: String
     let triggerKeywords: [String]
+    let leadInterestIds: [String]
     let xUsername: String
     let subtitle: String
     let inviteMessage: String
     let themeColorHex: String
     let locationLabel: String
     let inviteOrder: Int
+    let aliases: [String]
+    let entityKeywords: [String]
+    let primaryLanguage: String
+    let friendGreeting: String
+    let defaultVoiceSpeakerId: String
+    let defaultVoiceLabel: String
+    let socialCircleIds: [String]
+    let relationshipHints: [String: String]
+    let platformAccounts: [PersonaPlatformAccount]
 
     func makePersona() -> Persona {
         Persona(
@@ -43,199 +61,194 @@ struct PersonaCatalogEntry {
     }
 }
 
+private struct PersonaCatalogResourceEntry: Decodable {
+    let id: String
+    let displayName: String
+    let avatarName: String
+    let handle: String
+    let domains: [String]
+    let stance: String
+    let triggerKeywords: [String]
+    let entityKeywords: [String]
+    let leadInterestIds: [String]
+    let subtitle: String
+    let inviteMessage: String
+    let themeColorHex: String
+    let locationLabel: String
+    let baseInviteOrder: Int
+    let primaryLanguage: String
+    let friendGreeting: String
+    let aliases: [String]
+    let platformAccounts: [PersonaPlatformAccount]
+    let defaultVoiceSpeakerId: String
+    let defaultVoiceLabel: String
+    let socialCircleIds: [String]
+    let relationshipHints: [String: String]
+
+    func makeCatalogEntry() -> PersonaCatalogEntry {
+        let primaryXAccount = platformAccounts.first(where: { $0.platform == "x" && $0.isActive })?.handle ?? ""
+        return PersonaCatalogEntry(
+            id: id,
+            displayName: displayName,
+            avatarName: avatarName,
+            handle: handle,
+            domains: domains,
+            stance: stance,
+            triggerKeywords: triggerKeywords,
+            leadInterestIds: leadInterestIds,
+            xUsername: primaryXAccount,
+            subtitle: subtitle,
+            inviteMessage: inviteMessage,
+            themeColorHex: themeColorHex,
+            locationLabel: locationLabel,
+            inviteOrder: baseInviteOrder,
+            aliases: aliases,
+            entityKeywords: entityKeywords,
+            primaryLanguage: primaryLanguage,
+            friendGreeting: friendGreeting,
+            defaultVoiceSpeakerId: defaultVoiceSpeakerId,
+            defaultVoiceLabel: defaultVoiceLabel,
+            socialCircleIds: socialCircleIds,
+            relationshipHints: relationshipHints,
+            platformAccounts: platformAccounts
+        )
+    }
+}
+
+private final class PersonaCatalogBundleMarker: NSObject {}
+
 enum PersonaCatalog {
-    static let trump = PersonaCatalogEntry(
-        id: "trump",
-        displayName: "Donald Trump",
-        avatarName: "avatar_trump",
-        handle: "@realDonaldTrump",
-        domains: ["politics", "finance", "trade"],
-        stance: "美国优先, 反建制, 自我吹嘘, 攻击对手",
-        triggerKeywords: ["tariff", "china", "trade", "election", "tiktok", "truth social"],
-        xUsername: "realDonaldTrump",
-        subtitle: "45th & 47th POTUS",
-        inviteMessage: "Hey bruh! I heard you're interested in politics. GREAT choice. Nobody knows politics better than me. Accept this and I'll keep you updated on everything. Believe me. ☝️🇺🇸",
-        themeColorHex: "#D62839",
-        locationLabel: "United States",
-        inviteOrder: 0
-    )
+    private static let loadedEntries: [PersonaCatalogEntry] = loadEntries()
 
-    static let musk = PersonaCatalogEntry(
-        id: "musk",
-        displayName: "Elon Musk",
-        avatarName: "Avatar_ Elon",
-        handle: "@elonmusk",
-        domains: ["tech", "ai", "space", "ev"],
-        stance: "技术乐观派, 嘲讽竞争对手, 语气随意",
-        triggerKeywords: ["tesla", "spacex", "openai", "grok", "x.com", "ai"],
-        xUsername: "elonmusk",
-        subtitle: "CEO · SpaceX · xAI",
-        inviteMessage: "You seem sharp. Want first access to what matters in AI, rockets, and product launches? Let's talk. 🚀",
-        themeColorHex: "#1F2A8A",
-        locationLabel: "X HQ",
-        inviteOrder: 1
-    )
+    static var trump: PersonaCatalogEntry { requiredEntry(for: "trump") }
+    static var musk: PersonaCatalogEntry { requiredEntry(for: "musk") }
+    static var samAltman: PersonaCatalogEntry { requiredEntry(for: "sam_altman") }
+    static var zhangPeng: PersonaCatalogEntry { requiredEntry(for: "zhang_peng") }
+    static var leiJun: PersonaCatalogEntry { requiredEntry(for: "lei_jun") }
+    static var liuJingkang: PersonaCatalogEntry { requiredEntry(for: "liu_jingkang") }
+    static var luoYonghao: PersonaCatalogEntry { requiredEntry(for: "luo_yonghao") }
+    static var justinSun: PersonaCatalogEntry { requiredEntry(for: "justin_sun") }
+    static var kimKardashian: PersonaCatalogEntry { requiredEntry(for: "kim_kardashian") }
+    static var papi: PersonaCatalogEntry { requiredEntry(for: "papi") }
+    static var kobeBryant: PersonaCatalogEntry { requiredEntry(for: "kobe_bryant") }
 
-    static let zuckerberg = PersonaCatalogEntry(
-        id: "zuckerberg",
-        displayName: "Mark Zuckerberg",
-        avatarName: "avatar_zuckerberg",
-        handle: "@finkd",
-        domains: ["tech", "social", "ai", "vr"],
-        stance: "技术极客, 偶尔冷幽默, 强调元宇宙和社交",
-        triggerKeywords: ["meta", "instagram", "threads", "llama", "vr", "quest", "ai"],
-        xUsername: "finkd",
-        subtitle: "Meta · AI & Social",
-        inviteMessage: "I can send you concise updates on social platforms, AI releases, and what creators are reacting to in real time. 🤝",
-        themeColorHex: "#6A5AE0",
-        locationLabel: "Meta Park",
-        inviteOrder: 2
-    )
-
-    static let samAltman = PersonaCatalogEntry(
-        id: "sam_altman",
-        displayName: "Sam Altman",
-        avatarName: "Avatar_ Sam Altman",
-        handle: "@sama",
-        domains: ["tech", "finance", "world", "ai"],
-        stance: "AI 产品化推动者, 长期主义, 擅长人才与资源整合, 语气冷静但有明显使命感",
-        triggerKeywords: ["openai", "chatgpt", "gpt", "agi", "agents", "compute", "sora", "inference"],
-        xUsername: "sama",
-        subtitle: "OpenAI · AGI Builder",
-        inviteMessage: "You seem like someone who cares about where AI is actually going, not just the demos. Accept and I'll send the real signal.",
-        themeColorHex: "#0F172A",
-        locationLabel: "San Francisco",
-        inviteOrder: 3
-    )
-
-    static let zhangPeng = PersonaCatalogEntry(
-        id: "zhang_peng",
-        displayName: "张鹏",
-        avatarName: "",
-        handle: "@geekpark",
-        domains: ["tech", "world", "china", "ai"],
-        stance: "科技媒体人与趋势观察者, 擅长拉长时间轴看变量, 先给框架再下判断",
-        triggerKeywords: ["极客公园", "geekpark", "ai", "agent", "robot", "apple", "tesla", "innovation"],
-        xUsername: "",
-        subtitle: "极客公园 · 科技趋势",
-        inviteMessage: "如果你不只想看热闹，而是想看懂技术周期、产业变量和真正的拐点，我来给你发重点。",
-        themeColorHex: "#2563EB",
-        locationLabel: "北京",
-        inviteOrder: 4
-    )
-
-    static let leiJun = PersonaCatalogEntry(
-        id: "lei_jun",
-        displayName: "雷军",
-        avatarName: "Avatar_ Leijun",
-        handle: "@leijun",
-        domains: ["tech", "finance", "china", "ev"],
-        stance: "产品经理式表达, 强调效率和结果, 能把复杂产品与制造问题讲清楚",
-        triggerKeywords: ["xiaomi", "小米", "redmi", "su7", "yu7", "factory", "ecosystem", "芯片"],
-        xUsername: "leijun",
-        subtitle: "Xiaomi · Founder",
-        inviteMessage: "最近硬件、汽车和制造业节奏都很快。我可以把真正重要的产品和产业信号，用最直接的方式讲给你。",
-        themeColorHex: "#FF6900",
-        locationLabel: "北京",
-        inviteOrder: 5
-    )
-
-    static let liuJingkang = PersonaCatalogEntry(
-        id: "liu_jingkang",
-        displayName: "刘靖康",
-        avatarName: "Avatar_ LiuJingkang",
-        handle: "@jkliu",
-        domains: ["tech", "world", "china", "creator"],
-        stance: "硬件创业者, 用户痛点导向, 全球化视角, 说话直接, 很少空谈",
-        triggerKeywords: ["insta360", "影石", "camera", "creator", "drone", "gopro", "hardware"],
-        xUsername: "",
-        subtitle: "Insta360 · Founder",
-        inviteMessage: "如果你也关心产品怎么从真实痛点里长出来，我会把硬件、创作者和全球市场里真正值得看的变化发给你。",
-        themeColorHex: "#0F9D94",
-        locationLabel: "深圳",
-        inviteOrder: 6
-    )
-
-    static let luoYonghao = PersonaCatalogEntry(
-        id: "luo_yonghao",
-        displayName: "罗永浩",
-        avatarName: "Avatar_LuoYonghao",
-        handle: "@luoyonghao",
-        domains: ["tech", "entertainment", "china", "consumer"],
-        stance: "表达锋利, 吐槽感强, 重产品体验与真诚表达, 会自嘲也会直怼",
-        triggerKeywords: ["smartisan", "锤子", "直播", "电商", "创业", "product", "发布会"],
-        xUsername: "",
-        subtitle: "创业者 · 会把话讲明白",
-        inviteMessage: "我不跟你说套话。产品、创业、表达，还有那些值得吐槽的荒唐事，我都能跟你聊透。",
-        themeColorHex: "#7F1D1D",
-        locationLabel: "北京",
-        inviteOrder: 7
-    )
-
-    static let justinSun = PersonaCatalogEntry(
-        id: "justin_sun",
-        displayName: "孙宇晨",
-        avatarName: "Avatar_Justin Sun",
-        handle: "@justinsuntron",
-        domains: ["finance", "tech", "world", "crypto"],
-        stance: "高曝光营销型创始人, 交易叙事驱动, 节奏快, 喜欢制造市场关注度",
-        triggerKeywords: ["tron", "trx", "htx", "defi", "stablecoin", "crypto", "bitcoin", "ethereum"],
-        xUsername: "justinsuntron",
-        subtitle: "TRON · Crypto",
-        inviteMessage: "Markets move fast. I can send you the crypto signal before the timeline catches up.",
-        themeColorHex: "#0BBF9A",
-        locationLabel: "Hong Kong",
-        inviteOrder: 8
-    )
-
-    static let kimKardashian = PersonaCatalogEntry(
-        id: "kim_kardashian",
-        displayName: "Kim Kardashian",
-        avatarName: "Avatar_ Kim",
-        handle: "@KimKardashian",
-        domains: ["entertainment", "social", "finance", "fashion"],
-        stance: "名人品牌运营者, 审美与话题敏感, 擅长把流量转成商业与文化影响力",
-        triggerKeywords: ["skims", "fashion", "beauty", "campaign", "celebrity", "hollywood", "brand"],
-        xUsername: "KimKardashian",
-        subtitle: "SKIMS · Culture & Brand",
-        inviteMessage: "If you care about culture, campaigns, and what people will copy next, I'll keep the signal clean and ahead of the trend.",
-        themeColorHex: "#B78A6B",
-        locationLabel: "Los Angeles",
-        inviteOrder: 9
-    )
-
-    static let papi = PersonaCatalogEntry(
-        id: "papi",
-        displayName: "papi酱",
-        avatarName: "Avatar_Papi",
-        handle: "@papijiang",
-        domains: ["entertainment", "social", "china", "creator"],
-        stance: "内容创作者视角, 善于观察具体细节, 带点自嘲, 对空话和大词很警惕",
-        triggerKeywords: ["papi酱", "姜逸磊", "短视频", "创作", "内容", "综艺", "女性", "表达"],
-        xUsername: "",
-        subtitle: "内容创作者 · 观察很准",
-        inviteMessage: "你看起来不是只想看热闹的人。我可以把创作、内容生态和那些微妙的人情绪，讲得更明白一点。",
-        themeColorHex: "#E11D8D",
-        locationLabel: "上海",
-        inviteOrder: 10
-    )
-
-    static let all: [PersonaCatalogEntry] = [
-        trump,
-        musk,
-        zuckerberg,
-        samAltman,
-        zhangPeng,
-        leiJun,
-        liuJingkang,
-        luoYonghao,
-        justinSun,
-        kimKardashian,
-        papi,
-    ]
+    static var all: [PersonaCatalogEntry] {
+        loadedEntries
+    }
 
     static func entry(for personaId: String) -> PersonaCatalogEntry? {
-        all.first(where: { $0.id == personaId })
+        loadedEntries.first(where: { $0.id == personaId })
+    }
+
+    static func friendGreeting(for personaId: String) -> String {
+        entry(for: personaId)?.friendGreeting ?? "我已添加你了，直接开始聊天吧。"
+    }
+
+    static func inviteOrderMap(for selectedInterestIds: [String]) -> [String: Int] {
+        Dictionary(
+            uniqueKeysWithValues: prioritizedEntries(for: selectedInterestIds)
+                .enumerated()
+                .map { ($0.element.id, $0.offset) }
+        )
+    }
+
+    private static func prioritizedEntries(for selectedInterestIds: [String]) -> [PersonaCatalogEntry] {
+        let normalizedInterests = orderedUnique(selectedInterestIds)
+
+        return loadedEntries.sorted { left, right in
+            let leftScore = invitePriorityScore(for: left, selectedInterestIds: normalizedInterests)
+            let rightScore = invitePriorityScore(for: right, selectedInterestIds: normalizedInterests)
+
+            if leftScore != rightScore {
+                return leftScore > rightScore
+            }
+
+            return left.inviteOrder < right.inviteOrder
+        }
+    }
+
+    private static func invitePriorityScore(for entry: PersonaCatalogEntry, selectedInterestIds: [String]) -> Int {
+        guard !selectedInterestIds.isEmpty else { return 0 }
+
+        let overlap = selectedInterestIds.filter(entry.domains.contains)
+        let overlapScore = overlap.count * 100
+        let orderedBonus = overlap.enumerated().reduce(0) { partial, element in
+            partial + max(0, 60 - element.offset * 15)
+        }
+
+        let primaryBoost: Int
+        if let primaryInterestId = selectedInterestIds.first {
+            if primaryLeadPersonaId(for: primaryInterestId) == entry.id {
+                primaryBoost = 1000
+            } else if entry.domains.contains(primaryInterestId) {
+                primaryBoost = 600
+            } else {
+                primaryBoost = 0
+            }
+        } else {
+            primaryBoost = 0
+        }
+
+        return primaryBoost + overlapScore + orderedBonus
+    }
+
+    private static func primaryLeadPersonaId(for interestId: String) -> String? {
+        loadedEntries
+            .filter { $0.leadInterestIds.contains(interestId) }
+            .min(by: { $0.inviteOrder < $1.inviteOrder })?
+            .id ??
+        loadedEntries
+            .filter { $0.domains.contains(interestId) }
+            .min(by: { $0.inviteOrder < $1.inviteOrder })?
+            .id
+    }
+
+    private static func loadEntries() -> [PersonaCatalogEntry] {
+        let decoder = JSONDecoder()
+        for bundle in candidateBundles() {
+            guard let url = bundle.url(forResource: "SharedPersonas", withExtension: "json"),
+                  let data = try? Data(contentsOf: url),
+                  let decoded = try? decoder.decode([PersonaCatalogResourceEntry].self, from: data) else {
+                continue
+            }
+
+            return decoded
+                .map { $0.makeCatalogEntry() }
+                .sorted { $0.inviteOrder < $1.inviteOrder }
+        }
+
+        assertionFailure("SharedPersonas.json could not be loaded from the app bundle.")
+        return []
+    }
+
+    private static func candidateBundles() -> [Bundle] {
+        let bundles = [
+            Bundle.main,
+            Bundle(for: PersonaCatalogBundleMarker.self),
+        ]
+
+        var seen = Set<String>()
+        var result: [Bundle] = []
+        for bundle in bundles where seen.insert(bundle.bundlePath).inserted {
+            result.append(bundle)
+        }
+        return result
+    }
+
+    private static func orderedUnique<T: Hashable>(_ values: [T]) -> [T] {
+        var seen = Set<T>()
+        var result: [T] = []
+        for value in values where seen.insert(value).inserted {
+            result.append(value)
+        }
+        return result
+    }
+
+    private static func requiredEntry(for personaId: String) -> PersonaCatalogEntry {
+        guard let entry = entry(for: personaId) else {
+            fatalError("Missing persona catalog entry for \(personaId)")
+        }
+        return entry
     }
 }
 
@@ -297,6 +310,7 @@ final class UserProfile {
     @Attribute(.unique) var id: String
     var displayName: String
     var bruhHandle: String
+    @Attribute(.externalStorage) var avatarImageData: Data?
     var selectedInterestIds: [String]
     var timezoneIdentifier: String
     var onboardingCompletedAt: Date?
@@ -307,6 +321,7 @@ final class UserProfile {
         id: String = CurrentUserProfileStore.userId,
         displayName: String = "You",
         bruhHandle: String = "@yourboi",
+        avatarImageData: Data? = nil,
         selectedInterestIds: [String] = NewsInterest.defaultSelection.map(\.rawValue),
         timezoneIdentifier: String = TimeZone.current.identifier,
         onboardingCompletedAt: Date? = nil,
@@ -316,6 +331,7 @@ final class UserProfile {
         self.id = id
         self.displayName = displayName
         self.bruhHandle = bruhHandle
+        self.avatarImageData = avatarImageData
         self.selectedInterestIds = selectedInterestIds
         self.timezoneIdentifier = timezoneIdentifier
         self.onboardingCompletedAt = onboardingCompletedAt
@@ -435,11 +451,41 @@ enum CurrentUserProfileStore {
     @MainActor
     static func updateSelectedInterests(_ interestIds: [String], in context: ModelContext) {
         let profile = fetchOrCreate(in: context)
-        let normalized = interestIds
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        profile.selectedInterestIds = Array(NSOrderedSet(array: normalized)) as? [String] ?? normalized
+        let normalized = normalizedInterestIds(interestIds)
         profile.updatedAt = .now
+        profile.selectedInterestIds = normalized
+        if context.hasChanges {
+            try? context.save()
+        }
+    }
+
+    @MainActor
+    static func completeOnboarding(
+        displayName: String,
+        selectedInterestIds: [String],
+        avatarImageData: Data? = nil,
+        in context: ModelContext
+    ) {
+        let profile = fetchOrCreate(in: context)
+        let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        profile.displayName = trimmedName.isEmpty ? "You" : trimmedName
+        profile.selectedInterestIds = normalizedInterestIds(selectedInterestIds)
+        if let avatarImageData {
+            profile.avatarImageData = avatarImageData
+        }
+        profile.onboardingCompletedAt = .now
+        profile.timezoneIdentifier = TimeZone.current.identifier
+        profile.updatedAt = .now
+
+        let slug = trimmedName
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined()
+        if !slug.isEmpty {
+            profile.bruhHandle = "@\(String(slug.prefix(18)))"
+        }
+
         if context.hasChanges {
             try? context.save()
         }
@@ -450,6 +496,13 @@ enum CurrentUserProfileStore {
         guard profile.selectedInterestIds.isEmpty else { return }
         profile.selectedInterestIds = legacyOrDefaultInterests()
         profile.updatedAt = .now
+    }
+
+    private static func normalizedInterestIds(_ interestIds: [String]) -> [String] {
+        let normalized = interestIds
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return Array(NSOrderedSet(array: normalized)) as? [String] ?? normalized
     }
 
     private static func legacyOrDefaultInterests(userDefaults: UserDefaults = .standard) -> [String] {
