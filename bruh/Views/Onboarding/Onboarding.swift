@@ -129,15 +129,6 @@ struct Onboarding: View {
                     fallbackEmoji: "👩🏽"
                 )
             }
-
-            bubble(text: "假新闻！🗣️", textColor: Color(red: 0.85, green: 0.24, blue: 0.30))
-                .offset(x: -74, y: -38)
-
-            bubble(text: "去火星 🚀", textColor: Color(red: 0.35, green: 0.36, blue: 0.60))
-                .offset(x: -38, y: 26)
-
-            bubble(text: "AGI 快来了 🧠", textColor: Color(red: 0.07, green: 0.64, blue: 0.52))
-                .offset(x: 82, y: -34)
         }
     }
 
@@ -152,7 +143,7 @@ struct Onboarding: View {
                 avatarPickerButton
 
                 TextField("请输入昵称", text: $name)
-                    .font(.system(size: 28, weight: .regular))
+                    .font(.system(size: 22, weight: .regular))
                     .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.17))
                     .textInputAutocapitalization(.words)
                     .submitLabel(.done)
@@ -160,11 +151,11 @@ struct Onboarding: View {
                     .textFieldStyle(.plain)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 18)
-            .frame(minHeight: 132)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .frame(minHeight: 88)
             .background(Color.white.opacity(0.55))
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
     }
 
@@ -175,7 +166,7 @@ struct Onboarding: View {
             ZStack(alignment: .bottomTrailing) {
                 Circle()
                     .fill(Color(red: 0.90, green: 0.88, blue: 0.84))
-                    .frame(width: 108, height: 108)
+                    .frame(width: 72, height: 72)
                     .overlay {
                         Circle()
                             .stroke(Color.black.opacity(0.12), style: StrokeStyle(lineWidth: 5, dash: [10, 5]))
@@ -185,23 +176,23 @@ struct Onboarding: View {
                             Image(uiImage: profileImage)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(width: 96, height: 96)
+                                .frame(width: 62, height: 62)
                                 .clipShape(Circle())
                         } else {
                             Text("📸")
-                                .font(.system(size: 50))
+                                .font(.system(size: 30))
                         }
                     }
 
                 Circle()
                     .fill(Color(red: 0.10, green: 0.11, blue: 0.13))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 28, height: 28)
                     .overlay {
                         Image(systemName: "plus")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.white)
                     }
-                    .offset(x: 4, y: 2)
+                    .offset(x: 2, y: 1)
             }
         }
         .buttonStyle(.plain)
