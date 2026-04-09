@@ -227,6 +227,7 @@ struct MessageReplyDTO: Codable, Identifiable {
     let audioUrl: String?
     let audioDuration: TimeInterval?
     let voiceLabel: String?
+    let audioError: String?
     let audioOnly: Bool?
     let sourcePostIds: [String]
     let generatedAt: Date

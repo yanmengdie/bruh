@@ -522,11 +522,36 @@ function normalizeBoolean(value: unknown) {
   return false
 }
 
+function isConfiguredVoiceSpeakerId(speakerId: string) {
+  const normalized = speakerId.trim()
+  return /^upload:[a-f0-9]+$/i.test(normalized) || /^example:voice_[a-z0-9_]+$/i.test(normalized)
+}
+
 function resolveVoiceSpeakerId(
   persona: NonNullable<ReturnType<typeof resolvePersonaById>>,
 ) {
   const overrideKey = `VOICE_SPEAKER_${persona.personaId.toUpperCase()}`
   return asString(Deno.env.get(overrideKey)) || persona.defaultVoiceSpeakerId
+}
+
+function normalizeVoiceError(error: unknown) {
+  const raw = error instanceof Error ? error.message : String(error)
+  const trimmed = raw
+    .replace(/^TTS request failed(?:\s*\(\d+\))?:\s*/i, "")
+    .replace(/^Error:\s*/i, "")
+    .trim()
+
+  if (!trimmed) return "Voice synthesis failed"
+
+  try {
+    const payload = JSON.parse(trimmed) as Record<string, unknown>
+    const detail = asString(payload.detail ?? payload.message ?? payload.error)
+    if (detail) return detail
+  } catch {
+    // ignore malformed JSON and fall back to the raw text
+  }
+
+  return trimmed.length > 240 ? `${trimmed.slice(0, 237)}...` : trimmed
 }
 
 function classifyVoiceMood(content: string): VoiceMood {
@@ -615,7 +640,8 @@ function shouldReplyWithVoice(
   if (requestImage || !content) return false
 
   const words = content.split(/\s+/).filter((word) => word.length > 0)
-  if (words.length < 5 || words.length > 36) return false
+  const minimumWordCount = personaId === "musk" ? 2 : 5
+  if (words.length < minimumWordCount || words.length > 36) return false
 
   const lower = content.toLowerCase()
   const exclamationCount = countRegexMatches(content, /!/g)
@@ -653,6 +679,7 @@ function shouldReplyWithVoice(
   score += clamp(intenseSignalCount, 0, 3)
 
   if (personaId === "trump") score += 1
+  if (personaId === "musk") score += 1
   if (/[?？]$/.test(content) && exclamationCount === 0 && uppercaseWordCount === 0) score -= 1
 
   return score >= 2
@@ -663,7 +690,12 @@ function buildVoicePlan(
   content: string,
   requestImage: boolean,
 ): VoicePlan {
-  if (!shouldReplyWithVoice(persona.personaId, content, requestImage)) {
+  const speakerId = resolveVoiceSpeakerId(persona)
+
+  if (
+    !shouldReplyWithVoice(persona.personaId, content, requestImage) ||
+    !isConfiguredVoiceSpeakerId(speakerId)
+  ) {
     return {
       shouldGenerate: false,
       speakerId: "",
@@ -677,7 +709,7 @@ function buildVoicePlan(
   const mood = classifyVoiceMood(content)
   return {
     shouldGenerate: true,
-    speakerId: resolveVoiceSpeakerId(persona),
+    speakerId,
     voiceLabel: persona.defaultVoiceLabel,
     emoText: voiceMoodText(persona, mood),
     emoVector: voiceMoodVector(mood),
@@ -723,7 +755,12 @@ async function synthesizeVoiceReply(
   })
 
   if (!response.ok) {
-    throw new Error(`TTS request failed: ${await response.text()}`)
+    const responseText = (await response.text()).trim()
+    throw new Error(
+      responseText
+        ? `TTS request failed (${response.status}): ${responseText}`
+        : `TTS request failed (${response.status})`,
+    )
   }
 
   const payload = await response.json() as TTSResponse
@@ -1007,6 +1044,7 @@ Deno.serve(async (request) => {
     let audioUrl: string | null = null
     let audioDuration: number | null = null
     let voiceLabel: string | null = null
+    let audioError: string | null = null
     let audioOnly = false
 
     const voicePlan = buildVoicePlan(persona, content, requestImage)
@@ -1023,6 +1061,7 @@ Deno.serve(async (request) => {
         voiceLabel = voiceReply.voiceLabel
         audioOnly = true
       } catch (error) {
+        audioError = normalizeVoiceError(error)
         console.error("Voice synthesis failed", error)
       }
     }
@@ -1037,6 +1076,7 @@ Deno.serve(async (request) => {
         audioUrl,
         audioDuration,
         voiceLabel,
+        audioError,
         audioOnly,
         sourceUrl,
         sourcePostIds: [...selected.map((row) => row.id), ...relevantNews.map((row) => row.id)],

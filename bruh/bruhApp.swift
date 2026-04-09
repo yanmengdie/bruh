@@ -37,6 +37,7 @@ struct BruhApp: App {
             PersonaMessage.self,
             FeedComment.self,
             FeedLike.self,
+            FeedInteractionSeedState.self,
             Contact.self,
             UserProfile.self,
         ])

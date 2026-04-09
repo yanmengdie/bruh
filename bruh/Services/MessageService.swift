@@ -17,6 +17,7 @@ final class MessageService {
 
         try seedFallbackStarterMessagesIfNeeded(modelContext: modelContext)
         try ensureTrumpWebPreviewExample(modelContext: modelContext)
+        try normalizeStarterMessagesIfNeeded(modelContext: modelContext)
 
         if modelContext.hasChanges {
             try modelContext.save()
@@ -92,6 +93,7 @@ final class MessageService {
                 audioUrl: reply.audioUrl,
                 audioDuration: reply.audioDuration,
                 voiceLabel: reply.voiceLabel,
+                audioError: reply.audioError,
                 audioOnly: reply.audioOnly == true,
                 isIncoming: true,
                 createdAt: reply.generatedAt,
@@ -116,11 +118,7 @@ final class MessageService {
     func markThreadRead(personaId: String, modelContext: ModelContext) throws {
         let thread = try ensureThread(for: personaId, modelContext: modelContext)
         let latestIncomingAt = try latestIncomingMessageDate(for: personaId, modelContext: modelContext)
-        if let latestIncomingAt {
-            MessageReadStateStore.markRead(personaId: personaId, at: latestIncomingAt)
-        }
-        thread.unreadCount = 0
-        thread.updatedAt = .now
+        MessageThreadReadState.markRead(thread: thread, at: latestIncomingAt)
         if modelContext.hasChanges {
             try modelContext.save()
         }
@@ -156,26 +154,32 @@ final class MessageService {
             return
         }
 
-        let sortedStarters = reply.starters.sorted { left, right in
-            if left.personaId == right.personaId {
-                return left.createdAt < right.createdAt
+        var latestStarterByPersona: [String: MessageStarterDTO] = [:]
+        for starter in reply.starters {
+            guard acceptedPersonaIds.contains(starter.personaId) else { continue }
+            if let existing = latestStarterByPersona[starter.personaId], existing.createdAt >= starter.createdAt {
+                continue
             }
-            return left.personaId < right.personaId
+            latestStarterByPersona[starter.personaId] = starter
         }
 
-        for starter in sortedStarters {
-            guard acceptedPersonaIds.contains(starter.personaId) else { continue }
+        for personaId in latestStarterByPersona.keys.sorted() {
+            guard let starter = latestStarterByPersona[personaId] else { continue }
             let thread = try ensureThread(for: starter.personaId, modelContext: modelContext)
+            guard try !hasConversationHistoryBeyondStarter(for: starter.personaId, modelContext: modelContext) else {
+                continue
+            }
+
             let starterSourceUrl = starter.sourceUrl ?? starter.articleUrl
-            let messageId = starter.id
-            var descriptor = FetchDescriptor<PersonaMessage>(
-                predicate: #Predicate { $0.id == messageId }
-            )
-            descriptor.fetchLimit = 1
+            let starterPreview = messagePreview(text: starter.text, imageUrl: starter.imageUrl)
 
-            if let existing = try modelContext.fetch(descriptor).first {
-                guard existing.isSeedMessage else { continue }
-
+            if let existing = try starterMessage(for: starter.personaId, modelContext: modelContext) {
+                let previousPreview = messagePreview(
+                    text: existing.text,
+                    imageUrl: existing.imageUrl,
+                    audioUrl: existing.audioUrl,
+                    audioOnly: existing.audioOnly
+                )
                 let previousText = existing.text
                 let previousCreatedAt = existing.createdAt
                 existing.threadId = starter.personaId
@@ -183,23 +187,21 @@ final class MessageService {
                 existing.text = starter.text
                 existing.imageUrl = starter.imageUrl
                 existing.sourceUrl = starterSourceUrl
-                existing.createdAt = starter.createdAt
                 existing.deliveryState = "sent"
                 existing.sourcePostIds = starter.sourcePostIds
+                existing.isSeedMessage = true
                 ContentGraphStore.syncIncomingMessage(existing, in: modelContext)
-                let starterPreview = messagePreview(text: starter.text, imageUrl: starter.imageUrl)
 
                 let shouldRefreshPreview =
                     (thread.lastMessagePreview == previousText && thread.lastMessageAt == previousCreatedAt) ||
-                    thread.lastMessageAt < starter.createdAt
+                    (thread.lastMessagePreview == previousPreview && thread.lastMessageAt == previousCreatedAt)
 
                 if shouldRefreshPreview {
-                    updateThread(thread, preview: starterPreview, at: starter.createdAt, unreadCount: thread.unreadCount)
+                    updateThread(thread, preview: starterPreview, at: previousCreatedAt, unreadCount: thread.unreadCount)
                 }
             } else {
-                let starterPreview = messagePreview(text: starter.text, imageUrl: starter.imageUrl)
                 let message = PersonaMessage(
-                    id: starter.id,
+                    id: starterMessageId(for: starter.personaId),
                     threadId: starter.personaId,
                     personaId: starter.personaId,
                     text: starter.text,
@@ -213,39 +215,39 @@ final class MessageService {
                 )
                 modelContext.insert(message)
                 ContentGraphStore.syncIncomingMessage(message, in: modelContext)
-                let nextUnreadCount = thread.unreadCount + 1
+                let nextUnreadCount = nextUnreadCount(afterReceivingMessageAt: starter.createdAt, on: thread)
                 updateThread(thread, preview: starterPreview, at: starter.createdAt, unreadCount: nextUnreadCount)
             }
         }
 
+        try normalizeStarterMessagesIfNeeded(modelContext: modelContext)
         try seedFallbackStarterMessagesIfNeeded(modelContext: modelContext)
     }
 
     private func seedFallbackStarterMessagesIfNeeded(modelContext: ModelContext) throws {
         for personaId in try acceptedPersonaIds(modelContext: modelContext) {
             let thread = try ensureThread(for: personaId, modelContext: modelContext)
-            let threadId = personaId
-
-            var descriptor = FetchDescriptor<PersonaMessage>(
-                predicate: #Predicate { $0.threadId == threadId }
-            )
-            descriptor.fetchLimit = 1
-
-            if try modelContext.fetch(descriptor).isEmpty {
-                let starter = PersonaMessage(
-                    id: "starter-\(personaId)",
-                    threadId: personaId,
-                    personaId: personaId,
-                    text: starterMessage(for: personaId),
-                    isIncoming: true,
-                    createdAt: Date(),
-                    deliveryState: "sent",
-                    isSeedMessage: true
-                )
-                modelContext.insert(starter)
-                ContentGraphStore.syncIncomingMessage(starter, in: modelContext)
-                updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: 1)
+            guard try starterMessage(for: personaId, modelContext: modelContext) == nil else {
+                continue
             }
+            guard try !hasConversationHistoryBeyondStarter(for: personaId, modelContext: modelContext) else {
+                continue
+            }
+
+            let starter = PersonaMessage(
+                id: starterMessageId(for: personaId),
+                threadId: personaId,
+                personaId: personaId,
+                text: starterMessage(for: personaId),
+                isIncoming: true,
+                createdAt: Date(),
+                deliveryState: "sent",
+                isSeedMessage: true
+            )
+            modelContext.insert(starter)
+            ContentGraphStore.syncIncomingMessage(starter, in: modelContext)
+            let nextUnreadCount = nextUnreadCount(afterReceivingMessageAt: starter.createdAt, on: thread)
+            updateThread(thread, preview: starter.text, at: starter.createdAt, unreadCount: nextUnreadCount)
         }
     }
 
@@ -304,6 +306,10 @@ final class MessageService {
         PersonaCatalog.starterMessage(for: personaId)
     }
 
+    private func starterMessageId(for personaId: String) -> String {
+        "starter:\(personaId)"
+    }
+
     private func ensureTrumpWebPreviewExample(modelContext: ModelContext) throws {
         guard try acceptedPersonaIds(modelContext: modelContext).contains("trump") else { return }
         let demoId = "seed-trump-reuters-og"
@@ -327,13 +333,14 @@ final class MessageService {
             isIncoming: true,
             createdAt: demoDate,
             deliveryState: "sent",
-            isSeedMessage: true
+            isSeedMessage: false
         )
         modelContext.insert(demo)
         ContentGraphStore.syncIncomingMessage(demo, in: modelContext)
 
         if demoDate >= thread.lastMessageAt {
-            updateThread(thread, preview: demoText, at: demoDate, unreadCount: max(thread.unreadCount, 1))
+            let nextUnreadCount = nextUnreadCount(afterReceivingMessageAt: demoDate, on: thread)
+            updateThread(thread, preview: demoText, at: demoDate, unreadCount: nextUnreadCount)
         }
     }
 
@@ -354,39 +361,170 @@ final class MessageService {
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor).first?.createdAt
     }
-}
 
-enum MessageReadStateStore {
-    private static let defaults = UserDefaults.standard
-    private static let keyPrefix = "message.lastReadAt."
-
-    static func lastReadAt(for personaId: String) -> Date? {
-        let interval = defaults.double(forKey: key(for: personaId))
-        guard interval > 0 else { return nil }
-        return Date(timeIntervalSince1970: interval)
+    private func starterMessage(for personaId: String, modelContext: ModelContext) throws -> PersonaMessage? {
+        let starterMessages = try starterMessages(for: personaId, modelContext: modelContext)
+        if let canonical = starterMessages.first(where: { $0.id == starterMessageId(for: personaId) }) {
+            return canonical
+        }
+        return starterMessages.first
     }
 
-    static func markRead(personaId: String, at date: Date) {
-        let existing = lastReadAt(for: personaId) ?? .distantPast
-        guard date > existing else { return }
-        defaults.set(date.timeIntervalSince1970, forKey: key(for: personaId))
+    private func starterMessages(for personaId: String, modelContext: ModelContext) throws -> [PersonaMessage] {
+        let descriptor = FetchDescriptor<PersonaMessage>(
+            predicate: #Predicate { $0.threadId == personaId && $0.isSeedMessage },
+            sortBy: [SortDescriptor(\PersonaMessage.createdAt, order: .forward)]
+        )
+        return try modelContext.fetch(descriptor)
     }
 
-    static func unreadCount(
-        for personaId: String,
-        deliveries: [ContentDelivery],
-        fallbackCount: Int = 0
-    ) -> Int {
-        let threadDeliveries = deliveries.filter { $0.personaId == personaId }
-        guard !threadDeliveries.isEmpty else { return max(0, fallbackCount) }
-
-        let cutoff = lastReadAt(for: personaId) ?? .distantPast
-        return threadDeliveries.reduce(0) { count, delivery in
-            count + (delivery.sortDate > cutoff ? 1 : 0)
+    private func hasConversationHistoryBeyondStarter(for personaId: String, modelContext: ModelContext) throws -> Bool {
+        let descriptor = FetchDescriptor<PersonaMessage>(
+            predicate: #Predicate { $0.threadId == personaId && $0.isSeedMessage == false }
+        )
+        return try modelContext.fetch(descriptor).contains { message in
+            message.id != trumpWebPreviewDemoMessageId
         }
     }
 
-    private static func key(for personaId: String) -> String {
-        "\(keyPrefix)\(personaId)"
+    private func normalizeStarterMessagesIfNeeded(modelContext: ModelContext) throws {
+        for personaId in try acceptedPersonaIds(modelContext: modelContext) {
+            try normalizeStarterMessages(for: personaId, modelContext: modelContext)
+        }
+    }
+
+    private var trumpWebPreviewDemoMessageId: String {
+        "seed-trump-reuters-og"
+    }
+
+    private func normalizeStarterMessages(for personaId: String, modelContext: ModelContext) throws {
+        let starterMessages = try starterMessages(for: personaId, modelContext: modelContext)
+        guard starterMessages.count > 1 else { return }
+
+        let thread = try ensureThread(for: personaId, modelContext: modelContext)
+        let keeper = starterMessages.first(where: { $0.id == starterMessageId(for: personaId) }) ?? starterMessages[0]
+        let richest = preferredStarterMessage(from: starterMessages)
+        let previousCreatedAt = keeper.createdAt
+        let earliestCreatedAt = starterMessages.map(\.createdAt).min() ?? keeper.createdAt
+        let previousPreview = messagePreview(
+            text: keeper.text,
+            imageUrl: keeper.imageUrl,
+            audioUrl: keeper.audioUrl,
+            audioOnly: keeper.audioOnly
+        )
+
+        keeper.threadId = personaId
+        keeper.personaId = personaId
+        keeper.text = richest.text
+        keeper.imageUrl = richest.imageUrl
+        keeper.sourceUrl = richest.sourceUrl
+        keeper.audioUrl = richest.audioUrl
+        keeper.audioDuration = richest.audioDuration
+        keeper.voiceLabel = richest.voiceLabel
+        keeper.audioOnly = richest.audioOnly
+        keeper.deliveryState = "sent"
+        keeper.sourcePostIds = richest.sourcePostIds
+        keeper.isSeedMessage = true
+        keeper.createdAt = earliestCreatedAt
+        ContentGraphStore.syncIncomingMessage(keeper, in: modelContext)
+
+        let mergedPreview = messagePreview(
+            text: keeper.text,
+            imageUrl: keeper.imageUrl,
+            audioUrl: keeper.audioUrl,
+            audioOnly: keeper.audioOnly
+        )
+        if thread.lastMessageAt == previousCreatedAt || thread.lastMessagePreview == previousPreview {
+            updateThread(thread, preview: mergedPreview, at: earliestCreatedAt, unreadCount: thread.unreadCount)
+        }
+
+        for duplicate in starterMessages where duplicate.id != keeper.id {
+            try deleteArtifacts(for: duplicate, modelContext: modelContext)
+            modelContext.delete(duplicate)
+        }
+    }
+
+    private func preferredStarterMessage(from messages: [PersonaMessage]) -> PersonaMessage {
+        messages.max { left, right in
+            let leftScore = starterMessageScore(left)
+            let rightScore = starterMessageScore(right)
+            if leftScore == rightScore {
+                return left.createdAt < right.createdAt
+            }
+            return leftScore < rightScore
+        } ?? messages[0]
+    }
+
+    private func starterMessageScore(_ message: PersonaMessage) -> Int {
+        var score = 0
+        if !(message.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) { score += 1 }
+        if let sourceUrl = message.sourceUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !sourceUrl.isEmpty { score += 2 }
+        if message.imageUrl != nil { score += 2 }
+        if !message.sourcePostIds.isEmpty { score += 3 }
+        return score
+    }
+
+    private func deleteArtifacts(for message: PersonaMessage, modelContext: ModelContext) throws {
+        for deliveryId in ["delivery:message:\(message.id)", "delivery:album:\(message.id)"] {
+            if let delivery = try fetchContentDelivery(id: deliveryId, modelContext: modelContext) {
+                modelContext.delete(delivery)
+            }
+        }
+
+        let eventId = message.contentEventId ?? "event:message:\(message.id)"
+        if let event = try fetchContentEvent(id: eventId, modelContext: modelContext) {
+            modelContext.delete(event)
+        }
+    }
+
+    private func fetchContentDelivery(id: String, modelContext: ModelContext) throws -> ContentDelivery? {
+        var descriptor = FetchDescriptor<ContentDelivery>(
+            predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first
+    }
+
+    private func fetchContentEvent(id: String, modelContext: ModelContext) throws -> ContentEvent? {
+        var descriptor = FetchDescriptor<ContentEvent>(
+            predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first
+    }
+
+    private func nextUnreadCount(afterReceivingMessageAt date: Date, on thread: MessageThread) -> Int {
+        guard date > (thread.lastReadAt ?? .distantPast) else {
+            return max(0, thread.unreadCount)
+        }
+        return max(0, thread.unreadCount) + 1
+    }
+}
+
+enum MessageThreadReadState {
+    static func markRead(thread: MessageThread, at date: Date?) {
+        if let date {
+            let existing = thread.lastReadAt ?? .distantPast
+            if date > existing {
+                thread.lastReadAt = date
+            }
+        }
+        thread.unreadCount = 0
+        thread.updatedAt = .now
+    }
+
+    static func unreadCount(for thread: MessageThread, deliveries: [ContentDelivery]) -> Int {
+        let threadDeliveries = deliveries.filter { delivery in
+            if let threadId = delivery.threadId, threadId == thread.id {
+                return true
+            }
+            return delivery.personaId == thread.personaId
+        }
+        guard !threadDeliveries.isEmpty else { return max(0, thread.unreadCount) }
+
+        let cutoff = thread.lastReadAt ?? .distantPast
+        return threadDeliveries.reduce(0) { count, delivery in
+            count + (delivery.sortDate > cutoff ? 1 : 0)
+        }
     }
 }

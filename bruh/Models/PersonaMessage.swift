@@ -13,6 +13,7 @@ final class PersonaMessage {
     var audioUrl: String?
     var audioDuration: TimeInterval?
     var voiceLabel: String?
+    var audioError: String?
     var audioOnly: Bool
     var isIncoming: Bool
     var createdAt: Date
@@ -31,6 +32,7 @@ final class PersonaMessage {
         audioUrl: String? = nil,
         audioDuration: TimeInterval? = nil,
         voiceLabel: String? = nil,
+        audioError: String? = nil,
         audioOnly: Bool = false,
         isIncoming: Bool,
         createdAt: Date = .now,
@@ -48,6 +50,7 @@ final class PersonaMessage {
         self.audioUrl = audioUrl
         self.audioDuration = audioDuration
         self.voiceLabel = voiceLabel
+        self.audioError = audioError
         self.audioOnly = audioOnly
         self.isIncoming = isIncoming
         self.createdAt = createdAt

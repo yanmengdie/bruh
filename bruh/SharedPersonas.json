@@ -26,7 +26,7 @@
         "isActive": true
       }
     ],
-    "defaultVoiceSpeakerId": "example:voice_trump",
+    "defaultVoiceSpeakerId": "upload:c2a0ab3d750a4d2ea7f942d5b97b1a31",
     "defaultVoiceLabel": "Trump's voice",
     "socialCircleIds": ["musk", "kim_kardashian", "justin_sun"],
     "relationshipHints": {
@@ -62,7 +62,7 @@
         "isActive": true
       }
     ],
-    "defaultVoiceSpeakerId": "example:voice_musk",
+    "defaultVoiceSpeakerId": "upload:13ae480ff27644d29dc8ff1a29604d32",
     "defaultVoiceLabel": "Elon's voice",
     "socialCircleIds": ["trump", "sam_altman", "lei_jun", "liu_jingkang", "justin_sun"],
     "relationshipHints": {
@@ -363,7 +363,7 @@
     "friendGreeting": "I've added you. If you want to talk about discipline, pressure, or what winning really demands, send the real question.",
     "aliases": ["kobe_bryant", "kobe bryant", "kobe-bryant", "kobe", "black mamba", "mamba mentality", "科比"],
     "platformAccounts": [],
-    "defaultVoiceSpeakerId": "example:voice_kobe_bryant",
+    "defaultVoiceSpeakerId": "upload:afcb4886f276471598774d170fd6454a",
     "defaultVoiceLabel": "Kobe's voice",
     "socialCircleIds": ["cristiano_ronaldo", "musk", "kim_kardashian"],
     "relationshipHints": {
@@ -399,7 +399,7 @@
         "isActive": true
       }
     ],
-    "defaultVoiceSpeakerId": "example:voice_cristiano_ronaldo",
+    "defaultVoiceSpeakerId": "upload:c4ffed2632f84a648e49784db7e506e3",
     "defaultVoiceLabel": "Cristiano's voice",
     "socialCircleIds": ["kim_kardashian", "justin_sun"],
     "relationshipHints": {

@@ -7,7 +7,6 @@ import SwiftData
 import UIKit
 
 struct MessagesScreen: View {
-    @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     @Query(sort: [SortDescriptor(\PersonaMessage.createdAt, order: .reverse)]) private var recentMessages: [PersonaMessage]
     let threads: [MessageThread]
@@ -15,7 +14,6 @@ struct MessagesScreen: View {
     let service: MessageService
     let backgroundColor: Color
     @State private var searchText = ""
-    @State private var hasRequestedStarterRefresh = false
 
     private var visibleThreads: [MessageThread] {
         threads
@@ -68,9 +66,6 @@ struct MessagesScreen: View {
         }
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
         .navigationTitle("")
-        .task {
-            await refreshStartersIfNeeded()
-        }
     }
 
     private var divider: some View {
@@ -244,11 +239,7 @@ struct MessagesScreen: View {
     }
 
     private func unreadCount(for thread: MessageThread) -> Int {
-        MessageReadStateStore.unreadCount(
-            for: thread.personaId,
-            deliveries: messageDeliveries,
-            fallbackCount: thread.unreadCount
-        )
+        MessageThreadReadState.unreadCount(for: thread, deliveries: messageDeliveries)
     }
 
     private func messagePreview(for message: PersonaMessage) -> String {
@@ -261,16 +252,6 @@ struct MessagesScreen: View {
         let trimmed = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard message.imageUrl != nil else { return trimmed }
         return trimmed.isEmpty ? "[图片]" : "[图片] \(trimmed)"
-    }
-
-    private func refreshStartersIfNeeded() async {
-        guard !hasRequestedStarterRefresh else { return }
-        guard !acceptedPersonaIds.isEmpty else { return }
-        hasRequestedStarterRefresh = true
-        await service.refreshStarterMessages(
-            modelContext: modelContext,
-            userInterests: CurrentUserProfileStore.selectedInterests(in: modelContext)
-        )
     }
 }
 
@@ -437,7 +418,11 @@ private struct MessageDetailView: View {
         }
         .task {
             entryUnreadCount = currentUnreadCount
-            try? service.markThreadRead(personaId: thread.personaId, modelContext: modelContext)
+            markThreadAsRead()
+        }
+        .task(id: latestIncomingMessageId) {
+            guard latestIncomingMessageId != nil else { return }
+            markThreadAsRead()
         }
         .task(id: messages.count) {
             maybePlayEntryExcitedEffect()
@@ -512,14 +497,22 @@ private struct MessageDetailView: View {
         let incomingMessages = messages.filter(\.isIncoming)
         guard !incomingMessages.isEmpty else { return max(0, thread.unreadCount) }
 
-        let cutoff = MessageReadStateStore.lastReadAt(for: thread.personaId) ?? .distantPast
+        let cutoff = thread.lastReadAt ?? .distantPast
         return incomingMessages.reduce(0) { count, message in
             count + (message.createdAt > cutoff ? 1 : 0)
         }
     }
 
+    private var latestIncomingMessageId: String? {
+        messages.last(where: \.isIncoming)?.id
+    }
+
     private var headerAvatar: some View {
         avatarCircle(size: 52)
+    }
+
+    private func markThreadAsRead() {
+        try? service.markThreadRead(personaId: thread.personaId, modelContext: modelContext)
     }
 
     private func persona(for personaId: String) -> (name: String, tint: Color) {
@@ -657,6 +650,7 @@ private struct MessageDetailView: View {
                         messageContentView(
                             content: content,
                             sourceURL: sourceURL,
+                            audioError: message.audioError,
                             personaId: message.personaId,
                             isIncoming: true,
                             deliveryState: message.deliveryState,
@@ -674,6 +668,7 @@ private struct MessageDetailView: View {
                     messageContentView(
                         content: content,
                         sourceURL: sourceURL,
+                        audioError: message.audioError,
                         personaId: message.personaId,
                         isIncoming: false,
                         deliveryState: message.deliveryState,
@@ -697,6 +692,7 @@ private struct MessageDetailView: View {
     private func messageContentView(
         content: MessageContent,
         sourceURL: URL?,
+        audioError: String?,
         personaId: String,
         isIncoming: Bool,
         deliveryState: String,
@@ -732,6 +728,14 @@ private struct MessageDetailView: View {
 
             if let sourceURL {
                 sourceLinkChip(url: sourceURL, personaId: personaId, isIncoming: isIncoming)
+            }
+
+            if let voiceError = normalizedVoiceError(audioError), !content.hasPlayableAudio {
+                Text("语音未生成：\(voiceError)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.red.opacity(0.88))
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: isIncoming ? .leading : .trailing)
             }
         }
     }
@@ -784,6 +788,13 @@ private struct MessageDetailView: View {
 
     private var incomingAvatar: some View {
         avatarCircle(size: AppTheme.messageIncomingAvatarSize)
+    }
+
+    private func normalizedVoiceError(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
     }
 
     private func bubble(
@@ -1102,6 +1113,13 @@ private enum MessageContent {
     case text(String, imageUrl: URL?)
     case webPreview(URL)
     case audio(URL, duration: TimeInterval?, messageId: String)
+
+    var hasPlayableAudio: Bool {
+        if case .audio = self {
+            return true
+        }
+        return false
+    }
 }
 
 private struct TypingIndicatorBubble: View {

@@ -7,6 +7,7 @@ final class MessageThread {
     var personaId: String
     var lastMessagePreview: String
     var lastMessageAt: Date
+    var lastReadAt: Date?
     var unreadCount: Int
     var createdAt: Date
     var updatedAt: Date
@@ -16,6 +17,7 @@ final class MessageThread {
         personaId: String,
         lastMessagePreview: String,
         lastMessageAt: Date,
+        lastReadAt: Date? = nil,
         unreadCount: Int = 0,
         createdAt: Date = .now,
         updatedAt: Date = .now
@@ -24,6 +26,7 @@ final class MessageThread {
         self.personaId = personaId
         self.lastMessagePreview = lastMessagePreview
         self.lastMessageAt = lastMessageAt
+        self.lastReadAt = lastReadAt
         self.unreadCount = unreadCount
         self.createdAt = createdAt
         self.updatedAt = updatedAt

@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var homePath: [AppDestination] = []
     @State private var selectedTab: MainTab = .contacts
     @State private var messageService = MessageService()
+    @State private var hasLoadedRemoteStarters = false
 
     var body: some View {
         Group {
@@ -151,12 +152,10 @@ struct ContentView: View {
 
     private var totalUnreadMessages: Int {
         return max(0, acceptedPersonaIds.reduce(0) { count, personaId in
-            let fallbackCount = threads.first(where: { $0.personaId == personaId })?.unreadCount ?? 0
-            return count + MessageReadStateStore.unreadCount(
-                for: personaId,
-                deliveries: messageDeliveries,
-                fallbackCount: fallbackCount
-            )
+            guard let thread = threads.first(where: { $0.personaId == personaId }) else {
+                return count
+            }
+            return count + MessageThreadReadState.unreadCount(for: thread, deliveries: messageDeliveries)
         })
     }
 
@@ -224,6 +223,18 @@ struct ContentView: View {
         seedSystemContacts(into: modelContext)
         try? messageService.prepareThreads(modelContext: modelContext)
         syncContentGraph(into: modelContext)
+        guard !hasLoadedRemoteStarters else { return }
+
+        let acceptedContacts = (try? modelContext.fetch(FetchDescriptor<Contact>())) ?? []
+        guard acceptedContacts.contains(where: { $0.relationshipStatusValue == .accepted && $0.linkedPersonaId != nil }) else {
+            return
+        }
+
+        hasLoadedRemoteStarters = true
+        await messageService.refreshStarterMessages(
+            modelContext: modelContext,
+            userInterests: CurrentUserProfileStore.selectedInterests(in: modelContext)
+        )
     }
 
     private func configureNavigationAppearance() {
@@ -1290,14 +1301,7 @@ private struct ContactsView: View {
 
     private func scheduleTrumpFollowUps() {
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
-            insertIncomingMessage(
-                personaId: "trump",
-                text: "You’re in. Big moves ahead. I’ll send you the most important update first.",
-                sourcePostIds: []
-            )
-
-            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            try? await Task.sleep(nanoseconds: 11_000_000_000)
             insertIncomingMessage(
                 personaId: "trump",
                 text: "https://www.reuters.com/world/asia-pacific/trump-agrees-two-week-ceasefire-iran-says-safe-passage-through-hormuz-possible-2026-04-08/",
@@ -1324,7 +1328,9 @@ private struct ContactsView: View {
         ContentGraphStore.syncIncomingMessage(message, in: modelContext)
         thread.lastMessagePreview = text
         thread.lastMessageAt = now
-        thread.unreadCount = max(thread.unreadCount, 0) + 1
+        if now > (thread.lastReadAt ?? .distantPast) {
+            thread.unreadCount = max(thread.unreadCount, 0) + 1
+        }
         thread.updatedAt = now
         try? modelContext.save()
     }
@@ -1411,6 +1417,7 @@ private struct ContactFormView: View {
                 PersonaMessage.self,
                 FeedComment.self,
                 FeedLike.self,
+                FeedInteractionSeedState.self,
                 Contact.self,
                 UserProfile.self,
             ],
