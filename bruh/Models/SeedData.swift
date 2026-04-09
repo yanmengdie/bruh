@@ -45,6 +45,178 @@ func syncContentGraph(into context: ModelContext) {
 }
 
 @MainActor
+func seedDemoMomentsStoryboard(into context: ModelContext) {
+    let now = Date()
+    let publishedAt = now.addingTimeInterval(-8 * 60)
+    let postId = "demo_moments_groupchat"
+
+    let postContent = "Bros, big news — SpaceX just filed for IPO. Every single investment bank on Wall Street is fighting over us right now. Goldman literally sent flowers. 💐🚀"
+
+    var postDescriptor = FetchDescriptor<PersonaPost>(
+        predicate: #Predicate { $0.id == postId }
+    )
+    postDescriptor.fetchLimit = 1
+
+    let post = (try? context.fetch(postDescriptor).first) ?? {
+        let item = PersonaPost(
+            id: postId,
+            personaId: "musk",
+            content: postContent,
+            sourceType: "x",
+            sourceUrl: "https://bruh.local/demo/moments/group-chat",
+            topic: "tech",
+            importanceScore: 0.99,
+            publishedAt: publishedAt,
+            fetchedAt: now,
+            isDelivered: true
+        )
+        context.insert(item)
+        return item
+    }()
+
+    post.personaId = "musk"
+    post.content = postContent
+    post.sourceType = "x"
+    post.sourceUrl = "https://bruh.local/demo/moments/group-chat"
+    post.topic = "tech"
+    post.importanceScore = 0.99
+    post.publishedAt = publishedAt
+    post.fetchedAt = now
+    post.isDelivered = true
+
+    let fixedLikes: [(id: String, authorId: String, authorDisplayName: String, secondsOffset: TimeInterval)] = [
+        ("demo-like-musk", "musk", "Elon Musk", -410),
+        ("demo-like-sam", "sam_altman", "Sam Altman", -390),
+        ("demo-like-liu", "liu_jingkang", "刘靖康", -370),
+        ("demo-like-luo", "luo_yonghao", "罗永浩", -350),
+    ]
+    let fixedLikeIds = Set(fixedLikes.map(\.id))
+
+    for like in fixedLikes {
+        let likeId = like.id
+        var descriptor = FetchDescriptor<FeedLike>(
+            predicate: #Predicate { $0.id == likeId }
+        )
+        descriptor.fetchLimit = 1
+
+        if let existing = try? context.fetch(descriptor).first {
+            existing.postId = postId
+            existing.authorId = like.authorId
+            existing.authorDisplayName = like.authorDisplayName
+            existing.reasonCode = "demo"
+            existing.createdAt = now.addingTimeInterval(like.secondsOffset)
+            existing.isViewer = false
+        } else {
+            context.insert(
+                FeedLike(
+                    id: like.id,
+                    postId: postId,
+                    authorId: like.authorId,
+                    authorDisplayName: like.authorDisplayName,
+                    reasonCode: "demo",
+                    createdAt: now.addingTimeInterval(like.secondsOffset),
+                    isViewer: false
+                )
+            )
+        }
+    }
+
+    let fixedComments: [(id: String, authorId: String, authorDisplayName: String, content: String, replyToId: String?, secondsOffset: TimeInterval)] = [
+        (
+            "demo-comment-sam-1",
+            "sam_altman",
+            "Sam Altman",
+            "Oh, an IPO? How cute. I could take OpenAI public any day I want. I just… choose not to. It's called having OPTIONS, Elon.",
+            nil,
+            -260
+        ),
+        (
+            "demo-comment-musk-2",
+            "musk",
+            "Elon Musk",
+            "Options? Bro you literally had to restructure your entire company just to figure out if you're a nonprofit or not 😂",
+            "demo-comment-sam-1",
+            -220
+        ),
+        (
+            "demo-comment-liu-1",
+            "liu_jingkang",
+            "刘靖康",
+            "哎大家都别吵了，都很厉害的。说到 IPO，其实我们做硬件的也一直在探索，Insta360 最近的全景相机卖得挺不错的，大家有空可以体验一下 😊",
+            nil,
+            -180
+        ),
+        (
+            "demo-comment-luo-1",
+            "luo_yonghao",
+            "罗永浩",
+            "靖康说得对！做硬件确实不容易。毕竟，锤子手机都被我亲手做倒闭了——这种经验不是谁都有的 😂😂😂",
+            nil,
+            -140
+        ),
+    ]
+    let fixedCommentIds = Set(fixedComments.map(\.id))
+
+    for comment in fixedComments {
+        let commentId = comment.id
+        var descriptor = FetchDescriptor<FeedComment>(
+            predicate: #Predicate { $0.id == commentId }
+        )
+        descriptor.fetchLimit = 1
+
+        if let existing = try? context.fetch(descriptor).first {
+            existing.postId = postId
+            existing.authorId = comment.authorId
+            existing.authorDisplayName = comment.authorDisplayName
+            existing.content = comment.content
+            existing.reasonCode = "demo"
+            existing.inReplyToCommentId = comment.replyToId
+            existing.isViewer = false
+            existing.createdAt = now.addingTimeInterval(comment.secondsOffset)
+            existing.deliveryState = "sent"
+        } else {
+            context.insert(
+                FeedComment(
+                    id: comment.id,
+                    postId: postId,
+                    authorId: comment.authorId,
+                    authorDisplayName: comment.authorDisplayName,
+                    content: comment.content,
+                    reasonCode: "demo",
+                    inReplyToCommentId: comment.replyToId,
+                    isViewer: false,
+                    createdAt: now.addingTimeInterval(comment.secondsOffset),
+                    deliveryState: "sent"
+                )
+            )
+        }
+    }
+
+    let targetPostId = postId
+    let likeCleanupDescriptor = FetchDescriptor<FeedLike>(
+        predicate: #Predicate { $0.postId == targetPostId }
+    )
+    if let existingLikes = try? context.fetch(likeCleanupDescriptor) {
+        for like in existingLikes where !fixedLikeIds.contains(like.id) {
+            context.delete(like)
+        }
+    }
+
+    let commentCleanupDescriptor = FetchDescriptor<FeedComment>(
+        predicate: #Predicate { $0.postId == targetPostId }
+    )
+    if let existingComments = try? context.fetch(commentCleanupDescriptor) {
+        for comment in existingComments where !fixedCommentIds.contains(comment.id) {
+            context.delete(comment)
+        }
+    }
+
+    if context.hasChanges {
+        try? context.save()
+    }
+}
+
+@MainActor
 func seedSystemContacts(into context: ModelContext) {
     let personas: [Persona] = (try? context.fetch(FetchDescriptor<Persona>())) ?? []
     let contacts: [Contact] = (try? context.fetch(FetchDescriptor<Contact>())) ?? []
@@ -279,8 +451,29 @@ private func resolvedInviteStatus(
 @MainActor
 private func normalizeInviteFrontier(in context: ModelContext) {
     let contacts: [Contact] = (try? context.fetch(FetchDescriptor<Contact>())) ?? []
+    let personas: [Persona] = (try? context.fetch(FetchDescriptor<Persona>())) ?? []
+    let personaById = Dictionary(uniqueKeysWithValues: personas.map { ($0.id, $0) })
+    let selectedInterestSet = inviteInterestSet(in: context)
+
+    func personaMatchesSelectedInterests(_ personaId: String) -> Bool {
+        guard !selectedInterestSet.isEmpty else { return true }
+        guard let persona = personaById[personaId] else { return false }
+        return !Set(persona.domains).isDisjoint(with: selectedInterestSet)
+    }
+
+    for contact in contacts {
+        guard let personaId = contact.linkedPersonaId else { continue }
+        if !personaMatchesSelectedInterests(personaId),
+           contact.relationshipStatusValue == .pending {
+            contact.relationshipStatusValue = .locked
+        }
+    }
+
     let personaContacts = contacts
-        .filter { $0.linkedPersonaId != nil }
+        .filter { contact in
+            guard let personaId = contact.linkedPersonaId else { return false }
+            return personaMatchesSelectedInterests(personaId)
+        }
         .sorted { ($0.inviteOrder ?? 999) < ($1.inviteOrder ?? 999) }
 
     var frontierLocked = false
@@ -303,4 +496,24 @@ private func normalizeInviteFrontier(in context: ModelContext) {
             continue
         }
     }
+}
+
+@MainActor
+private func inviteInterestSet(in context: ModelContext) -> Set<String> {
+    let supported = Set(["politics", "entertainment", "finance", "sports", "tech"])
+
+    let selectedFromProfile = CurrentUserProfileStore.selectedInterests(in: context)
+        .filter { supported.contains($0) }
+    if !selectedFromProfile.isEmpty {
+        return Set(selectedFromProfile)
+    }
+
+    let selectedFromOnboarding = OnboardingInterestStore.load()
+        .map(\.rawValue)
+        .filter { supported.contains($0) }
+    if !selectedFromOnboarding.isEmpty {
+        return Set(selectedFromOnboarding)
+    }
+
+    return Set(["sports", "tech"])
 }

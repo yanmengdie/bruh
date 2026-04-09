@@ -16,6 +16,8 @@ struct HomeScreen: View {
     let messageUnreadCount: Int
     let momentsUnreadCount: Int
     let hasNewAlbumBadge: Bool
+    let pendingInvitationCount: Int
+    let messagePreviews: [HomeMessagePreview]
     @State private var isVoiceBubblePlaying = false
     @State private var voicePlayer: AVAudioPlayer?
     @State private var voiceDurationLabel = "--:--"
@@ -23,7 +25,7 @@ struct HomeScreen: View {
 
     private var quickApps: [HomeQuickApp] {
         [
-            .init(name: "鸽们", imageAsset: "Icon_contacts", destination: .contacts),
+            .init(name: "鸽们", imageAsset: "Icon_contacts", destination: .contacts, badgeCount: pendingInvitationCount > 0 ? pendingInvitationCount : nil),
             .init(name: "消息", imageAsset: "Icon_message", destination: .imessage, badgeCount: messageUnreadCount),
             .init(name: "日常", imageAsset: "Icon_moments", destination: .feed, badgeCount: momentsUnreadCount),
             .init(name: "相册", imageAsset: "Icon_album", destination: .album, badgeText: hasNewAlbumBadge ? "新" : nil),
@@ -142,8 +144,22 @@ struct HomeScreen: View {
             }
 
             VStack(spacing: 10) {
-                messageSnippet(name: "罗浩安", text: "不是鸽们，你不应该在台上Demo吗？", time: "2分", avatarAsset: "Avatar_LuoHaoan", avatarBackground: Color(red: 0.84, green: 0.76, blue: 0.64))
-                messageSnippet(name: "Hera", text: "欢迎关注小红书@欢崽（Ai版）", time: "15分", avatarAsset: "Avatar_Hera", avatarBackground: Color(red: 0.97, green: 0.82, blue: 0.87))
+                if messagePreviews.isEmpty {
+                    Text("暂无新消息")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.black.opacity(0.40))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ForEach(Array(messagePreviews.prefix(2).enumerated()), id: \.offset) { _, preview in
+                        messageSnippet(
+                            name: preview.name,
+                            text: preview.text,
+                            time: preview.time,
+                            avatarAsset: preview.avatarAsset,
+                            avatarBackground: preview.avatarBackground
+                        )
+                    }
+                }
             }
         }
         .padding(.horizontal, 14)
@@ -493,5 +509,23 @@ private struct HomeQuickApp: Identifiable {
 }
 
 #Preview {
-    HomeScreen(onNavigate: { _ in }, messageUnreadCount: 3, momentsUnreadCount: 5, hasNewAlbumBadge: true)
+    HomeScreen(
+        onNavigate: { _ in },
+        messageUnreadCount: 3,
+        momentsUnreadCount: 5,
+        hasNewAlbumBadge: true,
+        pendingInvitationCount: 2,
+        messagePreviews: [
+            .init(name: "特离谱", text: "今天这条新闻太离谱了。", time: "2分", avatarAsset: "Avatar_Trump"),
+            .init(name: "马期克", text: "火箭和 AI 同时推进。", time: "15分", avatarAsset: "Avatar_Elon"),
+        ]
+    )
+}
+
+struct HomeMessagePreview {
+    let name: String
+    let text: String
+    let time: String
+    var avatarAsset: String? = nil
+    var avatarBackground: Color = Color.black.opacity(0.85)
 }

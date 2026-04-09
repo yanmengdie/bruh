@@ -16,12 +16,22 @@ struct FeedInteractionTarget {
 @MainActor
 final class FeedInteractionService {
     private let api: APIClient
+    private let demoPinnedCanonicalPostId = "demo_moments_groupchat"
+    private let demoPinnedPostIds: Set<String> = [
+        "demo_moments_groupchat",
+        "event:feed:demo_moments_groupchat",
+        "delivery:feed:demo_moments_groupchat",
+    ]
 
     init(api: APIClient = APIClient()) {
         self.api = api
     }
 
     func loadInteractions(for target: FeedInteractionTarget, modelContext: ModelContext) async throws -> FeedInteractionState {
+        if let pinnedPostId = canonicalPinnedPostId(for: target.id) {
+            return try interactionState(for: pinnedPostId, modelContext: modelContext)
+        }
+
         let reply = try await api.generatePostInteractions(
             postId: target.id,
             personaId: target.personaId,
@@ -38,6 +48,10 @@ final class FeedInteractionService {
         text: String,
         modelContext: ModelContext
     ) async throws -> FeedInteractionState {
+        if let pinnedPostId = canonicalPinnedPostId(for: target.id) {
+            return try interactionState(for: pinnedPostId, modelContext: modelContext)
+        }
+
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return try interactionState(for: target.id, modelContext: modelContext)
@@ -62,6 +76,10 @@ final class FeedInteractionService {
         isLiked: Bool,
         modelContext: ModelContext
     ) async throws -> FeedInteractionState {
+        if let pinnedPostId = canonicalPinnedPostId(for: target.id) {
+            return try interactionState(for: pinnedPostId, modelContext: modelContext)
+        }
+
         let reply = try await api.generatePostInteractions(
             postId: target.id,
             personaId: target.personaId,
@@ -75,10 +93,16 @@ final class FeedInteractionService {
     }
 
     func interactionState(for postId: String, modelContext: ModelContext) throws -> FeedInteractionState {
-        FeedInteractionState(
-            likes: try fetchLikes(for: postId, modelContext: modelContext),
-            comments: try fetchComments(for: postId, modelContext: modelContext)
+        let resolvedPostId = canonicalPinnedPostId(for: postId) ?? postId
+        return FeedInteractionState(
+            likes: try fetchLikes(for: resolvedPostId, modelContext: modelContext),
+            comments: try fetchComments(for: resolvedPostId, modelContext: modelContext)
         )
+    }
+
+    private func canonicalPinnedPostId(for postId: String) -> String? {
+        guard demoPinnedPostIds.contains(postId) else { return nil }
+        return demoPinnedCanonicalPostId
     }
 
     private func fetchLikes(for postId: String, modelContext: ModelContext) throws -> [FeedLike] {

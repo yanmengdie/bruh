@@ -766,15 +766,23 @@ private struct MessageDetailView: View {
         deliveryState: String,
         themeColor: Color
     ) -> some View {
-        VStack(alignment: isIncoming ? .leading : .trailing, spacing: 4) {
-            VStack(alignment: .leading, spacing: imageURL == nil ? 0 : 10) {
+        let localImageAssetName = localAssetName(from: imageURL)
+
+        return VStack(alignment: isIncoming ? .leading : .trailing, spacing: 4) {
+            VStack(alignment: .leading, spacing: (imageURL == nil && localImageAssetName == nil) ? 0 : 10) {
                 if !text.isEmpty {
                     Text(text)
                         .font(.system(size: 16))
                         .foregroundColor(.primary)
                 }
 
-                if let imageURL {
+                if let localImageAssetName, UIImage(named: localImageAssetName) != nil {
+                    Image(localImageAssetName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 220, height: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                } else if let imageURL {
                     AsyncImage(url: imageURL) { phase in
                         switch phase {
                         case .success(let image):
@@ -829,6 +837,13 @@ private struct MessageDetailView: View {
                     .foregroundStyle(.red)
             }
         }
+    }
+
+    private func localAssetName(from url: URL?) -> String? {
+        guard let url, url.scheme == "asset" else { return nil }
+        let candidate = (url.host?.isEmpty == false ? url.host! : url.path)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return candidate.isEmpty ? nil : candidate
     }
 
     private func voiceMessageCard(

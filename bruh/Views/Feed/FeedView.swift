@@ -4,6 +4,7 @@ import UIKit
 
 struct FeedView: View {
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("demo.moments.pinned.enabled") private var demoPinnedMomentsEnabled = true
     @State private var isRefreshing = false
     @State private var hasLoadedInitially = false
 
@@ -16,6 +17,7 @@ struct FeedView: View {
     @Query private var sourceItems: [SourceItem]
 
     @Query private var contacts: [Contact]
+    private let demoPinnedLegacyPostId = "demo_moments_groupchat"
 
     private var feedService = FeedService()
     private var currentProfileAvatarImage: UIImage? {
@@ -42,9 +44,20 @@ struct FeedView: View {
         var entries: [FeedEntry] = []
 
         for delivery in deliveries {
+            let isDemoPinnedEntry =
+                delivery.legacyPostId == demoPinnedLegacyPostId
+                || delivery.id == "delivery:feed:\(demoPinnedLegacyPostId)"
+
+            if demoPinnedMomentsEnabled, !isDemoPinnedEntry {
+                continue
+            }
+
             guard delivery.channelValue == .feed,
-                  delivery.isVisible,
-                  acceptedPersonaIds.contains(delivery.personaId ?? "") else {
+                  delivery.isVisible else {
+                continue
+            }
+
+            if !isDemoPinnedEntry, !acceptedPersonaIds.contains(delivery.personaId ?? "") {
                 continue
             }
 
@@ -64,7 +77,7 @@ struct FeedView: View {
             )
         }
 
-        return entries
+        return entries.sorted { $0.delivery.sortDate > $1.delivery.sortDate }
     }
 
     var body: some View {

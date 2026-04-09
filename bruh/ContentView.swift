@@ -7,6 +7,7 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\MessageThread.lastMessageAt, order: .reverse)]) private var threads: [MessageThread]
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
+    @Query(sort: [SortDescriptor(\Persona.inviteOrder, order: .forward)]) private var personas: [Persona]
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("useHomeScreenMode") private var useHomeScreenMode = true
     @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
@@ -38,7 +39,9 @@ struct ContentView: View {
                 onNavigate: handleHomeNavigation,
                 messageUnreadCount: totalUnreadMessages,
                 momentsUnreadCount: totalUnreadMoments,
-                hasNewAlbumBadge: unseenAlbumCount > 0
+                hasNewAlbumBadge: unseenAlbumCount > 0,
+                pendingInvitationCount: pendingInvitationCountForHome,
+                messagePreviews: homeMessagePreviews
             )
             .navigationBarHidden(true)
             .navigationDestination(for: AppDestination.self) { destination in
@@ -164,6 +167,53 @@ struct ContentView: View {
         AppTheme.messagesBackground
     }
 
+    private let invitePersonaAllowlistForHome: Set<String> = [
+        "trump",
+        "musk",
+        "lei_jun",
+        "luo_yonghao",
+        "sam_altman",
+        "papi",
+        "justin_sun",
+        "liu_jingkang",
+    ]
+
+    private var pendingInvitationCountForHome: Int {
+        contacts
+            .filter { contact in
+                guard contact.isPendingInvitation,
+                      let personaId = contact.linkedPersonaId else { return false }
+                return invitePersonaAllowlistForHome.contains(personaId)
+                    && personaMatchesSelectedInterestsForHome(personaId: personaId)
+            }
+            .count
+    }
+
+    private var homeMessagePreviews: [HomeMessagePreview] {
+        threads
+            .filter { acceptedPersonaIds.contains($0.personaId) }
+            .sorted { $0.lastMessageAt > $1.lastMessageAt }
+            .prefix(2)
+            .map { thread in
+                let matchedContact = contacts.first(where: { $0.linkedPersonaId == thread.personaId })
+                let displayName = matchedContact?.name ?? thread.personaId.capitalized
+                let text = latestPreviewForHome(thread)
+                let time = relativeTimeForHome(thread.lastMessageAt)
+                let avatarAsset = matchedContact?.avatarName
+                let avatarBackground = AppTheme.color(
+                    from: matchedContact?.themeColorHex ?? "#2E2E2E",
+                    fallback: Color.black.opacity(0.85)
+                )
+                return HomeMessagePreview(
+                    name: displayName,
+                    text: text,
+                    time: time,
+                    avatarAsset: avatarAsset,
+                    avatarBackground: avatarBackground
+                )
+            }
+    }
+
     private var totalUnreadMoments: Int {
         guard lastViewedFeedAtInterval > 0 else { return feedDeliveries.count }
         let lastViewed = Date(timeIntervalSince1970: lastViewedFeedAtInterval)
@@ -213,6 +263,45 @@ struct ContentView: View {
         }
     }
 
+    private var inviteInterestSetForHome: Set<String> {
+        let supported = Set(["politics", "entertainment", "finance", "sports", "tech"])
+        let selected = CurrentUserProfileStore.selectedInterests(in: modelContext)
+            .filter { supported.contains($0) }
+
+        if !selected.isEmpty {
+            return Set(selected)
+        }
+
+        let onboardingSelected = OnboardingInterestStore.load()
+            .map(\.rawValue)
+            .filter { supported.contains($0) }
+        if !onboardingSelected.isEmpty {
+            return Set(onboardingSelected)
+        }
+
+        return Set(
+            ["sports", "tech"]
+        )
+    }
+
+    private func personaMatchesSelectedInterestsForHome(personaId: String) -> Bool {
+        guard !inviteInterestSetForHome.isEmpty else { return true }
+        guard let persona = personas.first(where: { $0.id == personaId }) else { return false }
+        return !Set(persona.domains).isDisjoint(with: inviteInterestSetForHome)
+    }
+
+    private func latestPreviewForHome(_ thread: MessageThread) -> String {
+        let preview = thread.lastMessagePreview.trimmingCharacters(in: .whitespacesAndNewlines)
+        return preview.isEmpty ? "开始聊天" : preview
+    }
+
+    private func relativeTimeForHome(_ date: Date) -> String {
+        guard date > Date.distantPast else { return "刚刚" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
     private func handleHomeNavigation(_ destination: AppDestination) {
         homePath.append(destination)
     }
@@ -222,6 +311,7 @@ struct ContentView: View {
         seedPersonas(into: modelContext)
         seedCurrentUserProfile(into: modelContext)
         seedSystemContacts(into: modelContext)
+        seedDemoMomentsStoryboard(into: modelContext)
         try? messageService.prepareThreads(modelContext: modelContext)
         syncContentGraph(into: modelContext)
     }
@@ -580,6 +670,8 @@ private struct ContactsView: View {
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
     @Query(sort: [SortDescriptor(\Persona.inviteOrder, order: .forward)]) private var personas: [Persona]
     @Query private var profiles: [UserProfile]
+    @AppStorage("demo.script.invite.sequence.configured") private var hasConfiguredDemoScriptSequence = false
+    @AppStorage("demo.script.invite.sequence.version") private var demoInviteSequenceVersion = 0
 
     @State private var searchText = ""
     @State private var isPresentingForm = false
@@ -592,16 +684,17 @@ private struct ContactsView: View {
     @State private var activeIndexLetter: String?
     @State private var lastIndexFeedbackLetter: String?
     private static let alphabet: [String] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map(String.init) + ["#"]
-    private let invitePersonaAllowlist: Set<String> = [
-        "trump",
-        "musk",
-        "lei_jun",
+    private let demoInvitePersonaOrder: [String] = [
         "luo_yonghao",
+        "musk",
         "sam_altman",
-        "papi",
-        "justin_sun",
         "liu_jingkang",
     ]
+    private let demoInviteSequenceExpectedVersion = 2
+
+    private var invitePersonaAllowlist: Set<String> {
+        Set(demoInvitePersonaOrder)
+    }
 
     private var currentProfile: UserProfile? {
         profiles.first(where: { $0.id == CurrentUserProfileStore.userId })
@@ -648,7 +741,6 @@ private struct ContactsView: View {
                 guard contact.isPendingInvitation,
                       let personaId = contact.linkedPersonaId else { return false }
                 return invitePersonaAllowlist.contains(personaId)
-                    && personaMatchesSelectedInterests(personaId: personaId)
             }
             .sorted { inviteSortKey(for: $0) < inviteSortKey(for: $1) }
             .compactMap { contact in
@@ -760,6 +852,7 @@ private struct ContactsView: View {
             seedPersonas(into: modelContext)
             seedCurrentUserProfile(into: modelContext)
             seedSystemContacts(into: modelContext)
+            configureDemoInviteSequenceIfNeeded()
             normalizeInviteFrontier()
         }
     }
@@ -1079,8 +1172,17 @@ private struct ContactsView: View {
 
         normalizeInviteFrontier()
 
-        if !wasAccepted && invitation.personaId == "trump" {
-            scheduleTrumpFollowUps()
+        if !wasAccepted {
+            scheduleDemoMessages(afterAccepting: invitation.personaId)
+            if invitation.personaId == "luo_yonghao" {
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    normalizeInviteFrontier()
+                    if let next = pendingInvitations.first(where: { $0.personaId == "musk" }) {
+                        presentedInvitation = next
+                    }
+                }
+            }
         }
 
         try? modelContext.save()
@@ -1163,22 +1265,10 @@ private struct ContactsView: View {
     }
 
     private func normalizeInviteFrontier() {
-        for contact in contacts {
-            guard let personaId = contact.linkedPersonaId,
-                  invitePersonaAllowlist.contains(personaId) else { continue }
-
-            if !personaMatchesSelectedInterests(personaId: personaId),
-               contact.relationshipStatusValue == .pending {
-                contact.relationshipStatusValue = .locked
-                contact.updatedAt = .now
-            }
-        }
-
         let personaContacts = contacts
             .filter { contact in
                 guard let personaId = contact.linkedPersonaId else { return false }
                 return invitePersonaAllowlist.contains(personaId)
-                    && personaMatchesSelectedInterests(personaId: personaId)
             }
             .sorted { inviteSortKey(for: $0) < inviteSortKey(for: $1) }
 
@@ -1219,7 +1309,6 @@ private struct ContactsView: View {
             .filter { contact in
                 guard let linkedPersonaId = contact.linkedPersonaId else { return false }
                 return invitePersonaAllowlist.contains(linkedPersonaId)
-                    && personaMatchesSelectedInterests(personaId: linkedPersonaId)
                     && contact.relationshipStatusValue == .locked
             }
             .filter { $0.linkedPersonaId != personaId }
@@ -1235,9 +1324,13 @@ private struct ContactsView: View {
         let deduped = Array(NSOrderedSet(array: selected)) as? [String] ?? selected
         if !deduped.isEmpty { return deduped }
 
-        return NewsInterest.defaultSelection
+        let onboardingSelected = OnboardingInterestStore.load()
             .map(\.rawValue)
             .filter { supported.contains($0) }
+        let onboardingDeduped = Array(NSOrderedSet(array: onboardingSelected)) as? [String] ?? onboardingSelected
+        if !onboardingDeduped.isEmpty { return onboardingDeduped }
+
+        return ["sports", "tech"]
     }
 
     private var inviteInterestSet: Set<String> {
@@ -1266,11 +1359,81 @@ private struct ContactsView: View {
     }
 
     private func inviteSortKey(for contact: Contact) -> (Int, Int, String) {
-        let fallbackRank = inviteInterestOrder.count + 10
+        let demoFallbackRank = demoInvitePersonaOrder.count + 10
         let priority = contact.linkedPersonaId
-            .flatMap { invitePriorityByPersonaId[$0] } ?? fallbackRank
+            .flatMap { demoInvitePersonaOrder.firstIndex(of: $0) } ?? demoFallbackRank
         let order = contact.inviteOrder ?? 999
         return (priority, order, contact.name)
+    }
+
+    private func configureDemoInviteSequenceIfNeeded() {
+        guard !hasConfiguredDemoScriptSequence || demoInviteSequenceVersion < demoInviteSequenceExpectedVersion else { return }
+
+        for contact in contacts {
+            guard let personaId = contact.linkedPersonaId,
+                  invitePersonaAllowlist.contains(personaId) else { continue }
+            contact.relationshipStatusValue = .locked
+            contact.acceptedAt = nil
+            contact.ignoredAt = nil
+            contact.isFavorite = false
+            contact.updatedAt = .now
+        }
+
+        if let first = contacts.first(where: { $0.linkedPersonaId == "luo_yonghao" }) {
+            first.relationshipStatusValue = .pending
+            first.updatedAt = .now
+        }
+
+        hasConfiguredDemoScriptSequence = true
+        demoInviteSequenceVersion = demoInviteSequenceExpectedVersion
+        if modelContext.hasChanges {
+            try? modelContext.save()
+        }
+    }
+
+    private func scheduleDemoMessages(afterAccepting personaId: String) {
+        switch personaId {
+        case "musk":
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                insertIncomingMessageIfNeeded(
+                    id: "demo-musk-invite-style",
+                    personaId: "musk",
+                    text: "it's elon. someone told me you're into AI. same. add me."
+                )
+            }
+        case "sam_altman":
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 900_000_000)
+                insertIncomingMessageIfNeeded(
+                    id: "demo-sam-invite-style",
+                    personaId: "sam_altman",
+                    text: "hey it's sam. i believe in AGI and also in making new friends. both are coming soon."
+                )
+            }
+        default:
+            break
+        }
+    }
+
+    private func insertIncomingMessageIfNeeded(
+        id: String,
+        personaId: String,
+        text: String
+    ) {
+        var descriptor = FetchDescriptor<PersonaMessage>(
+            predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        if let existing = try? modelContext.fetch(descriptor), !existing.isEmpty {
+            return
+        }
+
+        insertIncomingMessage(
+            personaId: personaId,
+            text: text,
+            sourcePostIds: []
+        )
     }
 
     private func scheduleTrumpFollowUps() {

@@ -42,7 +42,11 @@ struct FeedCard: View {
     }
 
     private var displayName: String {
-        contact?.name ?? resolvedPersonaId
+        if delivery.legacyPostId == "demo_moments_groupchat"
+            || delivery.id == "delivery:feed:demo_moments_groupchat" {
+            return "Elon Musk"
+        }
+        return contact?.name ?? resolvedPersonaId
     }
 
     private var bodyText: String {

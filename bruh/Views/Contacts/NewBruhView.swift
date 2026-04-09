@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import AVFoundation
 
 struct BruhInvitation: Identifiable, Hashable {
     let personaId: String
@@ -40,6 +41,30 @@ struct BruhInvitation: Identifiable, Hashable {
             self.avatarEmoji = "🧑‍💼"
             self.avatarColor = Color(red: 0.11, green: 0.74, blue: 0.63)
             self.themeHex = "#19BCA0"
+        } else if persona.id == "luo_yonghao" {
+            let fallbackColor = AppTheme.color(from: persona.themeColorHex, fallback: .gray)
+            self.displayName = persona.displayName
+            self.subtitle = persona.subtitle
+            self.inviteMessage = "听说你去小红书黑客松啦？交个朋友啊"
+            self.avatarEmoji = Self.avatarEmoji(for: persona.id)
+            self.avatarColor = fallbackColor
+            self.themeHex = persona.themeColorHex
+        } else if persona.id == "musk" {
+            let fallbackColor = AppTheme.color(from: persona.themeColorHex, fallback: .gray)
+            self.displayName = persona.displayName
+            self.subtitle = persona.subtitle
+            self.inviteMessage = "it's elon. someone told me you're into AI. same. add me."
+            self.avatarEmoji = Self.avatarEmoji(for: persona.id)
+            self.avatarColor = fallbackColor
+            self.themeHex = persona.themeColorHex
+        } else if persona.id == "sam_altman" {
+            let fallbackColor = AppTheme.color(from: persona.themeColorHex, fallback: .gray)
+            self.displayName = persona.displayName
+            self.subtitle = persona.subtitle
+            self.inviteMessage = "hey it's sam. i believe in AGI and also in making new friends. both are coming soon."
+            self.avatarEmoji = Self.avatarEmoji(for: persona.id)
+            self.avatarColor = fallbackColor
+            self.themeHex = persona.themeColorHex
         } else {
             let fallbackColor = AppTheme.color(from: persona.themeColorHex, fallback: .gray)
             self.displayName = persona.displayName
@@ -83,6 +108,8 @@ struct BruhInvitation: Identifiable, Hashable {
 
 struct NewBruhView: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var hasSpokenDemoVoiceLine = false
+    private let speechSynthesizer = AVSpeechSynthesizer()
 
     let invitation: BruhInvitation
     let lockedCandidateNames: [String]
@@ -225,6 +252,9 @@ struct NewBruhView: View {
             }
         }
         .enableUnifiedSwipeBack()
+        .onAppear {
+            playDemoVoiceLineIfNeeded()
+        }
     }
 
     private var invitationAvatar: some View {
@@ -260,6 +290,19 @@ struct NewBruhView: View {
                 .foregroundStyle(Color.black.opacity(0.24))
                 .lineLimit(1)
         }
+    }
+
+    private func playDemoVoiceLineIfNeeded() {
+        guard invitation.personaId == "luo_yonghao" else { return }
+        guard !hasSpokenDemoVoiceLine else { return }
+        hasSpokenDemoVoiceLine = true
+
+        let utterance = AVSpeechUtterance(string: "听说你去小红书黑客松啦？交个朋友啊")
+        utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
+        utterance.rate = 0.44
+        utterance.pitchMultiplier = 1.08
+        utterance.volume = 1.0
+        speechSynthesizer.speak(utterance)
     }
 }
 

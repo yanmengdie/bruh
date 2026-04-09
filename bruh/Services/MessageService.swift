@@ -66,6 +66,67 @@ final class MessageService {
         updateThread(thread, preview: trimmed, at: outgoing.createdAt, unreadCount: 0)
         try modelContext.save()
 
+        if personaId == "musk" {
+            outgoing.deliveryState = "sent"
+
+            let replyText = "Goldman Sachs, Morgan Stanley, and JP Morgan are all in. But honestly? I told them — whoever lets me ring the bell shirtless gets the deal. 🔔"
+            let linkText = "https://reuters.com/technology/spacex-ipo"
+            let selfieText = "Hey bruh, remember when we were chatting with the bankers today? Got our photo from the meeting. Here you go 📸"
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            let firstReplyAt = Date()
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            let secondReplyAt = Date()
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            let thirdReplyAt = Date()
+
+            let firstIncoming = PersonaMessage(
+                id: "scripted-musk-reply-\(UUID().uuidString)",
+                threadId: thread.id,
+                personaId: personaId,
+                text: replyText,
+                isIncoming: true,
+                createdAt: firstReplyAt,
+                deliveryState: "sent",
+                sourcePostIds: [],
+                isSeedMessage: false
+            )
+            modelContext.insert(firstIncoming)
+            ContentGraphStore.syncIncomingMessage(firstIncoming, in: modelContext)
+
+            let secondIncoming = PersonaMessage(
+                id: "scripted-musk-link-\(UUID().uuidString)",
+                threadId: thread.id,
+                personaId: personaId,
+                text: linkText,
+                isIncoming: true,
+                createdAt: secondReplyAt,
+                deliveryState: "sent",
+                sourcePostIds: ["demo-spacex-ipo-reuters"],
+                isSeedMessage: false
+            )
+            modelContext.insert(secondIncoming)
+            ContentGraphStore.syncIncomingMessage(secondIncoming, in: modelContext)
+
+            let thirdIncoming = PersonaMessage(
+                id: "scripted-musk-selfie-\(UUID().uuidString)",
+                threadId: thread.id,
+                personaId: personaId,
+                text: selfieText,
+                imageUrl: "asset://ElonMuskSelfie",
+                isIncoming: true,
+                createdAt: thirdReplyAt,
+                deliveryState: "sent",
+                sourcePostIds: [],
+                isSeedMessage: false
+            )
+            modelContext.insert(thirdIncoming)
+            ContentGraphStore.syncIncomingMessage(thirdIncoming, in: modelContext)
+
+            updateThread(thread, preview: selfieText, at: thirdReplyAt, unreadCount: 0)
+            try modelContext.save()
+            return
+        }
+
         do {
             let reply = try await api.sendMessage(
                 personaId: personaId,
