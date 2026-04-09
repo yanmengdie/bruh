@@ -8,7 +8,7 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @AppStorage("useHomeScreenMode") private var useHomeScreenMode = false
+    @AppStorage("useHomeScreenMode") private var useHomeScreenMode = true
     @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
     @AppStorage("lastViewedAlbumAt") private var lastViewedAlbumAtInterval: Double = 0
 

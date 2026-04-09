@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct FeedView: View {
     @Environment(\.modelContext) private var modelContext
@@ -17,6 +18,10 @@ struct FeedView: View {
     @Query private var contacts: [Contact]
 
     private var feedService = FeedService()
+    private var currentProfileAvatarImage: UIImage? {
+        guard let data = CurrentUserProfileStore.avatarImageData() else { return nil }
+        return UIImage(data: data)
+    }
 
     private var acceptedPersonaIds: Set<String> {
         Set(
@@ -73,7 +78,7 @@ struct FeedView: View {
                             Image(systemName: "bubble.left.and.exclamationmark.bubble.right")
                                 .font(.system(size: 28))
                                 .foregroundStyle(.secondary)
-                            Text("还没有朋友圈内容")
+                            Text("鸽们还没发日常")
                                 .font(.system(size: 17, weight: .medium))
                             Text("下拉或稍等片刻同步最新动态")
                                 .font(.system(size: 14))
@@ -114,58 +119,54 @@ struct FeedView: View {
 
     private var momentsHeader: some View {
         ZStack(alignment: .bottomTrailing) {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.45, green: 0.43, blue: 0.88),
-                    Color(red: 0.57, green: 0.45, blue: 0.88)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .frame(height: 280)
-            .overlay(alignment: .bottom) {
-                Text("我的朋友圈")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.bottom, 26)
-            }
+            Image("Moments_Background")
+                .resizable()
+                .scaledToFill()
+                .frame(height: momentsHeaderHeight)
+                .clipped()
 
-            HStack(alignment: .bottom, spacing: 10) {
-                Text(isRefreshing ? "同步中..." : "今天也有新鲜事")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .padding(.bottom, 8)
+            Text(isRefreshing ? "同步中..." : "")
+                .font(.system(size: 12))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .padding(.leading, 18)
+                .padding(.bottom, 12)
 
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.orange.opacity(0.92), Color.pink.opacity(0.82)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.orange.opacity(0.92), Color.pink.opacity(0.82)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                    .frame(width: 72, height: 72)
-                    .overlay {
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 26))
-                            .foregroundStyle(.white)
+                )
+                .frame(width: 72, height: 72)
+                .overlay {
+                    if let avatar = currentProfileAvatarImage {
+                        Image(uiImage: avatar)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 72, height: 72)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    } else {
+                        Text("📸")
+                            .font(.system(size: 34))
                     }
-                    .overlay(alignment: .bottomTrailing) {
-                        Circle()
-                            .fill(.white)
-                            .frame(width: 18, height: 18)
-                            .overlay {
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(.gray)
-                            }
-                            .offset(x: 4, y: 4)
-                    }
-            }
-            .padding(.trailing, 18)
-            .offset(y: 28)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white, lineWidth: 4)
+                }
+                .padding(.trailing, 18)
+                .padding(.bottom, 12)
         }
+        .frame(height: momentsHeaderHeight)
         .padding(.bottom, 34)
+    }
+
+    private var momentsHeaderHeight: CGFloat {
+        let width = UIScreen.main.bounds.width
+        return min(max(width * 0.68, 236), 320)
     }
 
     private func refresh() async {

@@ -295,27 +295,27 @@ final class MessageService {
     private func starterMessage(for personaId: String) -> String {
         switch personaId {
         case "musk":
-            return "今天有几条很有意思的 AI 和航天动态。你最关注哪条？"
+            return "AI 圈今天又在表演“重新定义明天”，航天那边顺手把明天提前了。地球进度条太慢，我先去火星那边催更。"
         case "trump":
-            return "今天有不少大新闻，贸易和政治都很热闹。你想先聊哪一个？"
+            return "今天的新闻，巨大，历史级，前所未有。别人还在读标题，我已经把关税这盘棋下到下一回合了。"
         case "zuckerberg":
             return "AI 和社交平台这边今天信息很多。你要简版还是深挖版？"
         case "sam_altman":
-            return "今天 AI 这边有几条真正影响产品方向的消息。你想先听哪条？"
+            return "今天 AI 圈最热闹的不是发布会，是大家偷偷改 roadmap。真正有用的信息通常不在海报上。"
         case "zhang_peng":
             return "今天科技圈有几条不只是热点、而是变量本身的新闻。你想先看哪一个？"
         case "lei_jun":
-            return "今天硬件和汽车线都有值得看的更新。我可以直接讲重点。"
+            return "参数表都很好看，发布会都很激情，真正见分晓还得看交付节奏。嘴上赢一时，量产赢一世。"
         case "liu_jingkang":
-            return "今天有几条和产品、创作者设备有关的信号。我先给你讲最重要的一条？"
+            return "创作者设备圈今天又出新词了，听起来都像革命，拆开看基本是迭代。能不能卖爆，用户手一摸就知道。"
         case "luo_yonghao":
-            return "今天有几条消息挺值得吐槽，也挺值得认真聊。你想从哪条开始？"
+            return "今天这几条消息，PPT 做得都很体面，现实做得就见仁见智了。场面话我不翻译，直接说人话。"
         case "justin_sun":
-            return "今天 crypto 这边节奏不慢。我可以先给你讲最会影响市场情绪的那条。"
+            return "链上今天波动很诚实，情绪比 K 线跑得还快。有人在讲长期主义，也有人在抢下一根针。"
         case "kim_kardashian":
             return "今天文化和品牌这边有几条很会发酵的消息。你想看趋势版还是八卦版？"
         case "papi":
-            return "今天内容圈和社交平台上有几条很有情绪张力的事。你想先聊哪一个？"
+            return "今天内容圈又上演熟悉剧情：标题负责炸场，评论区负责翻车，品牌方负责假装一切都在掌控中。"
         default:
             return "今天你想聊什么？"
         }

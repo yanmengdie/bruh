@@ -216,6 +216,7 @@ struct Onboarding: View {
                 .foregroundStyle(Color(red: 0.12, green: 0.13, blue: 0.15))
 
             HStack(spacing: 16) {
+                interestChip(.politics)
                 interestChip(.entertainment)
                 interestChip(.sports)
             }
