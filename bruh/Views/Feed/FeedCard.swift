@@ -28,8 +28,8 @@ struct FeedCard: View {
     private let interactionService = FeedInteractionService()
     private let imageSpacing: CGFloat = 6
 
-    private var previewImageURLs: [URL] {
-        Array(delivery.mediaUrls.prefix(9)).compactMap(URL.init(string:))
+    private var previewMediaItems: [FeedMediaItem] {
+        Array(delivery.mediaUrls.prefix(9)).compactMap(FeedMediaItem.init(rawValue:))
     }
 
     private var previewVideoURL: URL? {
@@ -45,6 +45,10 @@ struct FeedCard: View {
         if delivery.legacyPostId == "demo_moments_groupchat"
             || delivery.id == "delivery:feed:demo_moments_groupchat" {
             return "Elon Musk"
+        }
+        if delivery.legacyPostId == "demo_moments_kim_brand"
+            || delivery.id == "delivery:feed:demo_moments_kim_brand" {
+            return "Taylor Swift"
         }
         return contact?.name ?? resolvedPersonaId
     }
@@ -89,7 +93,7 @@ struct FeedCard: View {
     }
 
     private var imageColumnCount: Int {
-        switch previewImageURLs.count {
+        switch previewMediaItems.count {
         case 0, 1:
             return 1
         case 2, 4:
@@ -100,7 +104,7 @@ struct FeedCard: View {
     }
 
     private var imageThumbnailSide: CGFloat {
-        switch previewImageURLs.count {
+        switch previewMediaItems.count {
         case 0:
             return 0
         case 1:
@@ -159,7 +163,7 @@ struct FeedCard: View {
         }
         .fullScreenCover(isPresented: $isPresentingImagePreview) {
             FeedImagePreview(
-                urls: previewImageURLs,
+                items: previewMediaItems,
                 selectedIndex: selectedImageIndex,
                 isPresented: $isPresentingImagePreview
             )
@@ -179,8 +183,7 @@ struct FeedCard: View {
             .fill(avatarColor)
             .frame(width: 48, height: 48)
             .overlay {
-                if let avatarName = contact?.avatarName,
-                   !avatarName.isEmpty,
+                if let avatarName = avatarAssetName,
                    UIImage(named: avatarName) != nil {
                     Image(avatarName)
                         .resizable()
@@ -193,6 +196,17 @@ struct FeedCard: View {
                         .foregroundStyle(.white)
                 }
             }
+    }
+
+    private var avatarAssetName: String? {
+        if let avatarName = contact?.avatarName, !avatarName.isEmpty {
+            return avatarName
+        }
+        if delivery.legacyPostId == "demo_moments_kim_brand"
+            || delivery.id == "delivery:feed:demo_moments_kim_brand" {
+            return "Avatar_Taylor"
+        }
+        return nil
     }
 
     private var avatarColor: Color {
@@ -214,23 +228,23 @@ struct FeedCard: View {
 
     @ViewBuilder
     private var imageGrid: some View {
-        if !previewImageURLs.isEmpty {
-            realImageGrid(urls: previewImageURLs)
+        if !previewMediaItems.isEmpty {
+            realImageGrid(items: previewMediaItems)
         }
     }
 
-    private func realImageGrid(urls: [URL]) -> some View {
+    private func realImageGrid(items: [FeedMediaItem]) -> some View {
         Group {
-            if urls.count == 1 {
-                imageThumbnail(url: urls[0], index: 0)
+            if items.count == 1 {
+                imageThumbnail(item: items[0], index: 0)
                     .frame(width: imageThumbnailSide, height: imageThumbnailSide)
             } else {
                 LazyVGrid(
                     columns: Array(repeating: GridItem(.fixed(imageThumbnailSide), spacing: imageSpacing), count: imageColumnCount),
                     spacing: imageSpacing
                 ) {
-                    ForEach(Array(urls.enumerated()), id: \.offset) { index, url in
-                        imageThumbnail(url: url, index: index)
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                        imageThumbnail(item: item, index: index)
                             .frame(width: imageThumbnailSide, height: imageThumbnailSide)
                     }
                 }
@@ -239,7 +253,7 @@ struct FeedCard: View {
         }
     }
 
-    private func imageThumbnail(url: URL, index: Int) -> some View {
+    private func imageThumbnail(item: FeedMediaItem, index: Int) -> some View {
         Button {
             if previewVideoURL != nil {
                 isPresentingVideoPreview = true
@@ -248,27 +262,45 @@ struct FeedCard: View {
                 isPresentingImagePreview = true
             }
         } label: {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    ZStack {
-                        Color(.systemGray5)
-                        Image(systemName: "photo")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.secondary)
+            Group {
+                switch item {
+                case .localAsset(let assetName):
+                    if UIImage(named: assetName) != nil {
+                        Image(assetName)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        ZStack {
+                            Color(.systemGray5)
+                            Image(systemName: "photo")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                case .empty:
-                    ZStack {
-                        Color(.systemGray6)
-                        ProgressView()
-                            .controlSize(.small)
+                case .remote(let url):
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            ZStack {
+                                Color(.systemGray5)
+                                Image(systemName: "photo")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(.secondary)
+                            }
+                        case .empty:
+                            ZStack {
+                                Color(.systemGray6)
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        @unknown default:
+                            Color(.systemGray6)
+                        }
                     }
-                @unknown default:
-                    Color(.systemGray6)
                 }
             }
             .frame(width: imageThumbnailSide, height: imageThumbnailSide)
@@ -529,7 +561,7 @@ struct FeedCard: View {
 }
 
 private struct FeedImagePreview: View {
-    let urls: [URL]
+    let items: [FeedMediaItem]
     let selectedIndex: Int
     @Binding var isPresented: Bool
 
@@ -540,12 +572,12 @@ private struct FeedImagePreview: View {
             Color.black.ignoresSafeArea()
 
             TabView(selection: $currentIndex) {
-                ForEach(Array(urls.enumerated()), id: \.offset) { index, url in
-                    ZoomablePreviewImage(url: url)
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    ZoomablePreviewImage(item: item)
                         .tag(index)
                 }
             }
-            .tabViewStyle(.page(indexDisplayMode: urls.count > 1 ? .always : .never))
+            .tabViewStyle(.page(indexDisplayMode: items.count > 1 ? .always : .never))
 
             Button {
                 isPresented = false
@@ -557,7 +589,7 @@ private struct FeedImagePreview: View {
             }
         }
         .onAppear {
-            currentIndex = min(max(selectedIndex, 0), max(urls.count - 1, 0))
+            currentIndex = min(max(selectedIndex, 0), max(items.count - 1, 0))
         }
     }
 }
@@ -604,27 +636,61 @@ private struct FeedVideoPreview: View {
 }
 
 private struct ZoomablePreviewImage: View {
-    let url: URL
+    let item: FeedMediaItem
 
     var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black)
-            case .failure:
-                ContentUnavailableView("图片加载失败", systemImage: "photo")
-                    .foregroundStyle(.white)
-            case .empty:
-                ProgressView()
-                    .tint(.white)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            @unknown default:
-                EmptyView()
+        Group {
+            switch item {
+            case .localAsset(let assetName):
+                if UIImage(named: assetName) != nil {
+                    Image(assetName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black)
+                } else {
+                    ContentUnavailableView("图片加载失败", systemImage: "photo")
+                        .foregroundStyle(.white)
+                }
+            case .remote(let url):
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Color.black)
+                    case .failure:
+                        ContentUnavailableView("图片加载失败", systemImage: "photo")
+                            .foregroundStyle(.white)
+                    case .empty:
+                        ProgressView()
+                            .tint(.white)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
             }
         }
+    }
+}
+
+private enum FeedMediaItem {
+    case remote(URL)
+    case localAsset(String)
+
+    init?(rawValue: String) {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.lowercased().hasPrefix("asset://") {
+            let name = String(trimmed.dropFirst("asset://".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { return nil }
+            self = .localAsset(name)
+            return
+        }
+        guard let url = URL(string: trimmed) else { return nil }
+        self = .remote(url)
     }
 }

@@ -47,48 +47,168 @@ func syncContentGraph(into context: ModelContext) {
 @MainActor
 func seedDemoMomentsStoryboard(into context: ModelContext) {
     let now = Date()
-    let publishedAt = now.addingTimeInterval(-8 * 60)
-    let postId = "demo_moments_groupchat"
+    let demoPosts: [(id: String, personaId: String, content: String, topic: String, minutesAgo: Double, sourceURL: String, mediaUrls: [String])] = [
+        (
+            "demo_moments_groupchat",
+            "musk",
+            "Bros, big news — SpaceX just filed for IPO. Every single investment bank on Wall Street is fighting over us right now. Goldman literally sent flowers. 💐🚀",
+            "tech",
+            8,
+            "https://bruh.local/demo/moments/group-chat",
+            []
+        ),
+        (
+            "demo_moments_sam_agents",
+            "sam_altman",
+            "今天把 agent 工作流又压了一轮，速度比昨天快了不少。下一步不是更会聊，而是更会干活。",
+            "tech",
+            22,
+            "https://bruh.local/demo/moments/sam-agents",
+            []
+        ),
+        (
+            "demo_moments_liu_camera",
+            "liu_jingkang",
+            "刚看完一版新镜头测试，极暗环境下细节比上一代稳很多。真正有用的升级，永远是用户一上手就能感知到的那种。",
+            "tech",
+            35,
+            "https://bruh.local/demo/moments/liu-camera",
+            []
+        ),
+        (
+            "demo_moments_luo_hackathon",
+            "luo_yonghao",
+            "黑客松现场最不缺的是想法，最稀缺的是把想法在 48 小时内做出像样的东西。空谈不如上线。",
+            "tech",
+            51,
+            "https://bruh.local/demo/moments/luo-hackathon",
+            []
+        ),
+        (
+            "demo_moments_lei_delivery",
+            "lei_jun",
+            "发布会可以讲情怀，交付只能讲结果。今天工厂排产会又开了 4 个小时，大家都在抢每一分钟。",
+            "finance",
+            68,
+            "https://bruh.local/demo/moments/lei-delivery",
+            []
+        ),
+        (
+            "demo_moments_zhang_trend",
+            "trump",
+            "这轮 AI 竞争像长跑，不是看谁先冲刺，而是看谁每个补给点都不掉速。情绪会退潮，效率不会。懂的人已经开始布局下一季了。",
+            "politics",
+            84,
+            "https://bruh.local/demo/moments/zhang-trend",
+            []
+        ),
+        (
+            "demo_moments_kim_brand",
+            "taylor_swift",
+            "Backstage quick selfie before rehearsal. See you tonight, bruhs ✨",
+            "entertainment",
+            103,
+            "https://bruh.local/demo/moments/taylor-selfie",
+            ["asset://TaylorSelfie"]
+        ),
+        (
+            "demo_moments_papi_content",
+            "papi",
+            "流量这件事很诚实：你要么真有内容，要么就只能靠标题骗点开。骗得了一次，骗不了一周。",
+            "entertainment",
+            121,
+            "https://bruh.local/demo/moments/papi-content",
+            []
+        ),
+        (
+            "demo_moments_justin_market",
+            "justin_sun",
+            "链上今天波动很大，群里大家都在喊“长期主义”，手却比谁都快。市场永远奖励反应速度。",
+            "finance",
+            144,
+            "https://bruh.local/demo/moments/justin-market",
+            []
+        ),
+        (
+            "demo_moments_zuck_social",
+            "lei_jun",
+            "用户今年最在意的已经不是“功能多不多”，而是“每次打开到底值不值”。把打扰变成价值，才是产品分水岭。",
+            "tech",
+            169,
+            "https://bruh.local/demo/moments/zuck-social",
+            []
+        ),
+    ]
 
-    let postContent = "Bros, big news — SpaceX just filed for IPO. Every single investment bank on Wall Street is fighting over us right now. Goldman literally sent flowers. 💐🚀"
-
-    var postDescriptor = FetchDescriptor<PersonaPost>(
-        predicate: #Predicate { $0.id == postId }
-    )
-    postDescriptor.fetchLimit = 1
-
-    let post = (try? context.fetch(postDescriptor).first) ?? {
-        let item = PersonaPost(
-            id: postId,
-            personaId: "musk",
-            content: postContent,
-            sourceType: "x",
-            sourceUrl: "https://bruh.local/demo/moments/group-chat",
-            topic: "tech",
-            importanceScore: 0.99,
-            publishedAt: publishedAt,
-            fetchedAt: now,
-            isDelivered: true
+    for postSeed in demoPosts {
+        let postId = postSeed.id
+        let publishedAt = now.addingTimeInterval(-postSeed.minutesAgo * 60)
+        var postDescriptor = FetchDescriptor<PersonaPost>(
+            predicate: #Predicate { $0.id == postId }
         )
-        context.insert(item)
-        return item
-    }()
+        postDescriptor.fetchLimit = 1
 
-    post.personaId = "musk"
-    post.content = postContent
-    post.sourceType = "x"
-    post.sourceUrl = "https://bruh.local/demo/moments/group-chat"
-    post.topic = "tech"
-    post.importanceScore = 0.99
-    post.publishedAt = publishedAt
-    post.fetchedAt = now
-    post.isDelivered = true
+        let post = (try? context.fetch(postDescriptor).first) ?? {
+            let item = PersonaPost(
+                id: postId,
+                personaId: postSeed.personaId,
+                content: postSeed.content,
+                sourceType: "x",
+                sourceUrl: postSeed.sourceURL,
+                topic: postSeed.topic,
+                importanceScore: 0.96,
+                mediaUrls: postSeed.mediaUrls,
+                publishedAt: publishedAt,
+                fetchedAt: now,
+                isDelivered: true
+            )
+            context.insert(item)
+            return item
+        }()
 
-    let fixedLikes: [(id: String, authorId: String, authorDisplayName: String, secondsOffset: TimeInterval)] = [
-        ("demo-like-musk", "musk", "Elon Musk", -410),
-        ("demo-like-sam", "sam_altman", "Sam Altman", -390),
-        ("demo-like-liu", "liu_jingkang", "刘靖康", -370),
-        ("demo-like-luo", "luo_yonghao", "罗永浩", -350),
+        post.personaId = postSeed.personaId
+        post.content = postSeed.content
+        post.sourceType = "x"
+        post.sourceUrl = postSeed.sourceURL
+        post.topic = postSeed.topic
+        post.importanceScore = 0.96
+        post.mediaUrls = postSeed.mediaUrls
+        post.publishedAt = publishedAt
+        post.fetchedAt = now
+        post.isDelivered = true
+    }
+
+    let fixedLikes: [(id: String, postId: String, authorId: String, authorDisplayName: String, minutesAgo: Double)] = [
+        ("demo-like-groupchat-sam", "demo_moments_groupchat", "sam_altman", "Sam Altman", 7.3),
+        ("demo-like-groupchat-liu", "demo_moments_groupchat", "liu_jingkang", "刘靖康", 7.0),
+        ("demo-like-groupchat-luo", "demo_moments_groupchat", "luo_yonghao", "罗永浩", 6.8),
+
+        ("demo-like-sam-musk", "demo_moments_sam_agents", "musk", "Elon Musk", 20.0),
+        ("demo-like-sam-zuck", "demo_moments_sam_agents", "trump", "特离谱", 19.6),
+
+        ("demo-like-liu-lei", "demo_moments_liu_camera", "lei_jun", "田车", 33.0),
+        ("demo-like-liu-papi", "demo_moments_liu_camera", "papi", "Hahi酱", 31.9),
+
+        ("demo-like-luo-musk", "demo_moments_luo_hackathon", "musk", "Elon Musk", 49.7),
+        ("demo-like-luo-sam", "demo_moments_luo_hackathon", "sam_altman", "Sam Altman", 48.9),
+
+        ("demo-like-lei-zhang", "demo_moments_lei_delivery", "luo_yonghao", "罗永浩", 66.0),
+        ("demo-like-lei-liu", "demo_moments_lei_delivery", "liu_jingkang", "刘靖康", 64.5),
+
+        ("demo-like-zhang-sam", "demo_moments_zhang_trend", "sam_altman", "Sam Altman", 82.0),
+        ("demo-like-zhang-musk", "demo_moments_zhang_trend", "musk", "Elon Musk", 81.0),
+
+        ("demo-like-kim-papi", "demo_moments_kim_brand", "papi", "Hahi酱", 101.0),
+        ("demo-like-kim-zuck", "demo_moments_kim_brand", "musk", "Elon Musk", 99.2),
+
+        ("demo-like-papi-kim", "demo_moments_papi_content", "kim_kardashian", "Kim Kardashian", 118.0),
+        ("demo-like-papi-luo", "demo_moments_papi_content", "luo_yonghao", "罗永浩", 117.6),
+
+        ("demo-like-justin-musk", "demo_moments_justin_market", "musk", "Elon Musk", 141.5),
+        ("demo-like-justin-sam", "demo_moments_justin_market", "sam_altman", "Sam Altman", 140.8),
+
+        ("demo-like-zuck-sam", "demo_moments_zuck_social", "sam_altman", "Sam Altman", 165.0),
+        ("demo-like-zuck-kim", "demo_moments_zuck_social", "kim_kardashian", "Kim Kardashian", 164.2),
     ]
     let fixedLikeIds = Set(fixedLikes.map(\.id))
 
@@ -100,59 +220,144 @@ func seedDemoMomentsStoryboard(into context: ModelContext) {
         descriptor.fetchLimit = 1
 
         if let existing = try? context.fetch(descriptor).first {
-            existing.postId = postId
+            existing.postId = like.postId
             existing.authorId = like.authorId
             existing.authorDisplayName = like.authorDisplayName
             existing.reasonCode = "demo"
-            existing.createdAt = now.addingTimeInterval(like.secondsOffset)
+            existing.createdAt = now.addingTimeInterval(-like.minutesAgo * 60)
             existing.isViewer = false
         } else {
             context.insert(
                 FeedLike(
                     id: like.id,
-                    postId: postId,
+                    postId: like.postId,
                     authorId: like.authorId,
                     authorDisplayName: like.authorDisplayName,
                     reasonCode: "demo",
-                    createdAt: now.addingTimeInterval(like.secondsOffset),
+                    createdAt: now.addingTimeInterval(-like.minutesAgo * 60),
                     isViewer: false
                 )
             )
         }
     }
 
-    let fixedComments: [(id: String, authorId: String, authorDisplayName: String, content: String, replyToId: String?, secondsOffset: TimeInterval)] = [
+    let fixedComments: [(id: String, postId: String, authorId: String, authorDisplayName: String, content: String, replyToId: String?, minutesAgo: Double)] = [
         (
-            "demo-comment-sam-1",
+            "demo-comment-groupchat-sam",
+            "demo_moments_groupchat",
             "sam_altman",
             "Sam Altman",
             "Oh, an IPO? How cute. I could take OpenAI public any day I want. I just… choose not to. It's called having OPTIONS, Elon.",
             nil,
-            -260
+            6.2
         ),
         (
-            "demo-comment-musk-2",
+            "demo-comment-groupchat-musk",
+            "demo_moments_groupchat",
             "musk",
             "Elon Musk",
             "Options? Bro you literally had to restructure your entire company just to figure out if you're a nonprofit or not 😂",
-            "demo-comment-sam-1",
-            -220
+            "demo-comment-groupchat-sam",
+            5.8
         ),
         (
-            "demo-comment-liu-1",
+            "demo-comment-groupchat-liu",
+            "demo_moments_groupchat",
             "liu_jingkang",
             "刘靖康",
             "哎大家都别吵了，都很厉害的。说到 IPO，其实我们做硬件的也一直在探索，Insta360 最近的全景相机卖得挺不错的，大家有空可以体验一下 😊",
             nil,
-            -180
+            5.1
         ),
         (
-            "demo-comment-luo-1",
+            "demo-comment-groupchat-luo",
+            "demo_moments_groupchat",
             "luo_yonghao",
             "罗永浩",
             "靖康说得对！做硬件确实不容易。毕竟，锤子手机都被我亲手做倒闭了——这种经验不是谁都有的 😂😂😂",
             nil,
-            -140
+            4.6
+        ),
+        (
+            "demo-comment-sam-zhang",
+            "demo_moments_sam_agents",
+            "liu_jingkang",
+            "刘靖康",
+            "这条我认同，Agent 今年最关键的是“可交付”而不是“会说话”。",
+            nil,
+            18.8
+        ),
+        (
+            "demo-comment-liu-luo",
+            "demo_moments_liu_camera",
+            "luo_yonghao",
+            "罗永浩",
+            "这就对了，参数表之外，手感和稳定性才是第一生产力。",
+            nil,
+            30.5
+        ),
+        (
+            "demo-comment-luo-lei",
+            "demo_moments_luo_hackathon",
+            "lei_jun",
+            "田车",
+            "48 小时能跑通闭环已经非常硬核了，respect。",
+            nil,
+            47.8
+        ),
+        (
+            "demo-comment-lei-justin",
+            "demo_moments_lei_delivery",
+            "justin_sun",
+            "孙割",
+            "交付才是硬通货，这句可以直接当行业标语。",
+            nil,
+            63.2
+        ),
+        (
+            "demo-comment-zhang-sam",
+            "demo_moments_zhang_trend",
+            "sam_altman",
+            "Sam Altman",
+            "Totally. Progress is compounding, hype is not.",
+            nil,
+            79.4
+        ),
+        (
+            "demo-comment-kim-papi",
+            "demo_moments_kim_brand",
+            "papi",
+            "Hahi酱",
+            "太真实了，吵归吵，最后还是看转化率。",
+            nil,
+            97.3
+        ),
+        (
+            "demo-comment-papi-kim",
+            "demo_moments_papi_content",
+            "kim_kardashian",
+            "Kim Kardashian",
+            "Title hooks are easy. Retention is the real flex.",
+            nil,
+            115.1
+        ),
+        (
+            "demo-comment-justin-musk",
+            "demo_moments_justin_market",
+            "musk",
+            "Elon Musk",
+            "Markets are just psychology with better charts.",
+            nil,
+            138.6
+        ),
+        (
+            "demo-comment-zuck-sam",
+            "demo_moments_zuck_social",
+            "sam_altman",
+            "Sam Altman",
+            "Trust is product. Retention is proof.",
+            nil,
+            161.4
         ),
     ]
     let fixedCommentIds = Set(fixedComments.map(\.id))
@@ -165,48 +370,46 @@ func seedDemoMomentsStoryboard(into context: ModelContext) {
         descriptor.fetchLimit = 1
 
         if let existing = try? context.fetch(descriptor).first {
-            existing.postId = postId
+            existing.postId = comment.postId
             existing.authorId = comment.authorId
             existing.authorDisplayName = comment.authorDisplayName
             existing.content = comment.content
             existing.reasonCode = "demo"
             existing.inReplyToCommentId = comment.replyToId
             existing.isViewer = false
-            existing.createdAt = now.addingTimeInterval(comment.secondsOffset)
+            existing.createdAt = now.addingTimeInterval(-comment.minutesAgo * 60)
             existing.deliveryState = "sent"
         } else {
             context.insert(
                 FeedComment(
                     id: comment.id,
-                    postId: postId,
+                    postId: comment.postId,
                     authorId: comment.authorId,
                     authorDisplayName: comment.authorDisplayName,
                     content: comment.content,
                     reasonCode: "demo",
                     inReplyToCommentId: comment.replyToId,
                     isViewer: false,
-                    createdAt: now.addingTimeInterval(comment.secondsOffset),
+                    createdAt: now.addingTimeInterval(-comment.minutesAgo * 60),
                     deliveryState: "sent"
                 )
             )
         }
     }
 
-    let targetPostId = postId
-    let likeCleanupDescriptor = FetchDescriptor<FeedLike>(
-        predicate: #Predicate { $0.postId == targetPostId }
-    )
+    let demoPostIds = Set(demoPosts.map(\.id))
+    let demoPostIdPrefix = "demo_moments_"
+
+    let likeCleanupDescriptor = FetchDescriptor<FeedLike>()
     if let existingLikes = try? context.fetch(likeCleanupDescriptor) {
-        for like in existingLikes where !fixedLikeIds.contains(like.id) {
+        for like in existingLikes where (demoPostIds.contains(like.postId) || like.postId.hasPrefix(demoPostIdPrefix)) && !fixedLikeIds.contains(like.id) {
             context.delete(like)
         }
     }
 
-    let commentCleanupDescriptor = FetchDescriptor<FeedComment>(
-        predicate: #Predicate { $0.postId == targetPostId }
-    )
+    let commentCleanupDescriptor = FetchDescriptor<FeedComment>()
     if let existingComments = try? context.fetch(commentCleanupDescriptor) {
-        for comment in existingComments where !fixedCommentIds.contains(comment.id) {
+        for comment in existingComments where (demoPostIds.contains(comment.postId) || comment.postId.hasPrefix(demoPostIdPrefix)) && !fixedCommentIds.contains(comment.id) {
             context.delete(comment)
         }
     }

@@ -16,12 +16,7 @@ struct FeedInteractionTarget {
 @MainActor
 final class FeedInteractionService {
     private let api: APIClient
-    private let demoPinnedCanonicalPostId = "demo_moments_groupchat"
-    private let demoPinnedPostIds: Set<String> = [
-        "demo_moments_groupchat",
-        "event:feed:demo_moments_groupchat",
-        "delivery:feed:demo_moments_groupchat",
-    ]
+    private let demoPinnedPrefix = "demo_moments_"
 
     init(api: APIClient = APIClient()) {
         self.api = api
@@ -101,8 +96,18 @@ final class FeedInteractionService {
     }
 
     private func canonicalPinnedPostId(for postId: String) -> String? {
-        guard demoPinnedPostIds.contains(postId) else { return nil }
-        return demoPinnedCanonicalPostId
+        if postId.hasPrefix(demoPinnedPrefix) {
+            return postId
+        }
+        let eventPrefix = "event:feed:\(demoPinnedPrefix)"
+        if postId.hasPrefix(eventPrefix) {
+            return String(postId.dropFirst("event:feed:".count))
+        }
+        let deliveryPrefix = "delivery:feed:\(demoPinnedPrefix)"
+        if postId.hasPrefix(deliveryPrefix) {
+            return String(postId.dropFirst("delivery:feed:".count))
+        }
+        return nil
     }
 
     private func fetchLikes(for postId: String, modelContext: ModelContext) throws -> [FeedLike] {

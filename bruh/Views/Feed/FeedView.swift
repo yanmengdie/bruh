@@ -17,7 +17,7 @@ struct FeedView: View {
     @Query private var sourceItems: [SourceItem]
 
     @Query private var contacts: [Contact]
-    private let demoPinnedLegacyPostId = "demo_moments_groupchat"
+    private let demoPinnedLegacyPostPrefix = "demo_moments_"
 
     private var feedService = FeedService()
     private var currentProfileAvatarImage: UIImage? {
@@ -45,8 +45,8 @@ struct FeedView: View {
 
         for delivery in deliveries {
             let isDemoPinnedEntry =
-                delivery.legacyPostId == demoPinnedLegacyPostId
-                || delivery.id == "delivery:feed:\(demoPinnedLegacyPostId)"
+                (delivery.legacyPostId?.hasPrefix(demoPinnedLegacyPostPrefix) ?? false)
+                || delivery.id.hasPrefix("delivery:feed:\(demoPinnedLegacyPostPrefix)")
 
             if demoPinnedMomentsEnabled, !isDemoPinnedEntry {
                 continue
