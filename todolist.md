@@ -58,18 +58,25 @@
 
 ### P3 系统可持续运行
 
-- 建立环境分层的完整策略，把 `dev`、`staging`、`prod` 的配置、数据源和密钥管理彻底拆开。
-- 做 SwiftData 的正式迁移设计，包括版本演进、迁移失败回滚和旧数据兼容策略。
-- 清理数据库职责边界，明确 `source_posts`、`feed_items`、`news_events`、`persona_news_scores` 分别是谁写、谁读、谁回收。
-- 统一定时任务和幂等性，让所有 ingestion 和 build function 都可以安全重复执行。
+- [x] 建立环境分层的完整策略，把 `dev`、`staging`、`prod` 的配置、数据源和密钥管理彻底拆开。
+  已完成：已在 P2 落地 `AppEnvironment`、后端 `_shared/environment.ts` 和 `docs/environment-setup.md`，客户端、Edge Functions 和运维脚本已统一按 `KEY__ENV -> KEY` 解析环境配置。
+- [x] 做 SwiftData 的正式迁移设计，包括版本演进、迁移失败回滚和旧数据兼容策略。
+  已完成：已在 P2 落地 `BruhSchemaV1`、`BruhSchemaMigrationPlan`、`BruhModelStore` 与 `docs/swiftdata-migrations.md`，容器启动失败时会先备份再恢复，不再直接无痕删库。
+- [x] 清理数据库职责边界，明确 `source_posts`、`feed_items`、`news_events`、`persona_news_scores` 分别是谁写、谁读、谁回收。
+  已完成：已在 P1 的 `docs/architecture.md` 中补齐 backend storage responsibilities，明确各表的生产者、消费者、生命周期和回收责任。
+- [x] 统一定时任务和幂等性，让所有 ingestion 和 build function 都可以安全重复执行。
+  已完成：已在 P2 落地 `pipeline_job_locks`、`claim_pipeline_job` / `complete_pipeline_job` 与相关 runbook，主要 pipeline job 已具备锁保护、幂等 upsert 和 TTL 失效恢复。
 - [x] 给媒体链路补规范，统一图片、视频、语音的 URL、缓存、失效和失败回退策略。
   已完成：新增 `supabase/functions/_shared/media.ts` 和 `media_test.ts`，统一 source link 与 image/video/audio asset 的 URL 规范；`ingest-top-news`、`ingest-x-posts`、`build-feed`、`feed`、`generate-message`、`message-starters` 已接入该层，确保不安全协议、私网地址、重复媒体和坏链接在入库或出参前被剔除。iOS 端新增 `RemoteMediaPolicy`，在 DTO 解码和 Feed/Message 渲染阶段再次收口媒体 URL；语音播放仍保留现有 UI，但现在明确了本地缓存、坏缓存删除后重试一次、最终失败保留文本内容的回退策略。新增 `docs/media-policy.md` 记录规则。
 
 ### P4 平台化与成本控制
 
-- 建立 CI/CD 最小流水线，至少包含 iOS build、函数 lint 或类型检查、核心 smoke test 和 deploy check。
-- 增加 feature flag 和灰度能力，后续改 persona 策略、feed 排序、starter 逻辑时不要直接硬切。
-- 加成本控制，给 LLM、TTS、抓取链路增加调用统计、限额和降级策略。
+- [x] 建立 CI/CD 最小流水线，至少包含 iOS build、函数 lint 或类型检查、核心 smoke test 和 deploy check。
+  已完成：已在 P2 落地 `.github/workflows/ci.yml`，并新增 shell 语法校验；当前 CI 覆盖 secret scan、shell syntax、Deno check/test、iOS build 和 `run_p1_validation.sh`。
+- [x] 增加 feature flag 和灰度能力，后续改 persona 策略、feed 排序、starter 逻辑时不要直接硬切。
+  已完成：已在 P2 落地 `_shared/feature_flags.ts`、相关测试和 `docs/feature-flags.md`，当前 feed / starter / persona rollout 已支持按环境和策略灰度。
+- [x] 加成本控制，给 LLM、TTS、抓取链路增加调用统计、限额和降级策略。
+  已完成：已在 P2 落地 `_shared/cost_controls.ts`、相关测试和 `docs/cost-controls.md`，消息、starter 和 X ingestion 已接入成本开关与降级模式。
 - [x] 做错误恢复机制，消息发送失败、starter 拉取失败、feed 构建失败，都要有统一 retry 和 fallback policy。
   已完成：iOS 端在 `APIClient` 新增统一 `NetworkRetryPolicy`，把 `feed`、`message-starters`、`generate-message`、`generate-post-interactions` 四条链路收口到同一套瞬时失败判定和退避重试规则；仅对 timeout / network / provider / unknown 与 `408/429/500/502/503/504` 做有限重试，`validation/auth/config/database` 继续立即失败，避免误重试。`MessageService.refreshStarterMessages()` 现在会返回远端刷新结果，`AppBootstrapper` 改成只有远端成功才标记 starter 已加载，失败后保留本地 seed 并设置 20 秒冷却后可再次拉取，修复原来“一次失败整次会话都不再重试”的问题。后端 `feed` / `build-feed` 已补 `errorCategory` 和结构化日志，方便客户端和 cron 链路做更准确的恢复判断；新增 `docs/error-recovery.md` 记录当前策略。
 - [x] 建立接口版本约束，DTO 一旦变更要有兼容策略，不能依赖前后端同步上线。
@@ -144,6 +151,13 @@
   已完成：新增 `bruh/Services/MessageServiceSupport.swift` 收口 starter id/text、音频可播放判断和消息 preview 生成逻辑，新增 `bruh/Services/MessageThreadReadState.swift` 收口线程已读标记与 unread 计数规则；`MessageThreadStore.swift` 现在只保留 thread query、starter 查询和线程状态更新。同步更新工程文件，把新 service 文件接入 app target。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
 - [x] 拆 `APIClient.swift` 的 feed/message/starter/interaction endpoint 方法，降低 transport 核心与具体接口编排耦合。
   已完成：`APIClient.swift` 现在只保留 actor 初始化、decoder/错误包装和通用 `performDecodableRequest` transport 核心；新增 `bruh/Networking/APIClientFeedEndpoints.swift` 收口 feed 拉取，新增 `bruh/Networking/APIClientMessageEndpoints.swift` 收口消息发送与 starter 拉取，新增 `bruh/Networking/APIClientInteractionEndpoints.swift` 收口 feed interaction 生成。同步更新工程文件和 `scripts/run_p1_validation.sh` 的 API contract smoke 编译输入，确保拆分后 transport 与 endpoint 边界继续被验证。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
+
+### P9 真实环境验证
+
+- [ ] 配置 `.env.staging.local` 或 `.env.prod.local`，用真实 Supabase URL、service-role、functions base URL 和 anon key 跑通 `./scripts/run_release_preflight.sh`。
+  说明：当前 preflight 脚本和 env loader 已就绪，但本机尚未提供真实环境密钥；没有这些值时只能验证本地代码与脚本，不可能完成关键表探测和 backend health 判断。
+- [ ] 用真实环境执行 `./scripts/run_backend_health_snapshot.sh --strict`，确认 `pipeline_job_locks`、`news_articles`、`news_events`、`persona_news_scores`、`feed_items`、`source_posts` 的 freshness 和 job 状态达标。
+  说明：这是下一阶段最有价值的非 UI 工作，能把“结构上可运行”推进到“真实环境上可发布”。
 
 ### 时间映射
 
