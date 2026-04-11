@@ -11,25 +11,44 @@ struct MessageThreadStore {
         return Array(NSOrderedSet(array: ids)) as? [String] ?? ids
     }
 
-    func ensureThread(for personaId: String, modelContext: ModelContext) throws -> MessageThread {
-        var descriptor = FetchDescriptor<MessageThread>(
-            predicate: #Predicate { $0.id == personaId }
-        )
-        descriptor.fetchLimit = 1
+    func ensureThreads(for personaIds: [String], modelContext: ModelContext) throws -> [String: MessageThread] {
+        let dedupedPersonaIds = Array(NSOrderedSet(array: personaIds)) as? [String] ?? personaIds
+        guard !dedupedPersonaIds.isEmpty else { return [:] }
 
-        if let existing = try modelContext.fetch(descriptor).first {
-            return existing
+        let descriptor = FetchDescriptor<MessageThread>(
+            predicate: #Predicate<MessageThread> { dedupedPersonaIds.contains($0.id) }
+        )
+        let existingThreads = try modelContext.fetch(descriptor)
+        var threadsById = Dictionary(uniqueKeysWithValues: existingThreads.map { ($0.id, $0) })
+
+        for personaId in dedupedPersonaIds where threadsById[personaId] == nil {
+            let thread = MessageThread(
+                id: personaId,
+                personaId: personaId,
+                lastMessagePreview: "",
+                lastMessageAt: .distantPast,
+                unreadCount: 0
+            )
+            modelContext.insert(thread)
+            threadsById[personaId] = thread
         }
 
-        let thread = MessageThread(
-            id: personaId,
-            personaId: personaId,
-            lastMessagePreview: "",
-            lastMessageAt: .distantPast,
-            unreadCount: 0
-        )
-        modelContext.insert(thread)
-        return thread
+        return threadsById
+    }
+
+    func ensureThread(for personaId: String, modelContext: ModelContext) throws -> MessageThread {
+        try ensureThreads(for: [personaId], modelContext: modelContext)[personaId]
+            ?? {
+                let thread = MessageThread(
+                    id: personaId,
+                    personaId: personaId,
+                    lastMessagePreview: "",
+                    lastMessageAt: .distantPast,
+                    unreadCount: 0
+                )
+                modelContext.insert(thread)
+                return thread
+            }()
     }
 
     func recentConversation(
@@ -93,6 +112,42 @@ struct MessageThreadStore {
         return try modelContext.fetch(descriptor)
     }
 
+    func starterMessagesByPersonaId(
+        for personaIds: [String],
+        modelContext: ModelContext
+    ) throws -> [String: [PersonaMessage]] {
+        let dedupedPersonaIds = Array(NSOrderedSet(array: personaIds)) as? [String] ?? personaIds
+        guard !dedupedPersonaIds.isEmpty else { return [:] }
+
+        let descriptor = FetchDescriptor<PersonaMessage>(
+            predicate: #Predicate<PersonaMessage> { dedupedPersonaIds.contains($0.threadId) && $0.isSeedMessage },
+            sortBy: [SortDescriptor(\PersonaMessage.createdAt, order: .forward)]
+        )
+        let messages = try modelContext.fetch(descriptor)
+        return Dictionary(grouping: messages, by: \.threadId)
+    }
+
+    func canonicalStarterMessagesByPersonaId(
+        for personaIds: [String],
+        modelContext: ModelContext
+    ) throws -> [String: PersonaMessage] {
+        let starterMessagesByPersona = try starterMessagesByPersonaId(for: personaIds, modelContext: modelContext)
+        var canonicalByPersona: [String: PersonaMessage] = [:]
+
+        for personaId in personaIds {
+            guard let starterMessages = starterMessagesByPersona[personaId], !starterMessages.isEmpty else {
+                continue
+            }
+            if let canonical = starterMessages.first(where: { $0.id == MessageServiceSupport.starterMessageId(for: personaId) }) {
+                canonicalByPersona[personaId] = canonical
+            } else {
+                canonicalByPersona[personaId] = starterMessages.first
+            }
+        }
+
+        return canonicalByPersona
+    }
+
     func hasConversationHistoryBeyondStarter(for personaId: String, modelContext: ModelContext) throws -> Bool {
         let descriptor = FetchDescriptor<PersonaMessage>(
             predicate: #Predicate { $0.threadId == personaId && $0.isSeedMessage == false }
@@ -100,6 +155,24 @@ struct MessageThreadStore {
         return try modelContext.fetch(descriptor).contains { message in
             message.id != MessageServiceSupport.trumpWebPreviewDemoMessageId
         }
+    }
+
+    func personaIdsWithConversationHistoryBeyondStarter(
+        for personaIds: [String],
+        modelContext: ModelContext
+    ) throws -> Set<String> {
+        let dedupedPersonaIds = Array(NSOrderedSet(array: personaIds)) as? [String] ?? personaIds
+        guard !dedupedPersonaIds.isEmpty else { return [] }
+
+        let descriptor = FetchDescriptor<PersonaMessage>(
+            predicate: #Predicate<PersonaMessage> { dedupedPersonaIds.contains($0.threadId) && $0.isSeedMessage == false }
+        )
+        let messages = try modelContext.fetch(descriptor)
+        return Set(
+            messages.compactMap { message in
+                message.id == MessageServiceSupport.trumpWebPreviewDemoMessageId ? nil : message.threadId
+            }
+        )
     }
 
     func fetchContentDelivery(id: String, modelContext: ModelContext) throws -> ContentDelivery? {

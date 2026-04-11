@@ -20,13 +20,22 @@ extension StarterMessageLifecycle {
             latestStarterByPersona[starter.personaId] = starter
         }
 
-        for personaId in latestStarterByPersona.keys.sorted() {
+        let personaIds = latestStarterByPersona.keys.sorted()
+        let threadsByPersonaId = try threadStore.ensureThreads(for: personaIds, modelContext: modelContext)
+        let personaIdsWithConversationHistory = try threadStore.personaIdsWithConversationHistoryBeyondStarter(
+            for: personaIds,
+            modelContext: modelContext
+        )
+        let existingStarterByPersona = try threadStore.canonicalStarterMessagesByPersonaId(
+            for: personaIds,
+            modelContext: modelContext
+        )
+        var messagesToSync: [PersonaMessage] = []
+
+        for personaId in personaIds {
             guard let starter = latestStarterByPersona[personaId] else { continue }
-            let thread = try threadStore.ensureThread(for: starter.personaId, modelContext: modelContext)
-            guard try !threadStore.hasConversationHistoryBeyondStarter(
-                for: starter.personaId,
-                modelContext: modelContext
-            ) else {
+            guard let thread = threadsByPersonaId[starter.personaId] else { continue }
+            guard !personaIdsWithConversationHistory.contains(starter.personaId) else {
                 continue
             }
 
@@ -35,7 +44,7 @@ extension StarterMessageLifecycle {
                 imageUrl: starter.imageUrl
             )
 
-            if let existing = try threadStore.starterMessage(for: starter.personaId, modelContext: modelContext) {
+            if let existing = existingStarterByPersona[starter.personaId] {
                 let previousPreview = MessageServiceSupport.messagePreview(
                     text: existing.text,
                     imageUrl: existing.imageUrl,
@@ -52,7 +61,7 @@ extension StarterMessageLifecycle {
                 existing.deliveryState = "sent"
                 existing.sourcePostIds = starter.sourcePostIds
                 existing.isSeedMessage = true
-                ContentGraphStore.syncIncomingMessage(existing, in: modelContext)
+                messagesToSync.append(existing)
 
                 let shouldRefreshPreview =
                     (thread.lastMessagePreview == previousText && thread.lastMessageAt == previousCreatedAt) ||
@@ -81,7 +90,7 @@ extension StarterMessageLifecycle {
                     isSeedMessage: true
                 )
                 modelContext.insert(message)
-                ContentGraphStore.syncIncomingMessage(message, in: modelContext)
+                messagesToSync.append(message)
                 let nextUnreadCount = threadStore.nextUnreadCount(
                     afterReceivingMessageAt: starter.createdAt,
                     on: thread
@@ -95,6 +104,7 @@ extension StarterMessageLifecycle {
             }
         }
 
+        ContentGraphStore.syncIncomingMessages(messagesToSync, in: modelContext)
         try normalizeStarterMessagesIfNeeded(modelContext: modelContext)
         try seedFallbackStarterMessagesIfNeeded(modelContext: modelContext)
     }

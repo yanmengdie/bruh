@@ -5,12 +5,24 @@ extension StarterMessageLifecycle {
     func seedFallbackStarterMessagesIfNeeded(modelContext: ModelContext) throws {
         guard runtimeOptions.shouldSeedFallbackStarters else { return }
 
-        for personaId in try threadStore.acceptedPersonaIds(modelContext: modelContext) {
-            let thread = try threadStore.ensureThread(for: personaId, modelContext: modelContext)
-            guard try threadStore.starterMessage(for: personaId, modelContext: modelContext) == nil else {
+        let acceptedPersonaIds = try threadStore.acceptedPersonaIds(modelContext: modelContext)
+        let threadsByPersonaId = try threadStore.ensureThreads(for: acceptedPersonaIds, modelContext: modelContext)
+        let existingStarterByPersona = try threadStore.canonicalStarterMessagesByPersonaId(
+            for: acceptedPersonaIds,
+            modelContext: modelContext
+        )
+        let personaIdsWithConversationHistory = try threadStore.personaIdsWithConversationHistoryBeyondStarter(
+            for: acceptedPersonaIds,
+            modelContext: modelContext
+        )
+        var startersToSync: [PersonaMessage] = []
+
+        for personaId in acceptedPersonaIds {
+            guard let thread = threadsByPersonaId[personaId] else { continue }
+            guard existingStarterByPersona[personaId] == nil else {
                 continue
             }
-            guard try !threadStore.hasConversationHistoryBeyondStarter(for: personaId, modelContext: modelContext) else {
+            guard !personaIdsWithConversationHistory.contains(personaId) else {
                 continue
             }
 
@@ -25,7 +37,7 @@ extension StarterMessageLifecycle {
                 isSeedMessage: true
             )
             modelContext.insert(starter)
-            ContentGraphStore.syncIncomingMessage(starter, in: modelContext)
+            startersToSync.append(starter)
             let nextUnreadCount = threadStore.nextUnreadCount(afterReceivingMessageAt: starter.createdAt, on: thread)
             threadStore.updateThread(
                 thread,
@@ -34,6 +46,8 @@ extension StarterMessageLifecycle {
                 unreadCount: nextUnreadCount
             )
         }
+
+        ContentGraphStore.syncIncomingMessages(startersToSync, in: modelContext)
     }
 
     func ensureTrumpWebPreviewExample(modelContext: ModelContext) throws {

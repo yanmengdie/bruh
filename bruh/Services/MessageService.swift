@@ -36,9 +36,8 @@ final class MessageService {
     }
 
     func prepareThreads(modelContext: ModelContext) throws {
-        for personaId in try threadStore.acceptedPersonaIds(modelContext: modelContext) {
-            _ = try threadStore.ensureThread(for: personaId, modelContext: modelContext)
-        }
+        let acceptedPersonaIds = try threadStore.acceptedPersonaIds(modelContext: modelContext)
+        _ = try threadStore.ensureThreads(for: acceptedPersonaIds, modelContext: modelContext)
 
         try starterLifecycle.seedFallbackStarterMessagesIfNeeded(modelContext: modelContext)
         try starterLifecycle.ensureTrumpWebPreviewExample(modelContext: modelContext)

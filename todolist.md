@@ -155,6 +155,8 @@
   已完成：`FeedService.refreshFeed()` 现在会预取本地 `PersonaPost` 快照并复用内存 map，避免对每条远端 `PostDTO` 单独做 `FetchDescriptor`；`reconcileVisibleFeedWindow()` 也改成批量抓取 feed delivery 后再统一更新可见性。与此同时，`ContentGraphStore` 新增 feed 批量同步入口，预取对应的 `SourceItem`、`ContentEvent` 和 `ContentDelivery`，把原来每条 post 各查一次 source/event/delivery 的 N+1 路径收口成批量 fetch + 内存 cache，不改 UI 和业务结果。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
 - [x] 优化 `MessagesScreen` 的消息线程列表计算路径，减少联系人、消息和 delivery 的重复线性扫描。
   已完成：`MessagesScreen` 现在会预先构建 `contactByPersonaId`、`latestMessageByThreadId`、`latestDeliveryByThreadId` 和 `unreadCountByThreadId` 等缓存，列表排序、搜索、预览文案、未读 badge 和头像信息都改成基于一次性 map 读取，而不是在每次 row 渲染时反复 `first(where:)` / `filter` 扫 `contacts`、`recentMessages` 和 `deliveries`。对应改动不涉及 UI 变更，但能显著降低线程数上来后的列表渲染成本；已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
+- [x] 优化 starter 同步与消息 content graph 写侧的批量路径，减少 `MessageThreadStore` 和 `ContentGraphStore` 的逐条查询。
+  已完成：`MessageThreadStore` 新增批量 `ensureThreads`、starter 聚合和“是否已有非 starter 历史”查询，`StarterMessageRemoteSync` 与 `StarterMessageFallbackSeeder` 现在会先批量取线程、starter 和历史状态，再统一插入/更新消息。与此同时，`ContentGraphStore` 新增 message 批量同步入口，`prepareThreads` 与 content graph `backfill` 也改为复用批量接口，避免对每条 starter / incoming message 反复单独查 event 和 delivery。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
 
 ### P9 真实环境验证
 
