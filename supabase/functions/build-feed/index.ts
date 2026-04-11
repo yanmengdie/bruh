@@ -1,95 +1,137 @@
-import { createClient } from "jsr:@supabase/supabase-js@2"
-import { corsHeaders } from "../_shared/cors.ts"
-
-function extractVideoUrl(value: unknown): string | null {
-  if (!value || typeof value !== "object") return null
-
-  const record = value as Record<string, unknown>
-  const direct = typeof record.video_url === "string" && record.video_url ? record.video_url : null
-  if (direct) return direct
-
-  const rawPayload = record.raw_payload
-  if (!rawPayload || typeof rawPayload !== "object") return null
-
-  const payloadRecord = rawPayload as Record<string, unknown>
-  const payloadDirect = typeof payloadRecord.videoUrl === "string" && payloadRecord.videoUrl ? payloadRecord.videoUrl : null
-  if (payloadDirect) return payloadDirect
-
-  const note = payloadRecord.note
-  if (!note || typeof note !== "object") return null
-
-  const noteVideo = (note as Record<string, unknown>).videoUrl
-  return typeof noteVideo === "string" && noteVideo ? noteVideo : null
-}
+import { createClient } from "jsr:@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
+import { resolveSupabaseServiceConfig } from "../_shared/environment.ts";
+import {
+  extractNormalizedVideoUrl,
+  normalizeMediaUrls,
+  normalizeSourceUrl,
+} from "../_shared/media.ts";
+import {
+  classifyError,
+  createObservationContext,
+  logEdgeFailure,
+  logEdgeStart,
+  logEdgeSuccess,
+} from "../_shared/observability.ts";
+import {
+  claimPipelineJob,
+  completePipelineJob,
+} from "../_shared/pipeline_lock.ts";
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
+    return new Response("ok", { headers: corsHeaders });
   }
+
+  const observation = createObservationContext("build-feed");
+  logEdgeStart(observation, "job_started", {
+    method: request.method,
+  });
 
   try {
-    const url = Deno.env.get("PROJECT_URL")
-    const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")
-
-    if (!url || !serviceRoleKey) {
+    const { projectUrl, serviceRoleKey } = resolveSupabaseServiceConfig();
+    const supabase = createClient(projectUrl, serviceRoleKey);
+    const lock = await claimPipelineJob(supabase, "build-feed", 10 * 60);
+    if (!lock.acquired) {
+      logEdgeSuccess(observation, "job_skipped", {
+        reason: "already_running",
+        lockedBy: lock.currentOwnerId,
+        lockedUntil: lock.expiresAt,
+      });
       return Response.json(
-        { error: "Missing Supabase environment variables" },
-        { status: 500, headers: corsHeaders },
-      )
+        {
+          ok: true,
+          skipped: true,
+          reason: "already_running",
+          lockedBy: lock.currentOwnerId,
+          lockedUntil: lock.expiresAt,
+        },
+        { headers: corsHeaders },
+      );
     }
 
-    const body = request.method === "POST" ? await request.json().catch(() => ({})) : {}
-    const limitRaw = Number.parseInt(String(body.limit ?? 100), 10)
-    const limit = Number.isNaN(limitRaw) ? 100 : Math.min(Math.max(limitRaw, 1), 500)
+    try {
+      const body = request.method === "POST"
+        ? await request.json().catch(() => ({}))
+        : {};
+      const limitRaw = Number.parseInt(String(body.limit ?? 300), 10);
+      const limit = Number.isNaN(limitRaw)
+        ? 300
+        : Math.min(Math.max(limitRaw, 1), 500);
 
-    const supabase = createClient(url, serviceRoleKey)
-    const { data: sourcePosts, error: sourceError } = await supabase
-      .from("source_posts")
-      .select("id, persona_id, content, source_type, source_url, topic, importance_score, published_at, media_urls, video_url, raw_payload")
-      .order("published_at", { ascending: false })
-      .limit(limit)
+      const { data: sourcePosts, error: sourceError } = await supabase
+        .from("source_posts")
+        .select(
+          "id, persona_id, content, source_type, source_url, topic, importance_score, published_at, media_urls, video_url, raw_payload",
+        )
+        .order("published_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(limit);
 
-    if (sourceError) {
-      throw new Error(sourceError.message)
-    }
-
-    const rows = (sourcePosts ?? []).map((post) => ({
-      id: `feed-${post.id}`,
-      source_post_id: post.id,
-      persona_id: post.persona_id,
-      content: post.content,
-      source_type: post.source_type,
-      source_url: post.source_url,
-      topic: post.topic,
-      importance_score: post.importance_score,
-      published_at: post.published_at,
-      media_urls: Array.isArray(post.media_urls) ? post.media_urls : [],
-      video_url: extractVideoUrl(post),
-      delivered_at: new Date().toISOString(),
-    }))
-
-    if (rows.length > 0) {
-      const { error: upsertError } = await supabase
-        .from("feed_items")
-        .upsert(rows, { onConflict: "source_post_id" })
-
-      if (upsertError) {
-        throw new Error(upsertError.message)
+      if (sourceError) {
+        throw new Error(sourceError.message);
       }
-    }
 
+      const rows = (sourcePosts ?? []).map((post) => ({
+        id: `feed-${post.id}`,
+        source_post_id: post.id,
+        persona_id: post.persona_id,
+        content: post.content,
+        source_type: post.source_type,
+        source_url: normalizeSourceUrl(post.source_url),
+        topic: post.topic,
+        importance_score: post.importance_score,
+        published_at: post.published_at,
+        media_urls: normalizeMediaUrls(post.media_urls),
+        video_url: extractNormalizedVideoUrl(post),
+        delivered_at: new Date().toISOString(),
+      }));
+
+      if (rows.length > 0) {
+        const { error: upsertError } = await supabase
+          .from("feed_items")
+          .upsert(rows, { onConflict: "source_post_id" });
+
+        if (upsertError) {
+          throw new Error(upsertError.message);
+        }
+      }
+
+      await completePipelineJob(supabase, "build-feed", lock.ownerId, true);
+      logEdgeSuccess(observation, "job_succeeded", {
+        sourcePostCount: sourcePosts?.length ?? 0,
+        feedItemCount: rows.length,
+      });
+      return Response.json(
+        {
+          ok: true,
+          sourcePosts: sourcePosts?.length ?? 0,
+          feedItems: rows.length,
+        },
+        { headers: corsHeaders },
+      );
+    } catch (error) {
+      logEdgeFailure(observation, "job_failed", error, {
+        ownerId: lock.ownerId,
+      });
+      await completePipelineJob(
+        supabase,
+        "build-feed",
+        lock.ownerId,
+        false,
+        error instanceof Error ? error.message : String(error),
+      );
+      throw error;
+    }
+  } catch (error) {
+    const errorCategory = classifyError(error);
+    logEdgeFailure(observation, "request_failed", error);
     return Response.json(
       {
-        ok: true,
-        sourcePosts: sourcePosts?.length ?? 0,
-        feedItems: rows.length,
+        error: error instanceof Error ? error.message : "Unknown error",
+        errorCategory,
       },
-      { headers: corsHeaders },
-    )
-  } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500, headers: corsHeaders },
-    )
+    );
   }
-})
+});

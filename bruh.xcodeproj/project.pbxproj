@@ -42,6 +42,57 @@
 		A10000210000000000000021 /* ending.wav in Resources */ = {isa = PBXBuildFile; fileRef = B10000210000000000000021 /* ending.wav */; };
 		A10000220000000000000022 /* en.lproj/InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10000220000000000000022 /* en.lproj/InfoPlist.strings */; };
 		A10000230000000000000023 /* zh-Hans.lproj/InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10000230000000000000023 /* zh-Hans.lproj/InfoPlist.strings */; };
+		A10000240000000000000024 /* ContactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000240000000000000024 /* ContactsView.swift */; };
+		A10000250000000000000025 /* AlbumView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000250000000000000025 /* AlbumView.swift */; };
+		A10000260000000000000026 /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000260000000000000026 /* SettingsScreen.swift */; };
+		A10000270000000000000027 /* AppBootstrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000270000000000000027 /* AppBootstrapper.swift */; };
+		A10000280000000000000028 /* ContentGraphSelectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000280000000000000028 /* ContentGraphSelectors.swift */; };
+		A10000290000000000000029 /* AppRuntimeOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000290000000000000029 /* AppRuntimeOptions.swift */; };
+		A100002A000000000000002A /* APIClientConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100002A000000000000002A /* APIClientConfiguration.swift */; };
+		A100002B000000000000002B /* PersonaCatalogValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100002B000000000000002B /* PersonaCatalogValidator.swift */; };
+		A100002C000000000000002C /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100002C000000000000002C /* AppEnvironment.swift */; };
+		A100002D000000000000002D /* BruhModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100002D000000000000002D /* BruhModelStore.swift */; };
+		A100002E000000000000002E /* MessageThreadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100002E000000000000002E /* MessageThreadStore.swift */; };
+		A100002F000000000000002F /* StarterMessageLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100002F000000000000002F /* StarterMessageLifecycle.swift */; };
+		A10000300000000000000030 /* FeedInteractionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000300000000000000030 /* FeedInteractionStore.swift */; };
+		A10000310000000000000031 /* FeedLocalInteractionGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000310000000000000031 /* FeedLocalInteractionGenerator.swift */; };
+		A10000320000000000000032 /* ContentGraphStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000320000000000000032 /* ContentGraphStore.swift */; };
+		A10000330000000000000033 /* NetworkSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000330000000000000033 /* NetworkSupport.swift */; };
+		A10000340000000000000034 /* APIClientDTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000340000000000000034 /* APIClientDTOs.swift */; };
+		A10000350000000000000035 /* PersonaCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000350000000000000035 /* PersonaCatalog.swift */; };
+		A10000360000000000000036 /* PersonaSeedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000360000000000000036 /* PersonaSeedStore.swift */; };
+		A10000370000000000000037 /* ContactInviteSeedSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000370000000000000037 /* ContactInviteSeedSupport.swift */; };
+		A10000380000000000000038 /* DemoFeedSeedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000380000000000000038 /* DemoFeedSeedStore.swift */; };
+		A10000390000000000000039 /* PengyouMomentSeedCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000390000000000000039 /* PengyouMomentSeedCatalog.swift */; };
+		A10000400000000000000040 /* FeedInteractionCandidateRanker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000400000000000000040 /* FeedInteractionCandidateRanker.swift */; };
+		A10000410000000000000041 /* FeedInteractionCommentTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000410000000000000041 /* FeedInteractionCommentTemplates.swift */; };
+		A10000420000000000000042 /* StarterMessageRemoteSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000420000000000000042 /* StarterMessageRemoteSync.swift */; };
+		A10000430000000000000043 /* StarterMessageFallbackSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000430000000000000043 /* StarterMessageFallbackSeeder.swift */; };
+		A10000440000000000000044 /* StarterMessageNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000440000000000000044 /* StarterMessageNormalizer.swift */; };
+		A10000450000000000000045 /* FeedInteractionRemoteStateBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000450000000000000045 /* FeedInteractionRemoteStateBridge.swift */; };
+		A10000460000000000000046 /* RemoteMediaPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000460000000000000046 /* RemoteMediaPolicy.swift */; };
+		A10000470000000000000047 /* APIContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000470000000000000047 /* APIContract.swift */; };
+		A10000480000000000000048 /* NetworkRetryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000480000000000000048 /* NetworkRetryPolicy.swift */; };
+		A10000490000000000000049 /* CurrentUserProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000490000000000000049 /* CurrentUserProfileStore.swift */; };
+		A10000500000000000000050 /* PersonaCatalogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000500000000000000050 /* PersonaCatalogStore.swift */; };
+		A10000510000000000000051 /* PersonaCatalogInviteRanker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000510000000000000051 /* PersonaCatalogInviteRanker.swift */; };
+		A10000520000000000000052 /* ContentGraphStoreSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000520000000000000052 /* ContentGraphStoreSupport.swift */; };
+		A10000530000000000000053 /* ContentGraphFeedSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000530000000000000053 /* ContentGraphFeedSync.swift */; };
+		A10000540000000000000054 /* ContentGraphMessageSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000540000000000000054 /* ContentGraphMessageSync.swift */; };
+		A10000550000000000000055 /* APIClientFeedDTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000550000000000000055 /* APIClientFeedDTOs.swift */; };
+		A10000560000000000000056 /* APIClientMessageDTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000560000000000000056 /* APIClientMessageDTOs.swift */; };
+		A10000570000000000000057 /* APIClientInteractionDTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000570000000000000057 /* APIClientInteractionDTOs.swift */; };
+		A10000580000000000000058 /* PengyouMomentSeedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000580000000000000058 /* PengyouMomentSeedStore.swift */; };
+		A10000590000000000000059 /* PengyouMomentSeedSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000590000000000000059 /* PengyouMomentSeedSupport.swift */; };
+		A10000600000000000000060 /* PengyouMomentSeedWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000600000000000000060 /* PengyouMomentSeedWriter.swift */; };
+		A10000610000000000000061 /* PersonaCatalogSeedWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000610000000000000061 /* PersonaCatalogSeedWriter.swift */; };
+		A10000620000000000000062 /* PersonaRetirementCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000620000000000000062 /* PersonaRetirementCleaner.swift */; };
+		A10000630000000000000063 /* SystemContactSeedWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000630000000000000063 /* SystemContactSeedWriter.swift */; };
+		A10000640000000000000064 /* MessageServiceSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000640000000000000064 /* MessageServiceSupport.swift */; };
+		A10000650000000000000065 /* MessageThreadReadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000650000000000000065 /* MessageThreadReadState.swift */; };
+		A10000660000000000000066 /* APIClientFeedEndpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000660000000000000066 /* APIClientFeedEndpoints.swift */; };
+		A10000670000000000000067 /* APIClientMessageEndpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000670000000000000067 /* APIClientMessageEndpoints.swift */; };
+		A10000680000000000000068 /* APIClientInteractionEndpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000680000000000000068 /* APIClientInteractionEndpoints.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -80,6 +131,57 @@
 		B10000210000000000000021 /* ending.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ending.wav; sourceTree = SOURCE_ROOT; };
 		B10000220000000000000022 /* en.lproj/InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B10000230000000000000023 /* zh-Hans.lproj/InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		B10000240000000000000024 /* ContactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsView.swift; sourceTree = "<group>"; };
+		B10000250000000000000025 /* AlbumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumView.swift; sourceTree = "<group>"; };
+		B10000260000000000000026 /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
+		B10000270000000000000027 /* AppBootstrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBootstrapper.swift; sourceTree = "<group>"; };
+		B10000280000000000000028 /* ContentGraphSelectors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentGraphSelectors.swift; sourceTree = "<group>"; };
+		B10000290000000000000029 /* AppRuntimeOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimeOptions.swift; sourceTree = "<group>"; };
+		B100002A000000000000002A /* APIClientConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientConfiguration.swift; sourceTree = "<group>"; };
+		B100002B000000000000002B /* PersonaCatalogValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaCatalogValidator.swift; sourceTree = "<group>"; };
+		B100002C000000000000002C /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
+		B100002D000000000000002D /* BruhModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BruhModelStore.swift; sourceTree = "<group>"; };
+		B100002E000000000000002E /* MessageThreadStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageThreadStore.swift; sourceTree = "<group>"; };
+		B100002F000000000000002F /* StarterMessageLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterMessageLifecycle.swift; sourceTree = "<group>"; };
+		B10000300000000000000030 /* FeedInteractionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedInteractionStore.swift; sourceTree = "<group>"; };
+		B10000310000000000000031 /* FeedLocalInteractionGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedLocalInteractionGenerator.swift; sourceTree = "<group>"; };
+		B10000320000000000000032 /* ContentGraphStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentGraphStore.swift; sourceTree = "<group>"; };
+		B10000330000000000000033 /* NetworkSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSupport.swift; sourceTree = "<group>"; };
+		B10000340000000000000034 /* APIClientDTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientDTOs.swift; sourceTree = "<group>"; };
+		B10000350000000000000035 /* PersonaCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaCatalog.swift; sourceTree = "<group>"; };
+		B10000360000000000000036 /* PersonaSeedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaSeedStore.swift; sourceTree = "<group>"; };
+		B10000370000000000000037 /* ContactInviteSeedSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactInviteSeedSupport.swift; sourceTree = "<group>"; };
+		B10000380000000000000038 /* DemoFeedSeedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoFeedSeedStore.swift; sourceTree = "<group>"; };
+		B10000390000000000000039 /* PengyouMomentSeedCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PengyouMomentSeedCatalog.swift; sourceTree = "<group>"; };
+		B10000400000000000000040 /* FeedInteractionCandidateRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedInteractionCandidateRanker.swift; sourceTree = "<group>"; };
+		B10000410000000000000041 /* FeedInteractionCommentTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedInteractionCommentTemplates.swift; sourceTree = "<group>"; };
+		B10000420000000000000042 /* StarterMessageRemoteSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterMessageRemoteSync.swift; sourceTree = "<group>"; };
+		B10000430000000000000043 /* StarterMessageFallbackSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterMessageFallbackSeeder.swift; sourceTree = "<group>"; };
+		B10000440000000000000044 /* StarterMessageNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterMessageNormalizer.swift; sourceTree = "<group>"; };
+		B10000450000000000000045 /* FeedInteractionRemoteStateBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedInteractionRemoteStateBridge.swift; sourceTree = "<group>"; };
+		B10000460000000000000046 /* RemoteMediaPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteMediaPolicy.swift; sourceTree = "<group>"; };
+		B10000470000000000000047 /* APIContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIContract.swift; sourceTree = "<group>"; };
+		B10000480000000000000048 /* NetworkRetryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkRetryPolicy.swift; sourceTree = "<group>"; };
+		B10000490000000000000049 /* CurrentUserProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrentUserProfileStore.swift; sourceTree = "<group>"; };
+		B10000500000000000000050 /* PersonaCatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaCatalogStore.swift; sourceTree = "<group>"; };
+		B10000510000000000000051 /* PersonaCatalogInviteRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaCatalogInviteRanker.swift; sourceTree = "<group>"; };
+		B10000520000000000000052 /* ContentGraphStoreSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentGraphStoreSupport.swift; sourceTree = "<group>"; };
+		B10000530000000000000053 /* ContentGraphFeedSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentGraphFeedSync.swift; sourceTree = "<group>"; };
+		B10000540000000000000054 /* ContentGraphMessageSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentGraphMessageSync.swift; sourceTree = "<group>"; };
+		B10000550000000000000055 /* APIClientFeedDTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientFeedDTOs.swift; sourceTree = "<group>"; };
+		B10000560000000000000056 /* APIClientMessageDTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientMessageDTOs.swift; sourceTree = "<group>"; };
+		B10000570000000000000057 /* APIClientInteractionDTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientInteractionDTOs.swift; sourceTree = "<group>"; };
+		B10000580000000000000058 /* PengyouMomentSeedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PengyouMomentSeedStore.swift; sourceTree = "<group>"; };
+		B10000590000000000000059 /* PengyouMomentSeedSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PengyouMomentSeedSupport.swift; sourceTree = "<group>"; };
+		B10000600000000000000060 /* PengyouMomentSeedWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PengyouMomentSeedWriter.swift; sourceTree = "<group>"; };
+		B10000610000000000000061 /* PersonaCatalogSeedWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaCatalogSeedWriter.swift; sourceTree = "<group>"; };
+		B10000620000000000000062 /* PersonaRetirementCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaRetirementCleaner.swift; sourceTree = "<group>"; };
+		B10000630000000000000063 /* SystemContactSeedWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemContactSeedWriter.swift; sourceTree = "<group>"; };
+		B10000640000000000000064 /* MessageServiceSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageServiceSupport.swift; sourceTree = "<group>"; };
+		B10000650000000000000065 /* MessageThreadReadState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageThreadReadState.swift; sourceTree = "<group>"; };
+		B10000660000000000000066 /* APIClientFeedEndpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientFeedEndpoints.swift; sourceTree = "<group>"; };
+		B10000670000000000000067 /* APIClientMessageEndpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientMessageEndpoints.swift; sourceTree = "<group>"; };
+		B10000680000000000000068 /* APIClientInteractionEndpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientInteractionEndpoints.swift; sourceTree = "<group>"; };
 		C1000001000000000000001 /* bruh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bruh.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -126,6 +228,11 @@
 			isa = PBXGroup;
 			children = (
 				B1000003000000000000003 /* Persona.swift */,
+				B10000490000000000000049 /* CurrentUserProfileStore.swift */,
+				B10000350000000000000035 /* PersonaCatalog.swift */,
+				B10000500000000000000050 /* PersonaCatalogStore.swift */,
+				B10000510000000000000051 /* PersonaCatalogInviteRanker.swift */,
+				B100002B000000000000002B /* PersonaCatalogValidator.swift */,
 				B1000004000000000000004 /* PersonaPost.swift */,
 				B10000100000000000000010 /* MessageThread.swift */,
 				B10000110000000000000011 /* PersonaMessage.swift */,
@@ -133,7 +240,21 @@
 				B10000140000000000000014 /* FeedLike.swift */,
 				B10000160000000000000016 /* NewsInterest.swift */,
 				B1000005000000000000005 /* SeedData.swift */,
+				B10000360000000000000036 /* PersonaSeedStore.swift */,
+				B10000610000000000000061 /* PersonaCatalogSeedWriter.swift */,
+				B10000620000000000000062 /* PersonaRetirementCleaner.swift */,
+				B10000630000000000000063 /* SystemContactSeedWriter.swift */,
+				B10000370000000000000037 /* ContactInviteSeedSupport.swift */,
+				B10000380000000000000038 /* DemoFeedSeedStore.swift */,
+				B10000390000000000000039 /* PengyouMomentSeedCatalog.swift */,
+				B10000580000000000000058 /* PengyouMomentSeedStore.swift */,
+				B10000590000000000000059 /* PengyouMomentSeedSupport.swift */,
+				B10000600000000000000060 /* PengyouMomentSeedWriter.swift */,
 				B1000006000000000000006 /* SourceItem.swift */,
+				B10000320000000000000032 /* ContentGraphStore.swift */,
+				B10000520000000000000052 /* ContentGraphStoreSupport.swift */,
+				B10000530000000000000053 /* ContentGraphFeedSync.swift */,
+				B10000540000000000000054 /* ContentGraphMessageSync.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -141,12 +262,14 @@
 		E1000004000000000000004 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				E100000E00000000000000E /* Album */,
 				E100000C00000000000000C /* Contacts */,
 				E1000007000000000000007 /* Feed */,
 				E1000008000000000000008 /* Components */,
 				E1000009000000000000009 /* Home */,
 				E100000B00000000000000B /* Messages */,
 				E100000D00000000000000D /* Onboarding */,
+				E100000F00000000000000F /* Settings */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -154,8 +277,25 @@
 		E1000005000000000000005 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				B10000270000000000000027 /* AppBootstrapper.swift */,
+				B100002C000000000000002C /* AppEnvironment.swift */,
+				B100002D000000000000002D /* BruhModelStore.swift */,
+				B10000290000000000000029 /* AppRuntimeOptions.swift */,
+				B10000280000000000000028 /* ContentGraphSelectors.swift */,
 				B100000A00000000000000A /* FeedService.swift */,
 				B10000150000000000000015 /* FeedInteractionService.swift */,
+				B10000300000000000000030 /* FeedInteractionStore.swift */,
+				B10000450000000000000045 /* FeedInteractionRemoteStateBridge.swift */,
+				B10000310000000000000031 /* FeedLocalInteractionGenerator.swift */,
+				B10000400000000000000040 /* FeedInteractionCandidateRanker.swift */,
+				B10000410000000000000041 /* FeedInteractionCommentTemplates.swift */,
+				B100002E000000000000002E /* MessageThreadStore.swift */,
+				B10000640000000000000064 /* MessageServiceSupport.swift */,
+				B10000650000000000000065 /* MessageThreadReadState.swift */,
+				B100002F000000000000002F /* StarterMessageLifecycle.swift */,
+				B10000420000000000000042 /* StarterMessageRemoteSync.swift */,
+				B10000430000000000000043 /* StarterMessageFallbackSeeder.swift */,
+				B10000440000000000000044 /* StarterMessageNormalizer.swift */,
 				B10000120000000000000012 /* MessageService.swift */,
 			);
 			path = Services;
@@ -164,7 +304,19 @@
 		E1000006000000000000006 /* Networking */ = {
 			isa = PBXGroup;
 			children = (
+				B10000460000000000000046 /* RemoteMediaPolicy.swift */,
+				B10000330000000000000033 /* NetworkSupport.swift */,
+				B10000470000000000000047 /* APIContract.swift */,
 				B100000B00000000000000B /* APIClient.swift */,
+				B10000340000000000000034 /* APIClientDTOs.swift */,
+				B10000550000000000000055 /* APIClientFeedDTOs.swift */,
+				B10000560000000000000056 /* APIClientMessageDTOs.swift */,
+				B10000570000000000000057 /* APIClientInteractionDTOs.swift */,
+				B10000660000000000000066 /* APIClientFeedEndpoints.swift */,
+				B10000670000000000000067 /* APIClientMessageEndpoints.swift */,
+				B10000680000000000000068 /* APIClientInteractionEndpoints.swift */,
+				B100002A000000000000002A /* APIClientConfiguration.swift */,
+				B10000480000000000000048 /* NetworkRetryPolicy.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -218,6 +370,7 @@
 			isa = PBXGroup;
 			children = (
 				B100001E000000000000001E /* AddBruhView.swift */,
+				B10000240000000000000024 /* ContactsView.swift */,
 				B100001B000000000000001B /* NewBruhView.swift */,
 				B10000200000000000000020 /* ContactTagsView.swift */,
 			);
@@ -230,6 +383,22 @@
 				B100001C000000000000001C /* Onboarding.swift */,
 			);
 			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		E100000E00000000000000E /* Album */ = {
+			isa = PBXGroup;
+			children = (
+				B10000250000000000000025 /* AlbumView.swift */,
+			);
+			path = Album;
+			sourceTree = "<group>";
+		};
+		E100000F00000000000000F /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				B10000260000000000000026 /* SettingsScreen.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -311,6 +480,10 @@
 				A1000001000000000000001 /* bruhApp.swift in Sources */,
 				A1000002000000000000002 /* ContentView.swift in Sources */,
 				A1000003000000000000003 /* Persona.swift in Sources */,
+				A10000490000000000000049 /* CurrentUserProfileStore.swift in Sources */,
+				A10000350000000000000035 /* PersonaCatalog.swift in Sources */,
+				A10000500000000000000050 /* PersonaCatalogStore.swift in Sources */,
+				A10000510000000000000051 /* PersonaCatalogInviteRanker.swift in Sources */,
 				A1000004000000000000004 /* PersonaPost.swift in Sources */,
 				A10000100000000000000010 /* MessageThread.swift in Sources */,
 				A10000110000000000000011 /* PersonaMessage.swift in Sources */,
@@ -318,24 +491,71 @@
 				A10000140000000000000014 /* FeedLike.swift in Sources */,
 				A10000160000000000000016 /* NewsInterest.swift in Sources */,
 				A1000005000000000000005 /* SeedData.swift in Sources */,
+				A10000360000000000000036 /* PersonaSeedStore.swift in Sources */,
+				A10000610000000000000061 /* PersonaCatalogSeedWriter.swift in Sources */,
+				A10000620000000000000062 /* PersonaRetirementCleaner.swift in Sources */,
+				A10000630000000000000063 /* SystemContactSeedWriter.swift in Sources */,
+				A10000370000000000000037 /* ContactInviteSeedSupport.swift in Sources */,
+				A10000380000000000000038 /* DemoFeedSeedStore.swift in Sources */,
+				A10000390000000000000039 /* PengyouMomentSeedCatalog.swift in Sources */,
+				A10000580000000000000058 /* PengyouMomentSeedStore.swift in Sources */,
+				A10000590000000000000059 /* PengyouMomentSeedSupport.swift in Sources */,
+				A10000600000000000000060 /* PengyouMomentSeedWriter.swift in Sources */,
 				A1000006000000000000006 /* SourceItem.swift in Sources */,
+				A10000320000000000000032 /* ContentGraphStore.swift in Sources */,
+				A10000520000000000000052 /* ContentGraphStoreSupport.swift in Sources */,
+				A10000530000000000000053 /* ContentGraphFeedSync.swift in Sources */,
+				A10000540000000000000054 /* ContentGraphMessageSync.swift in Sources */,
 				A1000007000000000000007 /* FeedView.swift in Sources */,
 				A1000008000000000000008 /* FeedCard.swift in Sources */,
 				A10000170000000000000017 /* MessagesScreen.swift in Sources */,
 				A100001E000000000000001E /* AddBruhView.swift in Sources */,
 				A100001B000000000000001B /* NewBruhView.swift in Sources */,
 				A10000200000000000000020 /* ContactTagsView.swift in Sources */,
+				A10000240000000000000024 /* ContactsView.swift in Sources */,
 				A100001C000000000000001C /* Onboarding.swift in Sources */,
 				A10000180000000000000018 /* AppTheme.swift in Sources */,
 				A10000190000000000000019 /* AppBackIcon.swift in Sources */,
 				A1000009000000000000009 /* PersonaAvatar.swift in Sources */,
+				A10000250000000000000025 /* AlbumView.swift in Sources */,
 				A100000A00000000000000A /* FeedService.swift in Sources */,
 				A10000150000000000000015 /* FeedInteractionService.swift in Sources */,
+				A10000270000000000000027 /* AppBootstrapper.swift in Sources */,
+				A100002C000000000000002C /* AppEnvironment.swift in Sources */,
+				A100002D000000000000002D /* BruhModelStore.swift in Sources */,
+				A10000290000000000000029 /* AppRuntimeOptions.swift in Sources */,
+				A10000280000000000000028 /* ContentGraphSelectors.swift in Sources */,
+				A10000300000000000000030 /* FeedInteractionStore.swift in Sources */,
+				A10000450000000000000045 /* FeedInteractionRemoteStateBridge.swift in Sources */,
+				A10000310000000000000031 /* FeedLocalInteractionGenerator.swift in Sources */,
+				A10000400000000000000040 /* FeedInteractionCandidateRanker.swift in Sources */,
+				A10000410000000000000041 /* FeedInteractionCommentTemplates.swift in Sources */,
+				A100002E000000000000002E /* MessageThreadStore.swift in Sources */,
+				A10000640000000000000064 /* MessageServiceSupport.swift in Sources */,
+				A10000650000000000000065 /* MessageThreadReadState.swift in Sources */,
+				A100002F000000000000002F /* StarterMessageLifecycle.swift in Sources */,
+				A10000420000000000000042 /* StarterMessageRemoteSync.swift in Sources */,
+				A10000430000000000000043 /* StarterMessageFallbackSeeder.swift in Sources */,
+				A10000440000000000000044 /* StarterMessageNormalizer.swift in Sources */,
 				A10000120000000000000012 /* MessageService.swift in Sources */,
+				A10000460000000000000046 /* RemoteMediaPolicy.swift in Sources */,
+				A10000330000000000000033 /* NetworkSupport.swift in Sources */,
+				A10000470000000000000047 /* APIContract.swift in Sources */,
 				A100000B00000000000000B /* APIClient.swift in Sources */,
+				A10000340000000000000034 /* APIClientDTOs.swift in Sources */,
+				A10000550000000000000055 /* APIClientFeedDTOs.swift in Sources */,
+				A10000560000000000000056 /* APIClientMessageDTOs.swift in Sources */,
+				A10000570000000000000057 /* APIClientInteractionDTOs.swift in Sources */,
+				A10000660000000000000066 /* APIClientFeedEndpoints.swift in Sources */,
+				A10000670000000000000067 /* APIClientMessageEndpoints.swift in Sources */,
+				A10000680000000000000068 /* APIClientInteractionEndpoints.swift in Sources */,
+				A100002A000000000000002A /* APIClientConfiguration.swift in Sources */,
+				A10000480000000000000048 /* NetworkRetryPolicy.swift in Sources */,
 				A100000D00000000000000D /* PhoneFrame.swift in Sources */,
 				A100000E00000000000000E /* HomeScreen.swift in Sources */,
+				A10000260000000000000026 /* SettingsScreen.swift in Sources */,
 				A100001A000000000000001A /* SwipeBackGesture.swift in Sources */,
+				A100002B000000000000002B /* PersonaCatalogValidator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -472,6 +692,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MW8MKZLVY6;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_BRUH_APP_ENV = dev;
 				INFOPLIST_KEY_NSCameraUsageDescription = "用于拍摄你的头像照片。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于从相册选择你的头像照片。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -501,6 +722,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MW8MKZLVY6;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_BRUH_APP_ENV = prod;
 				INFOPLIST_KEY_NSCameraUsageDescription = "用于拍摄你的头像照片。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于从相册选择你的头像照片。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

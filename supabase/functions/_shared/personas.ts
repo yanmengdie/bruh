@@ -1,30 +1,10 @@
+import {
+  assertValidPersonaCatalogData,
+  type PersonaPlatformAccountRecord,
+} from "./persona_catalog_schema.ts"
 import personaCatalogData from "../../../bruh/SharedPersonas.json" with { type: "json" }
 
-export type PersonaPlatformAccount = {
-  platform: string
-  handle: string
-  profileUrl?: string | null
-  isPrimary: boolean
-  isActive: boolean
-}
-
-type PersonaCatalogRecord = {
-  id: string
-  displayName: string
-  stance: string
-  domains: string[]
-  leadInterestIds: string[]
-  triggerKeywords: string[]
-  entityKeywords: string[]
-  defaultVoiceSpeakerId: string
-  defaultVoiceLabel: string
-  aliases: string[]
-  primaryLanguage: string
-  friendGreeting: string
-  socialCircleIds: string[]
-  relationshipHints: Record<string, string>
-  platformAccounts: PersonaPlatformAccount[]
-}
+export type PersonaPlatformAccount = PersonaPlatformAccountRecord
 
 export type PersonaDefinition = {
   personaId: string
@@ -53,7 +33,19 @@ function uniqueStrings(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))]
 }
 
-const personaRecords = (personaCatalogData as PersonaCatalogRecord[]).map((record) => ({
+function normalizeStringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object") return {}
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([key, item]) => [key, typeof item === "string" ? item.trim() : ""] as const)
+      .filter((entry) => entry[1].length > 0),
+  )
+}
+
+assertValidPersonaCatalogData(personaCatalogData)
+
+const personaRecords = personaCatalogData.map((record) => ({
   ...record,
   aliases: uniqueStrings(record.aliases ?? []),
   triggerKeywords: uniqueStrings(record.triggerKeywords ?? []),
@@ -92,7 +84,7 @@ const personaDefinitions: PersonaDefinition[] = personaRecords.map((record) => {
     primaryLanguage: record.primaryLanguage,
     friendGreeting: record.friendGreeting,
     socialCircleIds: record.socialCircleIds,
-    relationshipHints: record.relationshipHints ?? {},
+    relationshipHints: normalizeStringRecord(record.relationshipHints),
     platformAccounts: record.platformAccounts,
   }
 })
@@ -129,4 +121,8 @@ export function resolvePersona(value: string) {
 
 export function resolvePersonaById(personaId: string) {
   return personaMap[personaId] ?? null
+}
+
+export function allPersonaIds() {
+  return Object.values(personaMap).map((persona) => persona.personaId)
 }

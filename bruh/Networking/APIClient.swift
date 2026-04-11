@@ -1,257 +1,80 @@
 import Foundation
 
-enum NetworkError: LocalizedError {
-    case invalidURL
-    case httpError(Int)
-    case decodingError
-    case noData
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidURL: return "Invalid URL"
-        case .httpError(let code): return "HTTP error \(code)"
-        case .decodingError: return "Failed to decode response"
-        case .noData: return "No data received"
-        }
-    }
-}
-
 actor APIClient {
-    private let baseURL: String
-    private let anonKey: String
-    private let session: URLSession
+    let baseURL: String
+    let anonKey: String
+    let session: URLSession
 
     init(
-        baseURL: String = "https://mrxctelezutprdeemqla.supabase.co/functions/v1",
-        anonKey: String = "sb_publishable_ry_i_qMeMDzxeE7qhSl1UA_XcAwgQL1"
+        configuration: APIClientConfiguration = .current
     ) {
-        self.baseURL = baseURL
-        self.anonKey = anonKey
+        self.baseURL = configuration.functionsBaseURL
+        self.anonKey = configuration.anonKey
         let configuration = URLSessionConfiguration.ephemeral
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCache = nil
         self.session = URLSession(configuration: configuration)
     }
 
-    /// Fetch posts newer than `since` (ISO8601).
-    func fetchFeed(since: Date? = nil, limit: Int = 20) async throws -> [PostDTO] {
-        var components = URLComponents(string: "\(baseURL)/feed")!
-        var queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "limit", value: "\(limit)"),
-            // Avoid stale timeline payloads from URLSession/HTTP caches for feed refresh.
-            URLQueryItem(name: "_ts", value: "\(Int(Date().timeIntervalSince1970))")
-        ]
-        if let since {
-            let iso = ISO8601DateFormatter()
-            queryItems.append(URLQueryItem(name: "since", value: iso.string(from: since)))
-        }
-        components.queryItems = queryItems
+    init(baseURL: String, anonKey: String) {
+        self.init(configuration: APIClientConfiguration(functionsBaseURL: baseURL, anonKey: anonKey))
+    }
 
-        guard let url = components.url else { throw NetworkError.invalidURL }
-
-        var request = URLRequest(url: url)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        request.setValue("no-cache", forHTTPHeaderField: "Pragma")
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let http = response as? HTTPURLResponse else { throw NetworkError.noData }
-        guard (200...299).contains(http.statusCode) else { throw NetworkError.httpError(http.statusCode) }
-
+    var decoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+
+    func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
         do {
-            return try decoder.decode([PostDTO].self, from: data)
+            return try decoder.decode(type, from: data)
         } catch {
-            throw NetworkError.decodingError
+            let snippet = String(decoding: data.prefix(240), as: UTF8.self)
+            throw NetworkError.decodingError(snippet.isEmpty ? error.localizedDescription : snippet)
         }
     }
 
-    func sendMessage(
-        personaId: String,
-        userMessage: String,
-        conversation: [MessageTurnDTO],
-        userInterests: [String],
-        requestImage: Bool = false
-    ) async throws -> MessageReplyDTO {
-        guard let url = URL(string: "\(baseURL)/generate-message") else {
-            throw NetworkError.invalidURL
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(
-            SendMessageRequestDTO(
-                personaId: personaId,
-                userMessage: userMessage,
-                conversation: conversation,
-                userInterests: userInterests,
-                requestImage: requestImage
-            )
-        )
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let http = response as? HTTPURLResponse else { throw NetworkError.noData }
-        guard (200...299).contains(http.statusCode) else { throw NetworkError.httpError(http.statusCode) }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        do {
-            return try decoder.decode(MessageReplyDTO.self, from: data)
-        } catch {
-            throw NetworkError.decodingError
-        }
+    func httpError(statusCode: Int, data: Data) -> NetworkError {
+        let payload = try? decoder.decode(APIErrorResponseDTO.self, from: data)
+        let message = payload?.error
+            ?? {
+                let snippet = String(decoding: data.prefix(240), as: UTF8.self)
+                return snippet.isEmpty ? nil : snippet
+            }()
+        return .httpError(statusCode, message, payload?.errorCategory)
     }
 
-    func fetchMessageStarters(userInterests: [String]) async throws -> MessageStarterReplyDTO {
-        guard let url = URL(string: "\(baseURL)/message-starters") else {
-            throw NetworkError.invalidURL
+    func performDecodableRequest<T: Decodable>(
+        _ request: URLRequest,
+        as type: T.Type,
+        retryProfile: NetworkRetryProfile,
+        contract: APIContractName
+    ) async throws -> T {
+        var lastError: Error = NetworkError.noData
+
+        for attempt in 1...retryProfile.maxAttempts {
+            do {
+                let (data, response) = try await session.data(for: request)
+                guard let http = response as? HTTPURLResponse else { throw NetworkError.noData }
+                guard (200...299).contains(http.statusCode) else {
+                    throw httpError(statusCode: http.statusCode, data: data)
+                }
+                try APIContract.validateResponse(http, expectedContract: contract)
+
+                return try decode(type, from: data)
+            } catch {
+                lastError = error
+                guard NetworkRetryPolicy.shouldRetry(error, attempt: attempt, profile: retryProfile) else {
+                    throw error
+                }
+
+                try await Task.sleep(
+                    nanoseconds: NetworkRetryPolicy.delayNanoseconds(forAttempt: attempt, profile: retryProfile)
+                )
+            }
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 6
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(
-            MessageStarterRequestDTO(userInterests: userInterests)
-        )
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let http = response as? HTTPURLResponse else { throw NetworkError.noData }
-        guard (200...299).contains(http.statusCode) else { throw NetworkError.httpError(http.statusCode) }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        do {
-            return try decoder.decode(MessageStarterReplyDTO.self, from: data)
-        } catch {
-            throw NetworkError.decodingError
-        }
+        throw lastError
     }
-
-    func generateAvatar(
-        referenceImageBase64: String,
-        referenceImageMimeType: String = "image/jpeg",
-        displayName: String? = nil
-    ) async throws -> AvatarGenerationReplyDTO {
-        guard let url = URL(string: "\(baseURL)/generate-avatar") else {
-            throw NetworkError.invalidURL
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 90
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(
-            AvatarGenerationRequestDTO(
-                referenceImageBase64: referenceImageBase64,
-                referenceImageMimeType: referenceImageMimeType,
-                displayName: displayName
-            )
-        )
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let http = response as? HTTPURLResponse else { throw NetworkError.noData }
-        guard (200...299).contains(http.statusCode) else { throw NetworkError.httpError(http.statusCode) }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        do {
-            return try decoder.decode(AvatarGenerationReplyDTO.self, from: data)
-        } catch {
-            throw NetworkError.decodingError
-        }
-    }
-
-}
-
-// MARK: - DTO
-
-struct PostDTO: Codable, Identifiable {
-    let id: String
-    let personaId: String
-    let content: String
-    let sourceType: String
-    let sourceUrl: String?
-    let topic: String?
-    let importanceScore: Double
-    let mediaUrls: [String]
-    let videoUrl: String?
-    let publishedAt: Date
-}
-
-struct MessageTurnDTO: Codable {
-    let role: String
-    let content: String
-}
-
-struct SendMessageRequestDTO: Codable {
-    let personaId: String
-    let userMessage: String
-    let conversation: [MessageTurnDTO]
-    let userInterests: [String]
-    let requestImage: Bool
-}
-
-struct AvatarGenerationRequestDTO: Codable {
-    let referenceImageBase64: String
-    let referenceImageMimeType: String
-    let displayName: String?
-}
-
-struct AvatarGenerationReplyDTO: Codable {
-    let imageBase64: String
-    let mimeType: String
-    let generatedAt: Date
-}
-
-struct MessageReplyDTO: Codable, Identifiable {
-    let id: String
-    let personaId: String
-    let content: String
-    let imageUrl: String?
-    let sourceUrl: String?
-    let audioUrl: String?
-    let audioDuration: TimeInterval?
-    let voiceLabel: String?
-    let audioError: String?
-    let audioOnly: Bool?
-    let sourcePostIds: [String]
-    let generatedAt: Date
-}
-
-struct MessageStarterRequestDTO: Codable {
-    let userInterests: [String]
-}
-
-struct MessageStarterDTO: Codable, Identifiable {
-    let id: String
-    let personaId: String
-    let text: String
-    let imageUrl: String?
-    let sourceUrl: String?
-    let articleUrl: String?
-    let sourcePostIds: [String]
-    let createdAt: Date
-    let category: String
-    let headline: String
-    let isGlobalTop: Bool
-}
-
-struct MessageStarterReplyDTO: Codable {
-    let starters: [MessageStarterDTO]
-    let topSummary: String
 }

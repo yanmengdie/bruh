@@ -5,6 +5,7 @@ import SwiftData
 @MainActor
 final class FeedService {
     private let api: APIClient
+    private let remoteFeedWindow = 50
     private let seedBaselineDate = Date(timeIntervalSince1970: 946684800) // 2000-01-01T00:00:00Z
     private let suspiciousDemoMarkers = ["example", "demo"]
 
@@ -16,14 +17,15 @@ final class FeedService {
     /// Returns the number of new posts fetched.
     func refreshFeed(modelContext: ModelContext) async throws -> Int {
         try demoteSeedPostsIfNeeded(modelContext: modelContext)
-        let since = try latestRemotePublishedAt(modelContext: modelContext)?.addingTimeInterval(-1)
-        let dtos = try await api.fetchFeed(since: since, limit: 40)
+        let dtos = try await api.fetchFeed(limit: remoteFeedWindow)
         let fetchDate = Date()
         var newCount = 0
+        let activeIds = Set(dtos.map(\.id))
 
         for dto in dtos {
+            let dtoId = dto.id
             var check = FetchDescriptor<PersonaPost>(
-                predicate: #Predicate { $0.id == dto.id }
+                predicate: #Predicate { $0.id == dtoId }
             )
             check.fetchLimit = 1
             if let existing = try modelContext.fetch(check).first {
@@ -61,19 +63,15 @@ final class FeedService {
             newCount += 1
         }
 
+        try reconcileVisibleFeedWindow(
+            activeIds: activeIds,
+            modelContext: modelContext,
+        )
+
         if modelContext.hasChanges {
             try modelContext.save()
         }
         return newCount
-    }
-
-    private func latestRemotePublishedAt(modelContext: ModelContext) throws -> Date? {
-        var descriptor = FetchDescriptor<PersonaPost>(
-            predicate: #Predicate { $0.isDelivered },
-            sortBy: [SortDescriptor(\PersonaPost.publishedAt, order: .reverse)]
-        )
-        descriptor.fetchLimit = 1
-        return try modelContext.fetch(descriptor).first?.publishedAt
     }
 
     private func demoteSeedPostsIfNeeded(modelContext: ModelContext) throws {
@@ -104,5 +102,42 @@ final class FeedService {
         }
 
         return suspiciousDemoMarkers.contains(where: sourceUrl.contains)
+    }
+
+    private func reconcileVisibleFeedWindow(
+        activeIds: Set<String>,
+        modelContext: ModelContext
+    ) throws {
+        let posts = try modelContext.fetch(FetchDescriptor<PersonaPost>())
+
+        for post in posts where !isLikelySeedPost(post) {
+            let isActive = activeIds.contains(post.id)
+            if post.isDelivered != isActive {
+                post.isDelivered = isActive
+            }
+
+            guard let delivery = try fetchFeedDelivery(
+                id: "delivery:feed:\(post.id)",
+                modelContext: modelContext
+            ) else {
+                continue
+            }
+
+            if delivery.isVisible != isActive {
+                delivery.isVisible = isActive
+                delivery.updatedAt = .now
+            }
+        }
+    }
+
+    private func fetchFeedDelivery(
+        id: String,
+        modelContext: ModelContext
+    ) throws -> ContentDelivery? {
+        var descriptor = FetchDescriptor<ContentDelivery>(
+            predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first
     }
 }

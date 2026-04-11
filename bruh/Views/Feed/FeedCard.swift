@@ -31,12 +31,11 @@ struct FeedCard: View {
     private let imageSpacing: CGFloat = 6
 
     private var previewImageURLs: [URL] {
-        Array(delivery.mediaUrls.prefix(9)).compactMap(URL.init(string:))
+        RemoteMediaPolicy.normalizedMediaURLs(delivery.mediaUrls)
     }
 
     private var previewVideoURL: URL? {
-        guard let raw = delivery.videoUrl else { return nil }
-        return URL(string: raw)
+        RemoteMediaPolicy.normalizedAssetURL(delivery.videoUrl)
     }
 
     private var resolvedPersonaId: String {

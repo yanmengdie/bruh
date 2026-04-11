@@ -15,20 +15,43 @@ from datetime import datetime, timezone
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-SUPABASE_URL = "https://mrxctelezutprdeemqla.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get(
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yeGN0ZWxlenV0cHJkZWVtcWxhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTQ5MTUxMywiZXhwIjoyMDkxMDY3NTEzfQ.0fqh2fasgqScEI4XFTqjQEYF7vwn45ZIw0ZYVG4bznU",
-)
+def normalize_app_env(raw_value: str | None) -> str:
+    normalized = (raw_value or "").strip().lower()
+    if normalized in {"", "dev", "development", "local", "debug"}:
+        return "dev"
+    if normalized in {"staging", "stage", "stg", "qa", "test"}:
+        return "staging"
+    if normalized in {"prod", "production", "release", "live"}:
+        return "prod"
+    return "dev"
 
-TWITTER_AUTH_TOKEN = os.environ.get("TWITTER_AUTH_TOKEN", "e60ac9253a730e8455d7fa53a752cdbe55afffb4")
-TWITTER_CT0 = os.environ.get(
-    "TWITTER_CT0",
-    "1b93be1f4f3949092149d08112f7085e15d5cbe2a605c36d58ffc4e75b40eae30ad623a1f253c5d72bef36e728038e604ec9c23117e447cdbb86dc997cd48317a4219bed957f68e2cbda23b48ba3bb58",
-)
 
-HTTP_PROXY = os.environ.get("HTTP_PROXY", "http://127.0.0.1:33210")
-HTTPS_PROXY = os.environ.get("HTTPS_PROXY", "http://127.0.0.1:33210")
+APP_ENV = normalize_app_env(os.environ.get("BRUH_APP_ENV") or os.environ.get("BRUH_ENV"))
+
+
+def resolve_env(*keys: str, default: str | None = None, required: bool = False) -> str | None:
+    suffix = APP_ENV.upper()
+    for key in keys:
+        for candidate in (f"{key}__{suffix}", key):
+            value = os.environ.get(candidate)
+            if value and value.strip():
+                return value.strip()
+
+    if required:
+        candidates = ", ".join([*(f"{key}__{suffix}" for key in keys), *keys])
+        raise RuntimeError(f"Missing environment variable. Looked for: {candidates}")
+
+    return default
+
+
+SUPABASE_URL = resolve_env("SUPABASE_URL", "PROJECT_URL")
+SUPABASE_SERVICE_ROLE_KEY = resolve_env("SUPABASE_SERVICE_ROLE_KEY", "SERVICE_ROLE_KEY")
+
+TWITTER_AUTH_TOKEN = resolve_env("TWITTER_AUTH_TOKEN")
+TWITTER_CT0 = resolve_env("TWITTER_CT0")
+
+HTTP_PROXY = resolve_env("HTTP_PROXY", default="")
+HTTPS_PROXY = resolve_env("HTTPS_PROXY", default="")
 
 PERSONAS = {
     "elonmusk": "musk",
@@ -37,7 +60,7 @@ PERSONAS = {
 }
 
 # Fetch this many posts per user each run — large enough to cover bursts
-FETCH_LIMIT = int(os.environ.get("FETCH_LIMIT", "200"))
+FETCH_LIMIT = int(resolve_env("FETCH_LIMIT", default="200") or "200")
 
 # State file: tracks the newest post timestamp seen per user
 STATE_FILE = os.path.expanduser("~/.bruh-ingest-state.json")
@@ -58,15 +81,17 @@ def save_state(state: dict[str, str]) -> None:
 # ── Twitter fetch ─────────────────────────────────────────────────────────────
 
 def fetch_user_posts(username: str, limit: int) -> list[dict]:
-    env = {
-        **os.environ,
-        "TWITTER_AUTH_TOKEN": TWITTER_AUTH_TOKEN,
-        "TWITTER_CT0": TWITTER_CT0,
-        "HTTP_PROXY": HTTP_PROXY,
-        "HTTPS_PROXY": HTTPS_PROXY,
-    }
+    env = {**os.environ}
+    if TWITTER_AUTH_TOKEN:
+        env["TWITTER_AUTH_TOKEN"] = TWITTER_AUTH_TOKEN
+    if TWITTER_CT0:
+        env["TWITTER_CT0"] = TWITTER_CT0
+    if HTTP_PROXY:
+        env["HTTP_PROXY"] = HTTP_PROXY
+    if HTTPS_PROXY:
+        env["HTTPS_PROXY"] = HTTPS_PROXY
 
-    twitter_bin = os.environ.get("TWITTER_BIN", "/Users/nayi/miniconda3/bin/twitter")
+    twitter_bin = resolve_env("TWITTER_BIN", default="twitter") or "twitter"
     result = subprocess.run(
         [twitter_bin, "user-posts", f"@{username}", "-n", str(limit), "--json"],
         capture_output=True,
@@ -160,6 +185,9 @@ def normalize(post: dict, username: str, persona_id: str) -> tuple[dict, datetim
 # ── Supabase upsert ───────────────────────────────────────────────────────────
 
 def supabase_upsert(rows: list[dict]) -> dict:
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        return {"ok": False, "status": 500, "error": "Missing Supabase environment variables"}
+
     payload = json.dumps(rows).encode()
     req = urllib.request.Request(
         f"{SUPABASE_URL}/rest/v1/source_posts?on_conflict=id",
@@ -182,6 +210,12 @@ def supabase_upsert(rows: list[dict]) -> dict:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    print(f"Environment: {APP_ENV}")
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError(
+            "Missing Supabase configuration. Set SUPABASE_URL/PROJECT_URL and "
+            "SUPABASE_SERVICE_ROLE_KEY/SERVICE_ROLE_KEY, optionally with __DEV/__STAGING/__PROD suffixes."
+        )
     state = load_state()
     new_state = dict(state)
     total_new = 0

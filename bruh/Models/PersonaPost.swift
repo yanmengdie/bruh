@@ -47,3 +47,59 @@ final class PersonaPost {
         self.isDelivered = isDelivered
     }
 }
+
+@Model
+final class PengyouMoment {
+    @Attribute(.unique) var id: String
+    var personaId: String
+    var displayName: String
+    var handle: String
+    var avatarName: String
+    var locationLabel: String
+    var sourceType: String
+    var exportedAt: Date
+    var postId: String
+    var content: String
+    var sourceUrl: String?
+    var mediaUrls: [String]
+    var videoUrl: String?
+    var publishedAt: Date
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(
+        id: String,
+        personaId: String,
+        displayName: String,
+        handle: String,
+        avatarName: String,
+        locationLabel: String,
+        sourceType: String,
+        exportedAt: Date = .now,
+        postId: String,
+        content: String,
+        sourceUrl: String? = nil,
+        mediaUrls: [String] = [],
+        videoUrl: String? = nil,
+        publishedAt: Date = .now,
+        createdAt: Date = .now,
+        updatedAt: Date = .now
+    ) {
+        self.id = id
+        self.personaId = personaId
+        self.displayName = displayName
+        self.handle = handle
+        self.avatarName = avatarName
+        self.locationLabel = locationLabel
+        self.sourceType = sourceType
+        self.exportedAt = exportedAt
+        self.postId = postId
+        self.content = content
+        self.sourceUrl = sourceUrl
+        self.mediaUrls = mediaUrls
+        self.videoUrl = videoUrl
+        self.publishedAt = publishedAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}

@@ -277,7 +277,3 @@ export function defaultStarterMessage(personaId: string, title: string) {
       return title
   }
 }
-
-export function allPersonaIds() {
-  return Object.values(personaMap).map((persona) => persona.personaId)
-}

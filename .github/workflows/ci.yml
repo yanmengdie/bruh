@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  backend-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Sensitive String Scan
+        run: |
+          ./scripts/check_sensitive_strings.sh
+          ./scripts/check_client_boundary.sh
+
+      - name: Deno Check
+        run: |
+          deno check \
+            supabase/functions/generate-message/index.ts \
+            supabase/functions/message-starters/index.ts \
+            supabase/functions/generate-post-interactions/index.ts \
+            supabase/functions/feed/index.ts \
+            supabase/functions/build-feed/index.ts \
+            supabase/functions/ingest-top-news/index.ts \
+            supabase/functions/build-news-events/index.ts \
+            supabase/functions/ingest-x-posts/index.ts \
+            supabase/functions/ingest-xhs-posts/index.ts
+
+      - name: Deno Test
+        run: |
+          deno test \
+            supabase/functions/_shared/api_contract_test.ts \
+            supabase/functions/_shared/content_safety_test.ts \
+            supabase/functions/_shared/media_test.ts \
+            supabase/functions/_shared/observability_test.ts \
+            supabase/functions/_shared/provider_metrics_test.ts \
+            supabase/functions/_shared/cost_controls_test.ts \
+            supabase/functions/_shared/environment_test.ts \
+            supabase/functions/_shared/feature_flags_test.ts \
+            supabase/functions/_shared/persona_catalog_schema_test.ts \
+            supabase/functions/_shared/news_test.ts \
+            supabase/functions/generate-message/fallbacks_test.ts \
+            supabase/functions/generate-post-interactions/fallbacks_test.ts \
+            scripts/backend_health_snapshot_test.ts \
+            scripts/release_preflight_test.ts
+
+  ios-validation:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Xcode Build
+        run: |
+          xcodebuild \
+            -project bruh.xcodeproj \
+            -scheme bruh \
+            -destination 'generic/platform=iOS Simulator' \
+            build
+
+      - name: Smoke Validation
+        run: ./scripts/run_p1_validation.sh

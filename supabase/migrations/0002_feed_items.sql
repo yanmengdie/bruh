@@ -11,17 +11,12 @@ create table if not exists public.feed_items (
   delivered_at timestamptz,
   created_at timestamptz not null default now()
 );
-
 create index if not exists idx_feed_items_published_at
   on public.feed_items (published_at desc);
-
 create index if not exists idx_feed_items_persona_published_at
   on public.feed_items (persona_id, published_at desc);
-
 alter table public.feed_items enable row level security;
-
 drop policy if exists "feed_items_public_read" on public.feed_items;
-
 create policy "feed_items_public_read"
   on public.feed_items
   for select

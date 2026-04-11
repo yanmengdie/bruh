@@ -190,19 +190,14 @@ struct MessagesScreen: View {
     }
 
     private var acceptedPersonaIds: Set<String> {
-        Set(
-            contacts
-                .filter { $0.relationshipStatusValue == .accepted }
-                .compactMap(\.linkedPersonaId)
-        )
+        ContentGraphSelectors.acceptedPersonaIds(from: contacts)
     }
 
     private var messageDeliveries: [ContentDelivery] {
-        deliveries.filter { delivery in
-            delivery.channelValue == .message
-                && delivery.isVisible
-                && acceptedPersonaIds.contains(delivery.personaId ?? "")
-        }
+        ContentGraphSelectors.visibleMessageDeliveries(
+            from: deliveries,
+            contacts: contacts
+        )
     }
 
     private func latestMessageDelivery(for personaId: String) -> ContentDelivery? {
@@ -655,7 +650,6 @@ private struct MessageDetailView: View {
 
     private func messageRow(for message: PersonaMessage) -> some View {
         let content = parseContent(from: message)
-        let sourceURL = resolvedSourceURL(for: message)
         let personaTheme = persona(for: thread.personaId).tint
         let reaction = reaction(for: message.id)
 
@@ -666,9 +660,7 @@ private struct MessageDetailView: View {
                         incomingAvatar
                         messageContentView(
                             content: content,
-                            sourceURL: sourceURL,
                             audioError: message.audioError,
-                            personaId: message.personaId,
                             isIncoming: true,
                             deliveryState: message.deliveryState,
                             themeColor: personaTheme
@@ -684,9 +676,7 @@ private struct MessageDetailView: View {
                     Spacer(minLength: 40)
                     messageContentView(
                         content: content,
-                        sourceURL: sourceURL,
                         audioError: message.audioError,
-                        personaId: message.personaId,
                         isIncoming: false,
                         deliveryState: message.deliveryState,
                         themeColor: personaTheme
@@ -708,9 +698,7 @@ private struct MessageDetailView: View {
     @ViewBuilder
     private func messageContentView(
         content: MessageContent,
-        sourceURL: URL?,
         audioError: String?,
-        personaId: String,
         isIncoming: Bool,
         deliveryState: String,
         themeColor: Color
@@ -743,10 +731,6 @@ private struct MessageDetailView: View {
                 )
             }
 
-            if let sourceURL {
-                sourceLinkChip(url: sourceURL, personaId: personaId, isIncoming: isIncoming)
-            }
-
             if let voiceError = normalizedVoiceError(audioError), !content.hasPlayableAudio {
                 Text("语音未生成：\(voiceError)")
                     .font(.system(size: 11, weight: .medium))
@@ -759,7 +743,7 @@ private struct MessageDetailView: View {
 
     private func parseContent(from message: PersonaMessage) -> MessageContent {
         if message.audioOnly,
-           let audioUrl = message.audioUrl.flatMap(URL.init(string:)) {
+           let audioUrl = RemoteMediaPolicy.normalizedAssetURL(message.audioUrl) {
             let resolvedDuration = audioPlayback.resolvedDurations[message.id] ?? message.audioDuration
             return .audio(
                 audioUrl,
@@ -768,7 +752,7 @@ private struct MessageDetailView: View {
             )
         }
 
-        if let imageUrl = message.imageUrl.flatMap(URL.init(string:)) {
+        if let imageUrl = RemoteMediaPolicy.normalizedAssetURL(message.imageUrl) {
             return .text(message.text, imageUrl: imageUrl)
         }
 
@@ -791,16 +775,6 @@ private struct MessageDetailView: View {
         }
 
         return URL(string: String(text[resultRange]))
-    }
-
-    private func resolvedSourceURL(for message: PersonaMessage) -> URL? {
-        guard firstURL(in: message.text) == nil,
-              let source = message.sourceUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !source.isEmpty else {
-            return nil
-        }
-
-        return URL(string: source)
     }
 
     private var incomingAvatar: some View {
@@ -1013,57 +987,6 @@ private struct MessageDetailView: View {
                     .foregroundStyle(.red)
             }
         }
-    }
-
-    private func sourceLinkChip(url: URL, personaId: String, isIncoming: Bool) -> some View {
-        Button {
-            presentedSourceURL = url
-            isPresentingSafari = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "link")
-                    .font(.system(size: 11, weight: .semibold))
-
-                Text(sourceLabel(for: url, personaId: personaId))
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(Color.white.opacity(0.7))
-            .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, alignment: isIncoming ? .leading : .trailing)
-    }
-
-    private func sourceLabel(for url: URL, personaId: String) -> String {
-        let prefix: String
-        switch personaId {
-        case "trump":
-            prefix = "Receipts"
-        case "musk":
-            prefix = "Link"
-        case "sam_altman", "kobe_bryant":
-            prefix = "Source"
-        case "zhang_peng", "liu_jingkang", "papi":
-            prefix = "原文"
-        case "lei_jun":
-            prefix = "看来源"
-        case "luo_yonghao":
-            prefix = "看这个"
-        case "justin_sun":
-            prefix = "Market context"
-        case "kim_kardashian", "cristiano_ronaldo":
-            prefix = "Story"
-        default:
-            prefix = "Source"
-        }
-
-        let host = (url.host ?? url.absoluteString)
-            .replacingOccurrences(of: "^www\\.", with: "", options: .regularExpression)
-        return "\(prefix) · \(host)"
     }
 
     private func heroFallback() -> some View {
