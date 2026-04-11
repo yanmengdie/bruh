@@ -3,7 +3,7 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-private let staticMomentDraftText = "今天把 pengyou 目录下的 5 份朋友圈数据接成了一个新的本地朋友圈表，这里先按写死内容展示。"
+private let staticMomentDraftText = "今天想把看到的、想到的，都认真留在这里。"
 
 struct FeedView: View {
     @Environment(\.modelContext) private var modelContext
@@ -107,7 +107,7 @@ struct FeedView: View {
                 .foregroundStyle(.secondary)
             Text("还没有朋友圈内容")
                 .font(.system(size: 17, weight: .medium))
-            Text("当前页面会展示写死到新数据表里的内容")
+            Text("等你和鸽们更新第一条动态。")
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
         }
@@ -352,7 +352,7 @@ private struct PengyouComposerSheet: View {
                     }
                 }
 
-                Text("写死展示内容")
+                Text("默认内容预览")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
 
@@ -364,7 +364,7 @@ private struct PengyouComposerSheet: View {
                     .background(Color(red: 0.97, green: 0.97, blue: 0.98))
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 
-                Text("点击“发布”后，会直接写入新的朋友圈本地数据表，内容保持固定。")
+                Text("当前版本先提供快捷发布一条默认动态。")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
 

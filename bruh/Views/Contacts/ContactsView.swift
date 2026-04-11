@@ -541,12 +541,12 @@ struct ContactsView: View {
         let normalizedEmail = draft.email.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !normalizedName.isEmpty else {
-            validationError = "Name cannot be empty."
+            validationError = "姓名不能为空。"
             return
         }
 
         guard !normalizedPhone.isEmpty else {
-            validationError = "Phone number cannot be empty."
+            validationError = "手机号不能为空。"
             return
         }
 
@@ -800,21 +800,21 @@ private struct ContactFormView: View {
 
     var body: some View {
         Form {
-            Section("Basic Info") {
-                TextField("Name", text: $draft.name)
+            Section("基本信息") {
+                TextField("姓名", text: $draft.name)
                     .textInputAutocapitalization(.words)
 
-                TextField("Phone Number", text: $draft.phoneNumber)
+                TextField("手机号", text: $draft.phoneNumber)
                     .keyboardType(.phonePad)
 
-                TextField("Email", text: $draft.email)
+                TextField("邮箱", text: $draft.email)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
                     .autocorrectionDisabled(true)
             }
 
-            Section("Options") {
-                Toggle("Favorite Contact", isOn: $draft.isFavorite)
+            Section("选项") {
+                Toggle("设为星标联系人", isOn: $draft.isFavorite)
             }
 
             if let validationError {
@@ -829,10 +829,10 @@ private struct ContactFormView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel", action: onCancel)
+                Button("取消", action: onCancel)
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Save", action: onSave)
+                Button("保存", action: onSave)
             }
         }
     }

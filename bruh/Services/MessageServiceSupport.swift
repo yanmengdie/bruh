@@ -25,7 +25,7 @@ enum MessageServiceSupport {
         audioOnly: Bool = false
     ) -> String {
         if audioOnly, let audioUrl, !audioUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "[Voice]"
+            return "[语音]"
         }
 
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

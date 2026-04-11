@@ -5,11 +5,11 @@ struct SettingsScreen: View {
 
     var body: some View {
         List {
-            Section("Display Mode") {
-                Toggle("Use HomeScreen Mode", isOn: $useHomeScreenMode)
+            Section("界面模式") {
+                Toggle("使用桌面首页模式", isOn: $useHomeScreenMode)
             }
 
-            Label("通知设置", systemImage: "bell.badge")
+            Label("通知", systemImage: "bell.badge")
             Label("内容偏好", systemImage: "slider.horizontal.3")
             Label("关于 Bruh", systemImage: "info.circle")
         }

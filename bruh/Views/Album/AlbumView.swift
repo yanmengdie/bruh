@@ -39,16 +39,17 @@ struct AlbumView: View {
 
                 let title: String
                 if day == today {
-                    title = "Today"
+                    title = "今天"
                 } else if day == yesterday {
-                    title = "Yesterday"
+                    title = "昨天"
                 } else {
                     let formatter = DateFormatter()
-                    formatter.dateFormat = "MMM d"
+                    formatter.locale = Locale(identifier: "zh_CN")
+                    formatter.dateFormat = "M月d日"
                     title = formatter.string(from: day)
                 }
 
-                let subtitle = "\(items.count) photos"
+                let subtitle = "\(items.count) 张照片"
                 return AlbumSection(id: day.formatted(date: .numeric, time: .omitted), title: title, subtitle: subtitle, items: items)
             }
     }
@@ -93,7 +94,7 @@ struct AlbumView: View {
 
     private var topBar: some View {
         HStack(alignment: .center) {
-            Text("ALBUM")
+            Text("相册")
                 .font(.system(size: 24, weight: .black, design: .rounded))
                 .foregroundStyle(Color.black.opacity(0.9))
 
@@ -123,7 +124,7 @@ struct AlbumView: View {
                         Image(systemName: "photo.on.rectangle.angled")
                             .font(.system(size: 34))
                             .foregroundStyle(.secondary)
-                        Text("No Album Yet")
+                        Text("还没有相册内容")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(Color.black.opacity(0.84))
                     }

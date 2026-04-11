@@ -41,12 +41,27 @@ struct MessagesScreen: View {
     }
 
     var body: some View {
+        let isSearching = !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
         ZStack {
             backgroundColor.ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 14) {
-                    if !filteredThreads.isEmpty {
+                    if filteredThreads.isEmpty {
+                        ContentUnavailableView(
+                            isSearching ? "没有搜索结果" : "还没有消息",
+                            systemImage: isSearching ? "magnifyingglass" : "message",
+                            description: Text(
+                                isSearching
+                                    ? "试试搜索其他联系人或聊天内容。"
+                                    : "等鸽们先给你发来第一条消息。"
+                            )
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 44)
+                    } else {
                         VStack(spacing: 0) {
                             ForEach(Array(filteredThreads.enumerated()), id: \.element.id) { index, thread in
                                 NavigationLink {
@@ -317,15 +332,12 @@ struct MessagesScreen: View {
     }
 
     private func messagePreview(for message: PersonaMessage) -> String {
-        if message.audioOnly,
-           let audioUrl = message.audioUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !audioUrl.isEmpty {
-            return "[Voice]"
-        }
-
-        let trimmed = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard message.imageUrl != nil else { return trimmed }
-        return trimmed.isEmpty ? "[图片]" : "[图片] \(trimmed)"
+        MessageServiceSupport.messagePreview(
+            text: message.text,
+            imageUrl: message.imageUrl,
+            audioUrl: message.audioUrl,
+            audioOnly: message.audioOnly
+        )
     }
 }
 
@@ -446,7 +458,7 @@ private struct MessageDetailView: View {
                     .buttonStyle(.plain)
                     .disabled(isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                    TextField("Message \(displayName)...", text: $draft)
+                    TextField("给\(displayName)发消息...", text: $draft)
                         .focused($isComposerFocused)
                         .submitLabel(.send)
                         .onSubmit {
@@ -552,7 +564,7 @@ private struct MessageDetailView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.primary)
 
-                Text("my bruh · \(presenceText)")
+                Text("鸽们 · \(presenceText)")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -576,7 +588,7 @@ private struct MessageDetailView: View {
     private var presenceText: String {
         let threshold: TimeInterval = 10 * 60
         let secondsSinceLastMessage = Date().timeIntervalSince(latestConversationDate)
-        return secondsSinceLastMessage <= threshold ? "online" : "offline"
+        return secondsSinceLastMessage <= threshold ? "在线" : "离线"
     }
 
     private var latestConversationDate: Date {
@@ -932,7 +944,7 @@ private struct MessageDetailView: View {
                 }
 
             if !isIncoming && deliveryState == "failed" {
-                Text("Failed to send")
+                Text("发送失败")
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
             }
@@ -974,7 +986,7 @@ private struct MessageDetailView: View {
             }
 
             if !isIncoming && deliveryState == "failed" {
-                Text("Failed to send")
+                Text("发送失败")
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
             }
@@ -1061,7 +1073,7 @@ private struct MessageDetailView: View {
             }
 
             if !isIncoming && deliveryState == "failed" {
-                Text("Failed to send")
+                Text("发送失败")
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
             }

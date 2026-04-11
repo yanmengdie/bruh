@@ -46,7 +46,7 @@ enum ContentGraphStoreSupport {
         audioOnly: Bool = false
     ) -> String {
         if audioOnly, normalizedValue(audioUrl) != nil {
-            return "[Voice]"
+            return "[语音]"
         }
 
         let trimmed = text
@@ -54,7 +54,7 @@ enum ContentGraphStoreSupport {
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
 
-        let base = trimmed.isEmpty ? (imageUrl == nil ? "Untitled" : "[图片]") : String(trimmed.prefix(80))
+        let base = trimmed.isEmpty ? (imageUrl == nil ? "未命名内容" : "[图片]") : String(trimmed.prefix(80))
         return base
     }
 

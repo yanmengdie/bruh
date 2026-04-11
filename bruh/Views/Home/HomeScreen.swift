@@ -1,6 +1,8 @@
+import Foundation
 import SwiftUI
 import UIKit
 import AVFoundation
+import SwiftData
 
 enum AppDestination: Hashable {
     case feed
@@ -11,7 +13,27 @@ enum AppDestination: Hashable {
 }
 
 struct HomeScreen: View {
+    private struct PersonaPresentation {
+        let name: String
+        let tint: Color
+        let avatarName: String
+    }
+
+    private struct HomeMessageSummary: Identifiable {
+        let id: String
+        let name: String
+        let preview: String
+        let timeLabel: String
+        let unreadCount: Int
+        let tint: Color
+        let avatarName: String
+    }
+
     @Environment(\.openURL) private var openURL
+    @Query(sort: [SortDescriptor(\MessageThread.lastMessageAt, order: .reverse)]) private var threads: [MessageThread]
+    @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
+    @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
+    @Query(sort: [SortDescriptor(\PersonaMessage.createdAt, order: .reverse)]) private var recentMessages: [PersonaMessage]
     let onNavigate: (AppDestination) -> Void
     let messageUnreadCount: Int
     let momentsUnreadCount: Int
@@ -69,6 +91,7 @@ struct HomeScreen: View {
     private let iconCornerRadius: CGFloat = 16
     private let fourColumnLayout: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 14), count: 4)
     private let homeBackgroundColor = Color(red: 0.93, green: 0.89, blue: 0.82)
+    private let maxMessageSummaryCount = 2
 
     var body: some View {
         VStack(spacing: 16) {
@@ -141,9 +164,28 @@ struct HomeScreen: View {
                 .buttonStyle(.plain)
             }
 
-            VStack(spacing: 10) {
-                messageSnippet(name: "罗浩安", text: "不是鸽们，你不应该在台上Demo吗？", time: "2分", avatarAsset: "Avatar_LuoHaoan", avatarBackground: Color(red: 0.84, green: 0.76, blue: 0.64))
-                messageSnippet(name: "Hera", text: "欢迎关注小红书@欢崽（Ai版）", time: "15分", avatarAsset: "Avatar_Hera", avatarBackground: Color(red: 0.97, green: 0.82, blue: 0.87))
+            if messageSummaries.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "message")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.black.opacity(0.28))
+
+                    Text("还没有消息")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.black.opacity(0.72))
+
+                    Text("等鸽们先给你发来第一条消息。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.black.opacity(0.36))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(messageSummaries) { summary in
+                        messageSnippet(summary)
+                    }
+                }
             }
         }
         .padding(.horizontal, 14)
@@ -152,31 +194,31 @@ struct HomeScreen: View {
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func messageSnippet(name: String, text: String, time: String, avatarAsset: String? = nil, avatarBackground: Color = Color.black.opacity(0.85)) -> some View {
+    private func messageSnippet(_ summary: HomeMessageSummary) -> some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(avatarBackground)
+                .fill(summary.tint.opacity(0.18))
                 .frame(width: 42, height: 42)
                 .overlay {
-                    if let avatarAsset, UIImage(named: avatarAsset) != nil {
-                        Image(avatarAsset)
+                    if !summary.avatarName.isEmpty, UIImage(named: summary.avatarName) != nil {
+                        Image(summary.avatarName)
                             .resizable()
                             .scaledToFill()
                             .frame(width: 42, height: 42)
                             .clipShape(Circle())
                     } else {
-                        Text(String(name.prefix(1)))
+                        Text(String(summary.name.prefix(1)))
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(summary.tint)
                     }
                 }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(name)
+                Text(summary.name)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.black.opacity(0.88))
 
-                Text(text)
+                Text(summary.preview)
                     .font(.system(size: 12))
                     .foregroundStyle(Color.black.opacity(0.40))
                     .lineLimit(1)
@@ -184,10 +226,218 @@ struct HomeScreen: View {
 
             Spacer(minLength: 0)
 
-            Text(time)
-                .font(.system(size: 12))
-                .foregroundStyle(Color.black.opacity(0.30))
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(summary.timeLabel)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.black.opacity(0.30))
+
+                if summary.unreadCount > 0 {
+                    Text(summary.unreadCount > 99 ? "99+" : "\(summary.unreadCount)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .frame(height: 18)
+                        .background(Color(red: 0.84, green: 0.15, blue: 0.24))
+                        .clipShape(Capsule())
+                }
+            }
         }
+    }
+
+    private var acceptedPersonaIds: Set<String> {
+        ContentGraphSelectors.acceptedPersonaIds(from: contacts)
+    }
+
+    private var contactByPersonaId: [String: Contact] {
+        Dictionary(
+            contacts.compactMap { contact in
+                guard let personaId = contact.linkedPersonaId else { return nil }
+                return (personaId, contact)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+    }
+
+    private var messageDeliveries: [ContentDelivery] {
+        ContentGraphSelectors.visibleMessageDeliveries(
+            from: deliveries,
+            contacts: contacts
+        )
+    }
+
+    private var latestMessageByThreadId: [String: PersonaMessage] {
+        var messagesByThreadId: [String: PersonaMessage] = [:]
+        for message in recentMessages where messagesByThreadId[message.threadId] == nil {
+            messagesByThreadId[message.threadId] = message
+        }
+        return messagesByThreadId
+    }
+
+    private var latestDeliveryByThreadId: [String: ContentDelivery] {
+        var deliveriesByThreadId: [String: ContentDelivery] = [:]
+
+        for delivery in messageDeliveries {
+            guard let key = threadKey(for: delivery), deliveriesByThreadId[key] == nil else {
+                continue
+            }
+            deliveriesByThreadId[key] = delivery
+        }
+
+        return deliveriesByThreadId
+    }
+
+    private var unreadCountByThreadId: [String: Int] {
+        let readCutoffByThreadId = Dictionary(
+            uniqueKeysWithValues: threads.map { ($0.id, $0.lastReadAt ?? .distantPast) }
+        )
+        var counts: [String: Int] = [:]
+
+        for delivery in messageDeliveries {
+            guard let key = threadKey(for: delivery) else { continue }
+            guard delivery.sortDate > (readCutoffByThreadId[key] ?? .distantPast) else { continue }
+            counts[key, default: 0] += 1
+        }
+
+        return counts
+    }
+
+    private var messageSummaries: [HomeMessageSummary] {
+        Array(
+            threads
+                .filter { acceptedPersonaIds.contains($0.personaId) }
+                .sorted { latestActivityDate(for: $0) > latestActivityDate(for: $1) }
+                .filter { latestActivityDate(for: $0) > .distantPast }
+                .prefix(maxMessageSummaryCount)
+        )
+        .map { thread in
+            let presentation = personaPresentation(for: thread.personaId)
+            return HomeMessageSummary(
+                id: thread.id,
+                name: presentation.name,
+                preview: latestPreview(for: thread),
+                timeLabel: relativeTime(latestActivityDate(for: thread)),
+                unreadCount: unreadCount(for: thread),
+                tint: presentation.tint,
+                avatarName: presentation.avatarName
+            )
+        }
+    }
+
+    private func personaPresentation(for personaId: String) -> PersonaPresentation {
+        if let contact = contactByPersonaId[personaId] {
+            return PersonaPresentation(
+                name: contact.name,
+                tint: AppTheme.color(from: contact.themeColorHex, fallback: fallbackTint(for: personaId)),
+                avatarName: contact.avatarName
+            )
+        }
+
+        if let persona = PersonaCatalog.entry(for: personaId) {
+            return PersonaPresentation(
+                name: persona.displayName,
+                tint: AppTheme.color(from: persona.themeColorHex, fallback: fallbackTint(for: personaId)),
+                avatarName: persona.avatarName
+            )
+        }
+
+        return PersonaPresentation(
+            name: personaId.capitalized,
+            tint: fallbackTint(for: personaId),
+            avatarName: ""
+        )
+    }
+
+    private func fallbackTint(for personaId: String) -> Color {
+        switch personaId {
+        case "trump":
+            return .orange
+        case "musk":
+            return .blue
+        case "sam_altman":
+            return Color(red: 0.06, green: 0.12, blue: 0.22)
+        case "zhang_peng":
+            return Color(red: 0.15, green: 0.39, blue: 0.92)
+        case "lei_jun":
+            return Color(red: 1.00, green: 0.41, blue: 0.00)
+        case "liu_jingkang":
+            return Color(red: 0.06, green: 0.62, blue: 0.58)
+        case "luo_yonghao":
+            return Color(red: 0.50, green: 0.11, blue: 0.11)
+        case "justin_sun":
+            return Color(red: 0.11, green: 0.74, blue: 0.63)
+        case "kim_kardashian":
+            return Color(red: 0.72, green: 0.54, blue: 0.42)
+        case "papi":
+            return Color(red: 0.88, green: 0.11, blue: 0.55)
+        case "kobe_bryant":
+            return Color(red: 0.99, green: 0.73, blue: 0.15)
+        case "cristiano_ronaldo":
+            return Color(red: 0.05, green: 0.58, blue: 0.53)
+        default:
+            return .gray
+        }
+    }
+
+    private func threadKey(for delivery: ContentDelivery) -> String? {
+        if let threadId = delivery.threadId?.trimmingCharacters(in: .whitespacesAndNewlines), !threadId.isEmpty {
+            return threadId
+        }
+
+        if let personaId = delivery.personaId?.trimmingCharacters(in: .whitespacesAndNewlines), !personaId.isEmpty {
+            return personaId
+        }
+
+        return nil
+    }
+
+    private func latestMessageDelivery(for personaId: String) -> ContentDelivery? {
+        latestDeliveryByThreadId[personaId]
+    }
+
+    private func latestPersistedMessage(for personaId: String) -> PersonaMessage? {
+        latestMessageByThreadId[personaId]
+    }
+
+    private func latestPreview(for thread: MessageThread) -> String {
+        if let message = latestPersistedMessage(for: thread.personaId) {
+            let preview = MessageServiceSupport.messagePreview(
+                text: message.text,
+                imageUrl: message.imageUrl,
+                audioUrl: message.audioUrl,
+                audioOnly: message.audioOnly
+            )
+            if !preview.isEmpty {
+                return preview
+            }
+        }
+
+        let preview = thread.lastMessagePreview.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !preview.isEmpty {
+            return preview
+        }
+        if let preview = latestMessageDelivery(for: thread.personaId)?.previewText,
+           !preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return preview
+        }
+        return "开始聊天"
+    }
+
+    private func latestActivityDate(for thread: MessageThread) -> Date {
+        let latestMessageDate = latestPersistedMessage(for: thread.personaId)?.createdAt ?? .distantPast
+        let latestDeliveryDate = latestMessageDelivery(for: thread.personaId)?.sortDate ?? .distantPast
+        return max(thread.lastMessageAt, max(latestMessageDate, latestDeliveryDate))
+    }
+
+    private func unreadCount(for thread: MessageThread) -> Int {
+        unreadCountByThreadId[thread.id] ?? max(0, thread.unreadCount)
+    }
+
+    private func relativeTime(_ date: Date) -> String {
+        guard date > .distantPast else { return "刚刚" }
+
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 
     private var voiceBubbleWidget: some View {
