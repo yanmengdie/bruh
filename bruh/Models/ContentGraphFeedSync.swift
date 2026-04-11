@@ -2,14 +2,40 @@ import Foundation
 import SwiftData
 
 extension ContentGraphStore {
+    private struct FeedSyncCache {
+        var sourceItemsById: [String: SourceItem]
+        var eventsById: [String: ContentEvent]
+        var deliveriesById: [String: ContentDelivery]
+    }
+
+    @MainActor
+    static func syncFeedPosts(_ posts: [PersonaPost], in context: ModelContext) {
+        guard !posts.isEmpty else { return }
+        var cache = makeFeedSyncCache(for: posts, in: context)
+
+        for post in posts {
+            syncFeedPost(post, in: context, cache: &cache)
+        }
+    }
+
     @MainActor
     static func syncFeedPost(_ post: PersonaPost, in context: ModelContext) {
-        let sourceItem = upsertSourceItem(for: post, in: context)
+        var cache = makeFeedSyncCache(for: [post], in: context)
+        syncFeedPost(post, in: context, cache: &cache)
+    }
+
+    @MainActor
+    private static func syncFeedPost(
+        _ post: PersonaPost,
+        in context: ModelContext,
+        cache: inout FeedSyncCache
+    ) {
+        let sourceItem = upsertSourceItem(for: post, in: context, cache: &cache)
         let eventId = "event:feed:\(post.id)"
         let preview = ContentGraphStoreSupport.previewText(text: post.content)
         let tags = [post.sourceType, post.topic, post.personaId].compactMap(ContentGraphStoreSupport.normalizedValue)
 
-        let event = ContentGraphStoreSupport.fetchContentEvent(id: eventId, in: context) ?? {
+        let event = cache.eventsById[eventId] ?? {
             let item = ContentEvent(
                 id: eventId,
                 kind: ContentEventKind.socialPost.rawValue,
@@ -26,6 +52,7 @@ extension ContentGraphStore {
                 updatedAt: .now
             )
             context.insert(item)
+            cache.eventsById[eventId] = item
             return item
         }()
 
@@ -44,7 +71,7 @@ extension ContentGraphStore {
         post.contentEventId = eventId
 
         let deliveryId = "delivery:feed:\(post.id)"
-        let delivery = ContentGraphStoreSupport.fetchContentDelivery(id: deliveryId, in: context) ?? {
+        let delivery = cache.deliveriesById[deliveryId] ?? {
             let item = ContentDelivery(
                 id: deliveryId,
                 eventId: eventId,
@@ -60,6 +87,7 @@ extension ContentGraphStore {
                 isVisible: true
             )
             context.insert(item)
+            cache.deliveriesById[deliveryId] = item
             return item
         }()
 
@@ -81,9 +109,13 @@ extension ContentGraphStore {
     }
 
     @MainActor
-    private static func upsertSourceItem(for post: PersonaPost, in context: ModelContext) -> SourceItem {
+    private static func upsertSourceItem(
+        for post: PersonaPost,
+        in context: ModelContext,
+        cache: inout FeedSyncCache
+    ) -> SourceItem {
         let sourceItemId = "source:feed:\(post.id)"
-        let sourceItem = ContentGraphStoreSupport.fetchSourceItem(id: sourceItemId, in: context) ?? {
+        let sourceItem = cache.sourceItemsById[sourceItemId] ?? {
             let item = SourceItem(
                 id: sourceItemId,
                 sourceType: post.sourceType,
@@ -98,6 +130,7 @@ extension ContentGraphStore {
                 isProcessed: true
             )
             context.insert(item)
+            cache.sourceItemsById[sourceItemId] = item
             return item
         }()
 
@@ -114,5 +147,61 @@ extension ContentGraphStore {
         sourceItem.isVerified = true
         sourceItem.isProcessed = true
         return sourceItem
+    }
+
+    @MainActor
+    private static func makeFeedSyncCache(
+        for posts: [PersonaPost],
+        in context: ModelContext
+    ) -> FeedSyncCache {
+        let postIds = Array(Set(posts.map(\.id)))
+        let sourceItemIds = postIds.map { "source:feed:\($0)" }
+        let eventIds = postIds.map { "event:feed:\($0)" }
+        let deliveryIds = postIds.map { "delivery:feed:\($0)" }
+
+        return FeedSyncCache(
+            sourceItemsById: fetchSourceItems(ids: sourceItemIds, in: context),
+            eventsById: fetchContentEvents(ids: eventIds, in: context),
+            deliveriesById: fetchContentDeliveries(ids: deliveryIds, in: context)
+        )
+    }
+
+    @MainActor
+    private static func fetchSourceItems(
+        ids: [String],
+        in context: ModelContext
+    ) -> [String: SourceItem] {
+        guard !ids.isEmpty else { return [:] }
+        let descriptor = FetchDescriptor<SourceItem>(
+            predicate: #Predicate<SourceItem> { ids.contains($0.id) }
+        )
+        let items = (try? context.fetch(descriptor)) ?? []
+        return Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+    }
+
+    @MainActor
+    private static func fetchContentEvents(
+        ids: [String],
+        in context: ModelContext
+    ) -> [String: ContentEvent] {
+        guard !ids.isEmpty else { return [:] }
+        let descriptor = FetchDescriptor<ContentEvent>(
+            predicate: #Predicate<ContentEvent> { ids.contains($0.id) }
+        )
+        let events = (try? context.fetch(descriptor)) ?? []
+        return Dictionary(uniqueKeysWithValues: events.map { ($0.id, $0) })
+    }
+
+    @MainActor
+    private static func fetchContentDeliveries(
+        ids: [String],
+        in context: ModelContext
+    ) -> [String: ContentDelivery] {
+        guard !ids.isEmpty else { return [:] }
+        let descriptor = FetchDescriptor<ContentDelivery>(
+            predicate: #Predicate<ContentDelivery> { ids.contains($0.id) }
+        )
+        let deliveries = (try? context.fetch(descriptor)) ?? []
+        return Dictionary(uniqueKeysWithValues: deliveries.map { ($0.id, $0) })
     }
 }

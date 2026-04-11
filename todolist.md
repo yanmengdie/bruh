@@ -151,6 +151,8 @@
   已完成：新增 `bruh/Services/MessageServiceSupport.swift` 收口 starter id/text、音频可播放判断和消息 preview 生成逻辑，新增 `bruh/Services/MessageThreadReadState.swift` 收口线程已读标记与 unread 计数规则；`MessageThreadStore.swift` 现在只保留 thread query、starter 查询和线程状态更新。同步更新工程文件，把新 service 文件接入 app target。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
 - [x] 拆 `APIClient.swift` 的 feed/message/starter/interaction endpoint 方法，降低 transport 核心与具体接口编排耦合。
   已完成：`APIClient.swift` 现在只保留 actor 初始化、decoder/错误包装和通用 `performDecodableRequest` transport 核心；新增 `bruh/Networking/APIClientFeedEndpoints.swift` 收口 feed 拉取，新增 `bruh/Networking/APIClientMessageEndpoints.swift` 收口消息发送与 starter 拉取，新增 `bruh/Networking/APIClientInteractionEndpoints.swift` 收口 feed interaction 生成。同步更新工程文件和 `scripts/run_p1_validation.sh` 的 API contract smoke 编译输入，确保拆分后 transport 与 endpoint 边界继续被验证。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
+- [x] 优化 `FeedService` 和 `ContentGraphStore` 的 feed 刷新查询路径，减少 SwiftData 的逐条 fetch 与 reconcile 开销。
+  已完成：`FeedService.refreshFeed()` 现在会预取本地 `PersonaPost` 快照并复用内存 map，避免对每条远端 `PostDTO` 单独做 `FetchDescriptor`；`reconcileVisibleFeedWindow()` 也改成批量抓取 feed delivery 后再统一更新可见性。与此同时，`ContentGraphStore` 新增 feed 批量同步入口，预取对应的 `SourceItem`、`ContentEvent` 和 `ContentDelivery`，把原来每条 post 各查一次 source/event/delivery 的 N+1 路径收口成批量 fetch + 内存 cache，不改 UI 和业务结果。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
 
 ### P9 真实环境验证
 
