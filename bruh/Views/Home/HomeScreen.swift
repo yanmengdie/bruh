@@ -45,16 +45,35 @@ struct HomeScreen: View {
 
     private var quickApps: [HomeQuickApp] {
         [
-            .init(name: "鸽们", imageAsset: "Icon_contacts", destination: .contacts),
-            .init(name: "消息", imageAsset: "Icon_message", destination: .imessage, badgeCount: messageUnreadCount),
-            .init(name: "日常", imageAsset: "Icon_moments", destination: .feed, badgeCount: momentsUnreadCount),
-            .init(name: "相册", imageAsset: "Icon_album", destination: .album, badgeText: hasNewAlbumBadge ? "新" : nil),
-        .init(
-            name: "小红书",
+            .init(
+                name: "羊崽",
+                imageAsset: "Icon_xhs",
+                destination: nil,
+                fallbackWebURL: URL(string: "https://xhslink.com/m/60xxnORQs5V")
+            ),
+            .init(
+                name: "欢崽",
+                imageAsset: "Icon_xhs",
+                destination: nil,
+                fallbackWebURL: URL(string: "https://xhslink.com/m/5zzSVyHYq3b")
+            ),
+            .init(
+                name: "SlashZ",
+                imageAsset: "Icon_xhs",
+                destination: nil,
+                fallbackWebURL: URL(string: "https://xhslink.com/m/8B1ScfZyQnZ")
+            ),
+            .init(
+                name: "星星",
+                imageAsset: "Icon_xhs",
+                destination: nil,
+                fallbackWebURL: URL(string: "https://xhslink.com/m/ABy083gT7yW")
+            ),
+            .init(
+            name: "LightYear",
             imageAsset: "Icon_xhs",
             destination: nil,
-            deepLinkURL: URL(string: "xhsdiscover://home"),
-            fallbackWebURL: URL(string: "https://www.xiaohongshu.com")
+            fallbackWebURL: URL(string: "https://xhslink.com/m/AQ6ODzD5O1m")
         ),
         .init(
             name: "影石",
