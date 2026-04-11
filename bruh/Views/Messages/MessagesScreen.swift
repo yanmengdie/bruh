@@ -7,6 +7,12 @@ import SwiftData
 import UIKit
 
 struct MessagesScreen: View {
+    private struct PersonaPresentation {
+        let name: String
+        let tint: Color
+        let avatarName: String
+    }
+
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     @Query(sort: [SortDescriptor(\PersonaMessage.createdAt, order: .reverse)]) private var recentMessages: [PersonaMessage]
     let threads: [MessageThread]
@@ -77,6 +83,9 @@ struct MessagesScreen: View {
 
     private func messageRow(thread: MessageThread) -> some View {
         let persona = persona(for: thread.personaId)
+        let unreadCount = unreadCount(for: thread)
+        let latestActivity = latestActivityDate(for: thread)
+        let preview = latestPreview(for: thread)
 
         return HStack(spacing: 12) {
             avatarCircle(for: thread.personaId, size: 50)
@@ -84,24 +93,24 @@ struct MessagesScreen: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(persona.name)
-                        .font(.system(size: 16, weight: unreadCount(for: thread) > 0 ? .semibold : .regular))
+                        .font(.system(size: 16, weight: unreadCount > 0 ? .semibold : .regular))
                         .foregroundStyle(.primary)
                     Spacer()
-                    Text(relativeTime(latestActivityDate(for: thread)))
+                    Text(relativeTime(latestActivity))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
 
                 HStack {
-                    Text(latestPreview(for: thread))
+                    Text(preview)
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
 
                     Spacer()
 
-                    if unreadCount(for: thread) > 0 {
-                        Text("\(unreadCount(for: thread))")
+                    if unreadCount > 0 {
+                        Text("\(unreadCount)")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 7)
@@ -121,23 +130,19 @@ struct MessagesScreen: View {
     }
 
     private func persona(for personaId: String) -> (name: String, tint: Color) {
-        if let contact = contacts.first(where: { $0.linkedPersonaId == personaId }) {
-            return (contact.name, AppTheme.color(from: contact.themeColorHex, fallback: fallbackTint(for: personaId)))
-        }
-
-        return (personaId.capitalized, fallbackTint(for: personaId))
+        let presentation = personaPresentation(for: personaId)
+        return (presentation.name, presentation.tint)
     }
 
     private func avatarCircle(for personaId: String, size: CGFloat) -> some View {
-        let persona = persona(for: personaId)
-        let avatarName = contacts.first(where: { $0.linkedPersonaId == personaId })?.avatarName ?? ""
+        let persona = personaPresentation(for: personaId)
 
         return Circle()
             .fill(persona.tint.opacity(0.18))
             .frame(width: size, height: size)
             .overlay {
-                if !avatarName.isEmpty, UIImage(named: avatarName) != nil {
-                    Image(avatarName)
+                if !persona.avatarName.isEmpty, UIImage(named: persona.avatarName) != nil {
+                    Image(persona.avatarName)
                         .resizable()
                         .scaledToFill()
                         .frame(width: size, height: size)
@@ -193,6 +198,16 @@ struct MessagesScreen: View {
         ContentGraphSelectors.acceptedPersonaIds(from: contacts)
     }
 
+    private var contactByPersonaId: [String: Contact] {
+        Dictionary(
+            contacts.compactMap { contact in
+                guard let personaId = contact.linkedPersonaId else { return nil }
+                return (personaId, contact)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+    }
+
     private var messageDeliveries: [ContentDelivery] {
         ContentGraphSelectors.visibleMessageDeliveries(
             from: deliveries,
@@ -200,12 +215,76 @@ struct MessagesScreen: View {
         )
     }
 
+    private var latestMessageByThreadId: [String: PersonaMessage] {
+        var messagesByThreadId: [String: PersonaMessage] = [:]
+        for message in recentMessages where messagesByThreadId[message.threadId] == nil {
+            messagesByThreadId[message.threadId] = message
+        }
+        return messagesByThreadId
+    }
+
+    private var latestDeliveryByThreadId: [String: ContentDelivery] {
+        var deliveriesByThreadId: [String: ContentDelivery] = [:]
+
+        for delivery in messageDeliveries {
+            guard let key = threadKey(for: delivery), deliveriesByThreadId[key] == nil else {
+                continue
+            }
+            deliveriesByThreadId[key] = delivery
+        }
+
+        return deliveriesByThreadId
+    }
+
+    private var unreadCountByThreadId: [String: Int] {
+        let readCutoffByThreadId = Dictionary(
+            uniqueKeysWithValues: threads.map { ($0.id, $0.lastReadAt ?? .distantPast) }
+        )
+        var counts: [String: Int] = [:]
+
+        for delivery in messageDeliveries {
+            guard let key = threadKey(for: delivery) else { continue }
+            guard delivery.sortDate > (readCutoffByThreadId[key] ?? .distantPast) else { continue }
+            counts[key, default: 0] += 1
+        }
+
+        return counts
+    }
+
+    private func personaPresentation(for personaId: String) -> PersonaPresentation {
+        if let contact = contactByPersonaId[personaId] {
+            return PersonaPresentation(
+                name: contact.name,
+                tint: AppTheme.color(from: contact.themeColorHex, fallback: fallbackTint(for: personaId)),
+                avatarName: contact.avatarName
+            )
+        }
+
+        return PersonaPresentation(
+            name: personaId.capitalized,
+            tint: fallbackTint(for: personaId),
+            avatarName: ""
+        )
+    }
+
+    private func threadKey(for delivery: ContentDelivery) -> String? {
+        if let threadId = delivery.threadId?.trimmingCharacters(in: .whitespacesAndNewlines), !threadId.isEmpty {
+            return threadId
+        }
+
+        if let personaId = delivery.personaId?.trimmingCharacters(in: .whitespacesAndNewlines), !personaId.isEmpty {
+            return personaId
+        }
+
+        return nil
+    }
+
     private func latestMessageDelivery(for personaId: String) -> ContentDelivery? {
-        messageDeliveries.first(where: { $0.personaId == personaId })
+        latestDeliveryByThreadId[personaId]
     }
 
     private func latestPersistedMessage(for personaId: String) -> PersonaMessage? {
-        recentMessages.first(where: { $0.threadId == personaId })
+        latestMessageByThreadId[personaId]
     }
 
     private func latestPreview(for thread: MessageThread) -> String {
@@ -234,7 +313,7 @@ struct MessagesScreen: View {
     }
 
     private func unreadCount(for thread: MessageThread) -> Int {
-        MessageThreadReadState.unreadCount(for: thread, deliveries: messageDeliveries)
+        unreadCountByThreadId[thread.id] ?? max(0, thread.unreadCount)
     }
 
     private func messagePreview(for message: PersonaMessage) -> String {

@@ -153,6 +153,8 @@
   已完成：`APIClient.swift` 现在只保留 actor 初始化、decoder/错误包装和通用 `performDecodableRequest` transport 核心；新增 `bruh/Networking/APIClientFeedEndpoints.swift` 收口 feed 拉取，新增 `bruh/Networking/APIClientMessageEndpoints.swift` 收口消息发送与 starter 拉取，新增 `bruh/Networking/APIClientInteractionEndpoints.swift` 收口 feed interaction 生成。同步更新工程文件和 `scripts/run_p1_validation.sh` 的 API contract smoke 编译输入，确保拆分后 transport 与 endpoint 边界继续被验证。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
 - [x] 优化 `FeedService` 和 `ContentGraphStore` 的 feed 刷新查询路径，减少 SwiftData 的逐条 fetch 与 reconcile 开销。
   已完成：`FeedService.refreshFeed()` 现在会预取本地 `PersonaPost` 快照并复用内存 map，避免对每条远端 `PostDTO` 单独做 `FetchDescriptor`；`reconcileVisibleFeedWindow()` 也改成批量抓取 feed delivery 后再统一更新可见性。与此同时，`ContentGraphStore` 新增 feed 批量同步入口，预取对应的 `SourceItem`、`ContentEvent` 和 `ContentDelivery`，把原来每条 post 各查一次 source/event/delivery 的 N+1 路径收口成批量 fetch + 内存 cache，不改 UI 和业务结果。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
+- [x] 优化 `MessagesScreen` 的消息线程列表计算路径，减少联系人、消息和 delivery 的重复线性扫描。
+  已完成：`MessagesScreen` 现在会预先构建 `contactByPersonaId`、`latestMessageByThreadId`、`latestDeliveryByThreadId` 和 `unreadCountByThreadId` 等缓存，列表排序、搜索、预览文案、未读 badge 和头像信息都改成基于一次性 map 读取，而不是在每次 row 渲染时反复 `first(where:)` / `filter` 扫 `contacts`、`recentMessages` 和 `deliveries`。对应改动不涉及 UI 变更，但能显著降低线程数上来后的列表渲染成本；已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
 
 ### P9 真实环境验证
 
