@@ -157,6 +157,8 @@
   已完成：`MessagesScreen` 现在会预先构建 `contactByPersonaId`、`latestMessageByThreadId`、`latestDeliveryByThreadId` 和 `unreadCountByThreadId` 等缓存，列表排序、搜索、预览文案、未读 badge 和头像信息都改成基于一次性 map 读取，而不是在每次 row 渲染时反复 `first(where:)` / `filter` 扫 `contacts`、`recentMessages` 和 `deliveries`。对应改动不涉及 UI 变更，但能显著降低线程数上来后的列表渲染成本；已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
 - [x] 优化 starter 同步与消息 content graph 写侧的批量路径，减少 `MessageThreadStore` 和 `ContentGraphStore` 的逐条查询。
   已完成：`MessageThreadStore` 新增批量 `ensureThreads`、starter 聚合和“是否已有非 starter 历史”查询，`StarterMessageRemoteSync` 与 `StarterMessageFallbackSeeder` 现在会先批量取线程、starter 和历史状态，再统一插入/更新消息。与此同时，`ContentGraphStore` 新增 message 批量同步入口，`prepareThreads` 与 content graph `backfill` 也改为复用批量接口，避免对每条 starter / incoming message 反复单独查 event 和 delivery。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
+- [x] 优化 `ContactsView` 的联系人目录与邀请派生状态计算路径，减少联系人、persona 和 invitation 的重复线性扫描。
+  已完成：`ContactsView` 现在会一次性构建 `ContactsDerivedState` 与 `InviteContext`，把联系人搜索/排序/分组、邀请 persona 匹配、pending invitation 列表、locked candidate 名单和字母索引 section key 收口到单次派生计算，不再在 `body`、`NewBruhView` 导航和 invite frontier 归一化过程中反复 `filter` / `first(where:)` / `sorted`。同时 `insertIncomingMessage()` 已改为复用 `MessageThreadStore.ensureThread(...)` 与统一 unread/thread preview 更新逻辑，去掉本地重复 thread fetch/create 分支。对应改动保持 UI 行为不变，并已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
 
 ### P9 真实环境验证
 

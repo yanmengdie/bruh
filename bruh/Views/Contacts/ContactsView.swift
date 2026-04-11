@@ -9,6 +9,41 @@ private struct ContactDraft {
     var isFavorite: Bool = false
 }
 
+private struct ContactsDerivedState {
+    let isSearching: Bool
+    let filteredContacts: [Contact]
+    let sectionedContacts: [(key: String, values: [Contact])]
+    let availableSectionKeys: Set<String>
+    let pendingInvitations: [BruhInvitation]
+    let lockedCandidateNamesByPersonaId: [String: [String]]
+
+    var pendingInvitationCount: Int {
+        pendingInvitations.count
+    }
+
+    func lockedCandidateNames(excluding personaId: String) -> [String] {
+        lockedCandidateNamesByPersonaId[personaId] ?? []
+    }
+}
+
+private struct InviteContext {
+    let personaById: [String: Persona]
+    let matchingPersonaIds: Set<String>
+    let priorityByPersonaId: [String: Int]
+    let fallbackRank: Int
+
+    func matches(personaId: String) -> Bool {
+        matchingPersonaIds.contains(personaId)
+    }
+
+    func sortKey(for contact: Contact) -> (Int, Int, String) {
+        let priority = contact.linkedPersonaId
+            .flatMap { priorityByPersonaId[$0] } ?? fallbackRank
+        let order = contact.inviteOrder ?? 999
+        return (priority, order, contact.name)
+    }
+}
+
 struct ContactsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
@@ -48,70 +83,20 @@ struct ContactsView: View {
         return UIImage(data: data)
     }
 
-    private var filteredContacts: [Contact] {
-        let sorted = contacts
-            .filter(\.isVisibleInContactsList)
-            .sorted {
-                if $0.isFavorite != $1.isFavorite { return $0.isFavorite && !$1.isFavorite }
-                return sortKey(for: $0.name).localizedCaseInsensitiveCompare(sortKey(for: $1.name)) == .orderedAscending
-            }
-
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return sorted }
-
-        return sorted.filter { contact in
-            contact.name.localizedCaseInsensitiveContains(query)
-                || contact.phoneNumber.localizedCaseInsensitiveContains(query)
-                || contact.email.localizedCaseInsensitiveContains(query)
-        }
-    }
-
-    private var isSearching: Bool {
-        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var sectionedContacts: [(key: String, values: [Contact])] {
-        let grouped = Dictionary(grouping: filteredContacts, by: sectionKey)
-        return Self.alphabet.compactMap { key in
-            guard let values = grouped[key], !values.isEmpty else { return nil }
-            return (key, values)
-        }
-    }
-
-    private var pendingInvitations: [BruhInvitation] {
-        contacts
-            .filter { contact in
-                guard contact.isPendingInvitation,
-                      let personaId = contact.linkedPersonaId else { return false }
-                return invitePersonaAllowlist.contains(personaId)
-                    && personaMatchesSelectedInterests(personaId: personaId)
-            }
-            .sorted { inviteSortKey(for: $0) < inviteSortKey(for: $1) }
-            .compactMap { contact in
-                guard let personaId = contact.linkedPersonaId,
-                      let persona = personas.first(where: { $0.id == personaId }) else {
-                    return nil
-                }
-                return BruhInvitation(persona: persona, contact: contact)
-            }
-    }
-
-    private var pendingInvitationCount: Int {
-        pendingInvitations.count
-    }
-
     var body: some View {
+        let derivedState = makeDerivedState()
+
         ScrollViewReader { proxy in
             ZStack(alignment: .trailing) {
                 List {
-                    if !isSearching {
-                        topCards
+                    if !derivedState.isSearching {
+                        topCards(pendingInvitationCount: derivedState.pendingInvitationCount)
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
                     }
 
-                    if filteredContacts.isEmpty {
+                    if derivedState.filteredContacts.isEmpty {
                         ContentUnavailableView(
                             searchText.isEmpty ? "暂无联系人" : "无搜索结果",
                             systemImage: searchText.isEmpty ? "person.crop.circle.badge.plus" : "magnifyingglass",
@@ -119,12 +104,12 @@ struct ContactsView: View {
                         )
                         .frame(maxWidth: .infinity, alignment: .center)
                         .listRowBackground(Color.clear)
-                    } else if isSearching {
-                        ForEach(filteredContacts, id: \.id) { contact in
+                    } else if derivedState.isSearching {
+                        ForEach(derivedState.filteredContacts, id: \.id) { contact in
                             contactListRow(contact)
                         }
                     } else {
-                        ForEach(sectionedContacts, id: \.key) { section in
+                        ForEach(derivedState.sectionedContacts, id: \.key) { section in
                             Section {
                                 ForEach(section.values, id: \.id) { contact in
                                     contactListRow(contact)
@@ -146,8 +131,8 @@ struct ContactsView: View {
                 .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
                 .navigationTitle("")
 
-                if !isSearching && !sectionedContacts.isEmpty {
-                    alphabetIndex(proxy: proxy)
+                if !derivedState.isSearching && !derivedState.sectionedContacts.isEmpty {
+                    alphabetIndex(proxy: proxy, availableSectionKeys: derivedState.availableSectionKeys)
                         .padding(.trailing, 0)
                         .padding(.top, 38)
                 }
@@ -169,7 +154,7 @@ struct ContactsView: View {
         .navigationDestination(item: $presentedInvitation) { invitation in
             NewBruhView(
                 invitation: invitation,
-                lockedCandidateNames: lockedCandidateNames(excluding: invitation.personaId),
+                lockedCandidateNames: derivedState.lockedCandidateNames(excluding: invitation.personaId),
                 onAccept: acceptInvitation,
                 onIgnore: ignoreInvitation
             )
@@ -194,10 +179,10 @@ struct ContactsView: View {
         }
     }
 
-    private var topCards: some View {
+    private func topCards(pendingInvitationCount: Int) -> some View {
         VStack(spacing: 12) {
             profileCard
-            quickActionsCard
+            quickActionsCard(pendingInvitationCount: pendingInvitationCount)
         }
     }
 
@@ -244,7 +229,7 @@ struct ContactsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    private var quickActionsCard: some View {
+    private func quickActionsCard(pendingInvitationCount: Int) -> some View {
         VStack(spacing: 0) {
             quickActionRow(
                 icon: "🤝",
@@ -305,7 +290,7 @@ struct ContactsView: View {
         .buttonStyle(.plain)
     }
 
-    private func alphabetIndex(proxy: ScrollViewProxy) -> some View {
+    private func alphabetIndex(proxy: ScrollViewProxy, availableSectionKeys: Set<String>) -> some View {
         HStack(spacing: 8) {
             if let activeIndexLetter {
                 Text(activeIndexLetter)
@@ -330,7 +315,7 @@ struct ContactsView: View {
                             .frame(width: 16, height: 12)
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                jumpToIndexLetter(letter, proxy: proxy, animated: true)
+                                jumpToIndexLetter(letter, proxy: proxy, availableSectionKeys: availableSectionKeys, animated: true)
                             }
                     }
                 }
@@ -349,7 +334,7 @@ struct ContactsView: View {
                             }
 
                             let letter = Self.alphabet[raw]
-                            jumpToIndexLetter(letter, proxy: proxy, animated: false)
+                            jumpToIndexLetter(letter, proxy: proxy, availableSectionKeys: availableSectionKeys, animated: false)
                         }
                         .onEnded { _ in
                             activeIndexLetter = nil
@@ -383,8 +368,13 @@ struct ContactsView: View {
         return (mutable as String).uppercased()
     }
 
-    private func jumpToIndexLetter(_ letter: String, proxy: ScrollViewProxy, animated: Bool) {
-        guard let target = targetSection(for: letter) else { return }
+    private func jumpToIndexLetter(
+        _ letter: String,
+        proxy: ScrollViewProxy,
+        availableSectionKeys: Set<String>,
+        animated: Bool
+    ) {
+        guard let target = targetSection(for: letter, availableSectionKeys: availableSectionKeys) else { return }
         activeIndexLetter = target
 
         if lastIndexFeedbackLetter != target {
@@ -401,19 +391,18 @@ struct ContactsView: View {
         }
     }
 
-    private func targetSection(for letter: String) -> String? {
-        let existing = Set(sectionedContacts.map(\.key))
+    private func targetSection(for letter: String, availableSectionKeys: Set<String>) -> String? {
         guard let requestedIndex = Self.alphabet.firstIndex(of: letter) else { return nil }
 
-        if existing.contains(letter) {
+        if availableSectionKeys.contains(letter) {
             return letter
         }
 
-        for index in requestedIndex..<Self.alphabet.count where existing.contains(Self.alphabet[index]) {
+        for index in requestedIndex..<Self.alphabet.count where availableSectionKeys.contains(Self.alphabet[index]) {
             return Self.alphabet[index]
         }
 
-        for index in stride(from: requestedIndex - 1, through: 0, by: -1) where existing.contains(Self.alphabet[index]) {
+        for index in stride(from: requestedIndex - 1, through: 0, by: -1) where availableSectionKeys.contains(Self.alphabet[index]) {
             return Self.alphabet[index]
         }
 
@@ -481,7 +470,7 @@ struct ContactsView: View {
 
     private func openNewBruh() {
         normalizeInviteFrontier()
-        guard let invitation = pendingInvitations.first else { return }
+        guard let invitation = makeDerivedState().pendingInvitations.first else { return }
         presentedInvitation = invitation
     }
 
@@ -600,11 +589,13 @@ struct ContactsView: View {
     }
 
     private func normalizeInviteFrontier() {
+        let inviteContext = makeInviteContext()
+
         for contact in contacts {
             guard let personaId = contact.linkedPersonaId,
                   invitePersonaAllowlist.contains(personaId) else { continue }
 
-            if !personaMatchesSelectedInterests(personaId: personaId),
+            if !inviteContext.matches(personaId: personaId),
                contact.relationshipStatusValue == .pending {
                 contact.relationshipStatusValue = .locked
                 contact.updatedAt = .now
@@ -615,9 +606,9 @@ struct ContactsView: View {
             .filter { contact in
                 guard let personaId = contact.linkedPersonaId else { return false }
                 return invitePersonaAllowlist.contains(personaId)
-                    && personaMatchesSelectedInterests(personaId: personaId)
+                    && inviteContext.matches(personaId: personaId)
             }
-            .sorted { inviteSortKey(for: $0) < inviteSortKey(for: $1) }
+            .sorted { inviteContext.sortKey(for: $0) < inviteContext.sortKey(for: $1) }
 
         var frontierConsumed = false
         for contact in personaContacts {
@@ -651,20 +642,71 @@ struct ContactsView: View {
         contacts.first(where: { $0.linkedPersonaId == personaId })
     }
 
-    private func lockedCandidateNames(excluding personaId: String) -> [String] {
-        contacts
-            .filter { contact in
-                guard let linkedPersonaId = contact.linkedPersonaId else { return false }
-                return invitePersonaAllowlist.contains(linkedPersonaId)
-                    && personaMatchesSelectedInterests(personaId: linkedPersonaId)
-                    && contact.relationshipStatusValue == .locked
+    private func makeDerivedState() -> ContactsDerivedState {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sortedVisibleContacts = contacts
+            .filter(\.isVisibleInContactsList)
+            .sorted {
+                if $0.isFavorite != $1.isFavorite { return $0.isFavorite && !$1.isFavorite }
+                return sortKey(for: $0.name).localizedCaseInsensitiveCompare(sortKey(for: $1.name)) == .orderedAscending
             }
-            .filter { $0.linkedPersonaId != personaId }
-            .sorted { inviteSortKey(for: $0) < inviteSortKey(for: $1) }
-            .map(\.name)
+
+        let filteredContacts: [Contact]
+        if query.isEmpty {
+            filteredContacts = sortedVisibleContacts
+        } else {
+            filteredContacts = sortedVisibleContacts.filter { contact in
+                contact.name.localizedCaseInsensitiveContains(query)
+                    || contact.phoneNumber.localizedCaseInsensitiveContains(query)
+                    || contact.email.localizedCaseInsensitiveContains(query)
+            }
+        }
+
+        let groupedContacts = Dictionary(grouping: filteredContacts, by: sectionKey)
+        let sectionedContacts: [(key: String, values: [Contact])] = Self.alphabet.compactMap { key in
+            guard let values = groupedContacts[key], !values.isEmpty else { return nil }
+            return (key, values)
+        }
+
+        let inviteContext = makeInviteContext()
+        let eligibleInviteContacts = contacts
+            .filter { contact in
+                guard let personaId = contact.linkedPersonaId else { return false }
+                return invitePersonaAllowlist.contains(personaId)
+                    && inviteContext.matches(personaId: personaId)
+            }
+            .sorted { inviteContext.sortKey(for: $0) < inviteContext.sortKey(for: $1) }
+
+        let pendingInvitations: [BruhInvitation] = eligibleInviteContacts.compactMap { contact in
+            guard contact.relationshipStatusValue == .pending,
+                  let personaId = contact.linkedPersonaId,
+                  let persona = inviteContext.personaById[personaId] else {
+                return nil
+            }
+            return BruhInvitation(persona: persona, contact: contact)
+        }
+
+        let lockedInviteContacts = eligibleInviteContacts.filter { $0.relationshipStatusValue == .locked }
+        let eligiblePersonaIds = Set(eligibleInviteContacts.compactMap(\.linkedPersonaId))
+        var lockedCandidateNamesByPersonaId: [String: [String]] = [:]
+
+        for personaId in eligiblePersonaIds {
+            lockedCandidateNamesByPersonaId[personaId] = lockedInviteContacts
+                .filter { $0.linkedPersonaId != personaId }
+                .map(\.name)
+        }
+
+        return ContactsDerivedState(
+            isSearching: !query.isEmpty,
+            filteredContacts: filteredContacts,
+            sectionedContacts: sectionedContacts,
+            availableSectionKeys: Set(sectionedContacts.map { $0.key }),
+            pendingInvitations: pendingInvitations,
+            lockedCandidateNamesByPersonaId: lockedCandidateNamesByPersonaId
+        )
     }
 
-    private var inviteInterestOrder: [String] {
+    private func makeInviteInterestOrder() -> [String] {
         let supported = Set(["politics", "entertainment", "finance", "sports", "tech"])
         let selected = CurrentUserProfileStore.selectedInterests(in: modelContext)
             .filter { supported.contains($0) }
@@ -677,37 +719,34 @@ struct ContactsView: View {
             .filter { supported.contains($0) }
     }
 
-    private var inviteInterestSet: Set<String> {
-        Set(inviteInterestOrder)
-    }
+    private func makeInviteContext() -> InviteContext {
+        let inviteInterestOrder = makeInviteInterestOrder()
+        let inviteInterestSet = Set(inviteInterestOrder)
+        let fallbackRank = inviteInterestOrder.count + 10
+        let personaById = Dictionary(uniqueKeysWithValues: personas.map { ($0.id, $0) })
 
-    private func personaMatchesSelectedInterests(personaId: String) -> Bool {
-        guard !inviteInterestSet.isEmpty else { return true }
-        guard let persona = personas.first(where: { $0.id == personaId }) else { return false }
-        return !Set(persona.domains).isDisjoint(with: inviteInterestSet)
-    }
+        let matchingPersonaIds: Set<String> = Set(
+            personas.compactMap { persona in
+                guard invitePersonaAllowlist.contains(persona.id) else { return nil }
+                guard !inviteInterestSet.isEmpty else { return persona.id }
+                return Set(persona.domains).isDisjoint(with: inviteInterestSet) ? nil : persona.id
+            }
+        )
 
-    private var invitePriorityByPersonaId: [String: Int] {
-        let interests = inviteInterestOrder
-        let fallback = interests.count + 10
-        var result: [String: Int] = [:]
-
+        var priorityByPersonaId: [String: Int] = [:]
         for persona in personas where invitePersonaAllowlist.contains(persona.id) {
             let rank = persona.domains
-                .compactMap { interests.firstIndex(of: $0) }
-                .min() ?? fallback
-            result[persona.id] = rank
+                .compactMap { inviteInterestOrder.firstIndex(of: $0) }
+                .min() ?? fallbackRank
+            priorityByPersonaId[persona.id] = rank
         }
 
-        return result
-    }
-
-    private func inviteSortKey(for contact: Contact) -> (Int, Int, String) {
-        let fallbackRank = inviteInterestOrder.count + 10
-        let priority = contact.linkedPersonaId
-            .flatMap { invitePriorityByPersonaId[$0] } ?? fallbackRank
-        let order = contact.inviteOrder ?? 999
-        return (priority, order, contact.name)
+        return InviteContext(
+            personaById: personaById,
+            matchingPersonaIds: matchingPersonaIds,
+            priorityByPersonaId: priorityByPersonaId,
+            fallbackRank: fallbackRank
+        )
     }
 
     private func scheduleTrumpFollowUps() {
@@ -722,7 +761,16 @@ struct ContactsView: View {
     }
 
     private func insertIncomingMessage(personaId: String, text: String, sourcePostIds: [String]) {
-        let thread = ensureThread(for: personaId)
+        let threadStore = MessageThreadStore()
+        let thread: MessageThread
+
+        do {
+            thread = try threadStore.ensureThread(for: personaId, modelContext: modelContext)
+        } catch {
+            print("Failed to ensure thread for \(personaId): \(error.localizedDescription)")
+            return
+        }
+
         let now = Date()
         let message = PersonaMessage(
             id: UUID().uuidString,
@@ -737,34 +785,9 @@ struct ContactsView: View {
         )
         modelContext.insert(message)
         ContentGraphStore.syncIncomingMessage(message, in: modelContext)
-        thread.lastMessagePreview = text
-        thread.lastMessageAt = now
-        if now > (thread.lastReadAt ?? .distantPast) {
-            thread.unreadCount = max(thread.unreadCount, 0) + 1
-        }
-        thread.updatedAt = now
+        let unreadCount = threadStore.nextUnreadCount(afterReceivingMessageAt: now, on: thread)
+        threadStore.updateThread(thread, preview: text, at: now, unreadCount: unreadCount)
         try? modelContext.save()
-    }
-
-    private func ensureThread(for personaId: String) -> MessageThread {
-        var descriptor = FetchDescriptor<MessageThread>(
-            predicate: #Predicate { $0.id == personaId }
-        )
-        descriptor.fetchLimit = 1
-
-        if let existing = try? modelContext.fetch(descriptor).first {
-            return existing
-        }
-
-        let thread = MessageThread(
-            id: personaId,
-            personaId: personaId,
-            lastMessagePreview: "",
-            lastMessageAt: .distantPast,
-            unreadCount: 0
-        )
-        modelContext.insert(thread)
-        return thread
     }
 }
 
