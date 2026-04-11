@@ -96,6 +96,8 @@
   已完成：新增 `supabase/functions/_shared/provider_metrics.ts` 和 `provider_metrics_test.ts`，统一产出 `provider_metric` 结构化事件，标准字段覆盖 `operation`、`provider`、`outcome`、`durationMs` 以及请求上下文。`generate-message`、`message-starters`、`generate-post-interactions`、`ingest-x-posts` 现在都已接入 provider 级 success/failure/fallback/skipped 指标，覆盖 LLM、图片、语音和 Apify actor fallback 链路；同时补齐 `docs/observability.md` 中的 provider 查询说明，并接入 CI 与本地验证脚本。
 - [x] 增加发布前 preflight/runbook，把环境变量、关键表、函数契约、最小 smoke 验证收口成一次性检查。
   已完成：新增 `scripts/release_preflight.ts`、`release_preflight_lib.ts`、`release_preflight_test.ts` 和 `run_release_preflight.sh`，把环境变量解析、关键表探测、后台健康快照、契约/smoke 验证收口成单次发布前检查；支持 `--strict` / `--json`，并新增 `docs/release-preflight.md` 记录操作 runbook。对应测试已接入 CI 和本地验证脚本。
+- [x] 给 operator 脚本补本地 env loader 和模板，降低 preflight / 健康巡检的启动成本。
+  已完成：新增 `scripts/load_env.sh`，统一为 `run_release_preflight.sh` 和新增的 `run_backend_health_snapshot.sh` 自动加载 `.env`、`.env.local`、`.env.<env>`、`.env.<env>.local`，并打印实际加载的本地配置文件，方便排查“为什么 preflight 读不到环境变量”。同时新增 `scripts/preflight.env.template` 作为可复制的本地模板，并把 shell 语法检查接入 CI 与本地验证脚本；`docs/environment-setup.md`、`docs/release-preflight.md`、`docs/observability.md` 也已同步更新 runbook。
 
 ### P7 后端互动链路继续收敛
 

@@ -110,6 +110,18 @@ See [cost-controls.md](./cost-controls.md) for degradation policy and rollout ex
 
 `scripts/backend_health_snapshot.ts` uses the same scoped environment rules through the shared backend environment layer.
 
+Operator shell wrappers now auto-load ignored local env files in this order:
+
+- `.env`
+- `.env.local`
+- `.env.<env>`
+- `.env.<env>.local`
+
+Supported wrappers:
+
+- `scripts/run_backend_health_snapshot.sh`
+- `scripts/run_release_preflight.sh`
+
 Required for ingestion:
 
 - `SUPABASE_URL` or `PROJECT_URL`
@@ -127,7 +139,7 @@ Useful operational command:
 
 ```bash
 export BRUH_APP_ENV=staging
-deno run --allow-env --allow-net scripts/backend_health_snapshot.ts --strict
+./scripts/run_backend_health_snapshot.sh --strict
 ```
 
 Release preflight:
@@ -135,6 +147,12 @@ Release preflight:
 ```bash
 export BRUH_APP_ENV=staging
 ./scripts/run_release_preflight.sh
+```
+
+Template for local operator env files:
+
+```bash
+cp scripts/preflight.env.template .env.staging.local
 ```
 
 ## Suggested Local Setup
@@ -163,5 +181,13 @@ export SERVICE_ROLE_KEY__STAGING=...
 export BRUH_FUNCTIONS_BASE_URL__STAGING=https://your-staging-project.supabase.co/functions/v1
 export BRUH_SUPABASE_ANON_KEY__STAGING=...
 ```
+
+Equivalent local file setup:
+
+```bash
+cp scripts/preflight.env.template .env.prod.local
+```
+
+Then replace the placeholder values in `.env.prod.local` with real secrets that stay ignored by Git.
 
 Do not commit real secrets or real service-role keys into the repository.

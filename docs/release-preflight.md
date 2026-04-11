@@ -18,7 +18,7 @@ Full release preflight:
 ./scripts/run_release_preflight.sh
 ```
 
-The shell wrapper runs the backend preflight first and then executes `scripts/run_p1_validation.sh`.
+The shell wrapper auto-loads `.env`, `.env.local`, `.env.<env>`, and `.env.<env>.local`, then runs the backend preflight first and finally executes `scripts/run_p1_validation.sh`.
 
 ## What Gets Checked
 
@@ -52,13 +52,15 @@ Validation gates:
 ## Suggested Runbook
 
 1. Export the target environment, for example `BRUH_APP_ENV=staging` or `BRUH_APP_ENV=prod`.
-2. Confirm the target environment has scoped keys such as `PROJECT_URL__STAGING` and `SERVICE_ROLE_KEY__STAGING`.
-3. Run `./scripts/run_release_preflight.sh`.
-4. If the backend preflight fails, fix missing env vars, broken table access, or stale backend health before release.
-5. If local validation fails, fix contract drift, content graph regressions, or backend test failures before release.
+2. Copy `scripts/preflight.env.template` into an ignored local file such as `.env.staging.local` or `.env.prod.local`, then fill in real values.
+3. Confirm the target environment has scoped keys such as `PROJECT_URL__STAGING` and `SERVICE_ROLE_KEY__STAGING`, or provide the equivalent values in the matching local `.env.<env>.local` file.
+4. Run `./scripts/run_release_preflight.sh`.
+5. If the backend preflight fails, fix missing env vars, broken table access, or stale backend health before release.
+6. If local validation fails, fix contract drift, content graph regressions, or backend test failures before release.
 
 ## Notes
 
 - Optional provider keys show up as warnings, not hard failures.
 - Missing required environment variables or unhealthy backend state will fail `--strict`.
 - The preflight is intentionally read-only for backend data. It does not claim job locks or mutate tables.
+- The wrapper prints which ignored env files were loaded so operators can debug the active configuration quickly.

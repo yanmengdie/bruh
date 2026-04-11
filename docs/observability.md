@@ -75,23 +75,24 @@ When a provider starts degrading:
 CLI:
 
 - `scripts/backend_health_snapshot.ts`
+- `scripts/run_backend_health_snapshot.sh`
 
 Run manually:
 
 ```bash
-deno run --allow-env --allow-net scripts/backend_health_snapshot.ts
+./scripts/run_backend_health_snapshot.sh
 ```
 
 Machine-readable output:
 
 ```bash
-deno run --allow-env --allow-net scripts/backend_health_snapshot.ts --json
+./scripts/run_backend_health_snapshot.sh --json
 ```
 
 Fail the process when health is not `healthy` or `running`:
 
 ```bash
-deno run --allow-env --allow-net scripts/backend_health_snapshot.ts --strict
+./scripts/run_backend_health_snapshot.sh --strict
 ```
 
 What it checks:
@@ -130,3 +131,5 @@ What it checks:
 - local contract and smoke validation through `run_p1_validation.sh`
 
 See [release-preflight.md](./release-preflight.md) for the operator runbook.
+
+Both shell wrappers auto-load ignored local env files and print the ones they actually used, which makes it easier to diagnose operator-side config drift without changing backend code.

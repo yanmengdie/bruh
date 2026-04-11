@@ -12,6 +12,35 @@ cd "$ROOT_DIR"
 ./scripts/check_sensitive_strings.sh
 ./scripts/check_client_boundary.sh
 
+bash -n \
+  scripts/check_sensitive_strings.sh \
+  scripts/check_client_boundary.sh \
+  scripts/load_env.sh \
+  scripts/run_backend_health_snapshot.sh \
+  scripts/run_p1_validation.sh \
+  scripts/run_release_preflight.sh
+
+ENV_LOADER_SMOKE_DIR="$BUILD_DIR/env_loader_smoke"
+rm -rf "$ENV_LOADER_SMOKE_DIR"
+mkdir -p "$ENV_LOADER_SMOKE_DIR"
+cp scripts/preflight.env.template "$ENV_LOADER_SMOKE_DIR/.env.prod.local"
+
+bash -lc '
+  set -euo pipefail
+  root_dir="$1"
+  env_dir="$2"
+  source "$root_dir/scripts/load_env.sh"
+  load_bruh_env "$env_dir" prod
+  [[ "$BRUH_APP_ENV" == "prod" ]]
+  [[ "$PROJECT_URL" == "https://example.supabase.co" ]]
+  [[ "$SERVICE_ROLE_KEY" == "test-service-role" ]]
+  [[ "$BRUH_FUNCTIONS_BASE_URL" == "https://example.supabase.co/functions/v1" ]]
+  [[ "$BRUH_SUPABASE_ANON_KEY" == "test-anon-key" ]]
+  [[ " ${BRUH_LOADED_ENV_FILES[*]} " == *" .env.prod.local "* ]]
+' bash "$ROOT_DIR" "$ENV_LOADER_SMOKE_DIR"
+
+rm -rf "$ENV_LOADER_SMOKE_DIR"
+
 deno test \
   supabase/functions/_shared/api_contract_test.ts \
   supabase/functions/_shared/content_safety_test.ts \

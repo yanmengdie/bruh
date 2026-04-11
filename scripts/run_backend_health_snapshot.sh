@@ -11,17 +11,11 @@ cd "$ROOT_DIR"
 source "$ROOT_DIR/scripts/load_env.sh"
 load_bruh_env "$ROOT_DIR" "${BRUH_APP_ENV:-prod}"
 
-echo "==> Release preflight environment: ${BRUH_APP_ENV}"
+echo "==> Backend health snapshot environment: ${BRUH_APP_ENV}"
 if [[ ${#BRUH_LOADED_ENV_FILES[@]} -gt 0 ]]; then
   echo "==> Loaded env files: ${BRUH_LOADED_ENV_FILES[*]}"
 else
   echo "==> Loaded env files: none"
 fi
 
-echo "==> Backend release preflight"
-deno run --allow-env --allow-net scripts/release_preflight.ts --strict
-
-echo "==> Local validation"
-./scripts/run_p1_validation.sh
-
-echo "Release preflight passed"
+deno run --allow-env --allow-net scripts/backend_health_snapshot.ts "$@"

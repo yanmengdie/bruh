@@ -26,6 +26,16 @@ jobs:
           ./scripts/check_sensitive_strings.sh
           ./scripts/check_client_boundary.sh
 
+      - name: Shell Script Syntax
+        run: |
+          bash -n \
+            scripts/check_sensitive_strings.sh \
+            scripts/check_client_boundary.sh \
+            scripts/load_env.sh \
+            scripts/run_backend_health_snapshot.sh \
+            scripts/run_p1_validation.sh \
+            scripts/run_release_preflight.sh
+
       - name: Deno Check
         run: |
           deno check \
