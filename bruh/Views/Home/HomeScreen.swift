@@ -749,7 +749,7 @@ private final class HomeVoicePlayerDelegate: NSObject, AVAudioPlayerDelegate {
 }
 
 private struct HomeQuickApp: Identifiable {
-    let id = UUID()
+    let id: String
     let name: String
     var imageAsset: String? = nil
     var placeholderText: String? = nil
@@ -759,6 +759,30 @@ private struct HomeQuickApp: Identifiable {
     var fallbackWebURL: URL? = nil
     var badgeCount: Int? = nil
     var badgeText: String? = nil
+
+    init(
+        id: String? = nil,
+        name: String,
+        imageAsset: String? = nil,
+        placeholderText: String? = nil,
+        placeholderColors: [Color]? = nil,
+        destination: AppDestination?,
+        deepLinkURL: URL? = nil,
+        fallbackWebURL: URL? = nil,
+        badgeCount: Int? = nil,
+        badgeText: String? = nil
+    ) {
+        self.id = id ?? name
+        self.name = name
+        self.imageAsset = imageAsset
+        self.placeholderText = placeholderText
+        self.placeholderColors = placeholderColors
+        self.destination = destination
+        self.deepLinkURL = deepLinkURL
+        self.fallbackWebURL = fallbackWebURL
+        self.badgeCount = badgeCount
+        self.badgeText = badgeText
+    }
 }
 
 #Preview {
