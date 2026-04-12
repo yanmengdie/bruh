@@ -91,12 +91,23 @@ enum SystemContactSeedWriter {
     @MainActor
     static func forceDemoInviteOrder(into context: ModelContext) {
         let contacts: [Contact] = (try? context.fetch(FetchDescriptor<Contact>())) ?? []
-
-        // If trump is already accepted, the demo has progressed — don't reset.
-        let trumpContact = contacts.first(where: { $0.linkedPersonaId == "trump" })
-        guard trumpContact?.relationshipStatusValue != .accepted else { return }
-
         let demoOrder: [String: Int] = ["trump": 0, "musk": 1, "sam_altman": 2]
+
+        // Once the demo invite flow has progressed, keep the user's current frontier intact.
+        let hasDemoProgress = contacts.contains { contact in
+            guard let personaId = contact.linkedPersonaId,
+                  demoOrder[personaId] != nil else {
+                return false
+            }
+
+            switch contact.relationshipStatusValue {
+            case .accepted, .ignored:
+                return true
+            case .pending, .locked, .custom:
+                return false
+            }
+        }
+        guard !hasDemoProgress else { return }
 
         for contact in contacts {
             guard let personaId = contact.linkedPersonaId, let order = demoOrder[personaId] else { continue }
