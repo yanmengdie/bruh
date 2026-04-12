@@ -64,6 +64,9 @@ struct ContactsView: View {
     @State private var messageService = MessageService()
 
     private static let alphabet: [String] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map(String.init) + ["#"]
+    private let trumpFollowUpMessageId = "demo:trump-news-1"
+    private let trumpFollowUpSourcePostIds = ["trump-news-1"]
+    private let trumpFollowUpURL = "https://www.reuters.com/world/asia-pacific/trump-agrees-two-week-ceasefire-iran-says-safe-passage-through-hormuz-possible-2026-04-08/"
     private let invitePersonaAllowlist: Set<String> = [
         "trump",
         "musk",
@@ -501,13 +504,14 @@ struct ContactsView: View {
 
         normalizeInviteFrontier()
 
-        if !wasAccepted && invitation.personaId == "trump" {
-            scheduleTrumpFollowUps()
-        }
+        let shouldScheduleTrumpFollowUps = !wasAccepted && invitation.personaId == "trump"
 
         do {
             try modelContext.save()
             try messageService.prepareThreads(modelContext: modelContext)
+            if shouldScheduleTrumpFollowUps {
+                scheduleTrumpFollowUps()
+            }
         } catch {
             print("Failed to accept invitation for \(invitation.personaId): \(error.localizedDescription)")
         }
@@ -762,15 +766,25 @@ struct ContactsView: View {
     private func scheduleTrumpFollowUps() {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 11_000_000_000)
+            guard contact(for: "trump")?.relationshipStatusValue == .accepted else { return }
             insertIncomingMessage(
+                id: trumpFollowUpMessageId,
                 personaId: "trump",
-                text: "https://www.reuters.com/world/asia-pacific/trump-agrees-two-week-ceasefire-iran-says-safe-passage-through-hormuz-possible-2026-04-08/",
-                sourcePostIds: ["trump-news-1"]
+                text: trumpFollowUpURL,
+                sourcePostIds: trumpFollowUpSourcePostIds
             )
         }
     }
 
-    private func insertIncomingMessage(personaId: String, text: String, sourcePostIds: [String]) {
+    private func insertIncomingMessage(
+        id: String = UUID().uuidString,
+        personaId: String,
+        text: String,
+        sourcePostIds: [String]
+    ) {
+        guard contact(for: personaId)?.relationshipStatusValue == .accepted else { return }
+        guard !messageExists(id: id) else { return }
+
         let threadStore = MessageThreadStore()
         let thread: MessageThread
 
@@ -783,7 +797,7 @@ struct ContactsView: View {
 
         let now = Date()
         let message = PersonaMessage(
-            id: UUID().uuidString,
+            id: id,
             threadId: thread.id,
             personaId: personaId,
             text: text,
@@ -798,6 +812,15 @@ struct ContactsView: View {
         let unreadCount = threadStore.nextUnreadCount(afterReceivingMessageAt: now, on: thread)
         threadStore.updateThread(thread, preview: text, at: now, unreadCount: unreadCount)
         try? modelContext.save()
+    }
+
+    private func messageExists(id: String) -> Bool {
+        let targetId = id
+        var descriptor = FetchDescriptor<PersonaMessage>(
+            predicate: #Predicate { $0.id == targetId }
+        )
+        descriptor.fetchLimit = 1
+        return ((try? modelContext.fetch(descriptor)) ?? []).isEmpty == false
     }
 }
 

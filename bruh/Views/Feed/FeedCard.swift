@@ -307,7 +307,13 @@ struct FeedCard: View {
                         .frame(width: 0.5, height: 16)
 
                     Button {
-                        showComments.toggle()
+                        let shouldShowComments = !showComments
+                        showComments = shouldShowComments
+                        if shouldShowComments {
+                            Task {
+                                await loadInteractionsIfNeeded()
+                            }
+                        }
                     } label: {
                         Image(systemName: "ellipsis")
                             .foregroundStyle(.secondary)
@@ -493,8 +499,8 @@ struct FeedCard: View {
 
     private func loadInteractionsIfNeeded() async {
         guard !hasLoadedInteractions else { return }
+        guard !isLoadingInteractions else { return }
         guard let interactionTarget else { return }
-        hasLoadedInteractions = true
         isLoadingInteractions = true
         interactionError = nil
 
@@ -503,7 +509,9 @@ struct FeedCard: View {
             likes = state.likes
             comments = state.comments
             isLiked = state.likes.contains(where: { $0.authorId == "viewer" })
+            hasLoadedInteractions = true
         } catch {
+            hasLoadedInteractions = false
             if !shouldIgnoreInteractionError(error) {
                 interactionError = error.localizedDescription
             }

@@ -4,6 +4,7 @@ import SwiftData
 @MainActor
 func seedPersonas(into context: ModelContext) {
     PersonaCatalogSeedWriter.sync(into: context)
+    PersonaRetirementCleaner.purge(into: context)
 }
 
 @MainActor
