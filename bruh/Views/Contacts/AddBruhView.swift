@@ -8,6 +8,8 @@ struct AddBruhView: View {
 
     @State private var selectedTag = "全部"
     private let featuredNames = ["马云", "Tim Cook", "吴京", "Kanye West", "Warren Buffett"]
+    private let topicTags = ["科技", "财经", "娱乐", "体育", "政治"]
+    private let regionTags = ["中国", "美国"]
 
     private let candidates: [AddBruhCandidate] = [
         // US (10)
@@ -52,31 +54,32 @@ struct AddBruhView: View {
     }
 
     private var filteredCandidates: [AddBruhCandidate] {
-        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        candidates.filter(matchesCurrentFilter)
+    }
 
-        return candidates.filter { candidate in
-            let matchTag = selectedTag == "全部" || candidate.tags.contains(selectedTag)
-            let matchSearch: Bool
-            if keyword.isEmpty {
-                matchSearch = true
-            } else {
-                matchSearch = candidate.name.lowercased().contains(keyword)
-                    || candidate.subtitle.lowercased().contains(keyword)
-                    || candidate.tags.joined(separator: " ").lowercased().contains(keyword)
-            }
-            return matchTag && matchSearch
+    private var visiblePendingCandidates: [AddBruhCandidate] {
+        candidates.filter { candidate in
+            pendingNames.contains(candidate.name) && matchesCurrentFilter(candidate)
         }
+    }
+
+    private var totalPendingCount: Int {
+        pendingNames.count
+    }
+
+    private var availableCandidates: [AddBruhCandidate] {
+        filteredCandidates.filter { !pendingNames.contains($0.name) }
     }
 
     private var featuredCandidates: [AddBruhCandidate] {
         featuredNames.compactMap { name in
-            filteredCandidates.first(where: { $0.name == name })
+            availableCandidates.first(where: { $0.name == name })
         }
     }
 
     private var moreCandidates: [AddBruhCandidate] {
-        let featuredSet = Set(featuredNames)
-        return filteredCandidates.filter { !featuredSet.contains($0.name) }
+        let featuredSet = Set(featuredCandidates.map(\.name))
+        return availableCandidates.filter { !featuredSet.contains($0.name) }
     }
 
     var body: some View {
@@ -87,13 +90,30 @@ struct AddBruhView: View {
 
                 categoryChips
 
-                sectionTitle("热门推荐")
-                    .padding(.top, 4)
-                cards(for: featuredCandidates)
+                recommendationIntro
 
-                sectionTitle("人气榜")
-                    .padding(.top, 4)
-                cards(for: moreCandidates)
+                if !visiblePendingCandidates.isEmpty {
+                    sectionTitle("已加入候选")
+                        .padding(.top, 4)
+                    cards(for: visiblePendingCandidates, section: .pending)
+                }
+
+                if featuredCandidates.isEmpty && moreCandidates.isEmpty {
+                    discoveryEmptyState
+                        .padding(.top, 4)
+                } else {
+                    if !featuredCandidates.isEmpty {
+                        sectionTitle("先认识这些人")
+                            .padding(.top, 4)
+                        cards(for: featuredCandidates, section: .featured)
+                    }
+
+                    if !moreCandidates.isEmpty {
+                        sectionTitle("继续探索")
+                            .padding(.top, 4)
+                        cards(for: moreCandidates, section: .explore)
+                    }
+                }
             }
             .padding(.horizontal, 14)
             .padding(.bottom, 28)
@@ -114,6 +134,48 @@ struct AddBruhView: View {
             }
         }
         .enableUnifiedSwipeBack()
+    }
+
+    private var recommendationIntro: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(selectedTag == "全部" ? "先从这些鸽们开始认识" : "先从\(selectedTag)方向开始认识")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.black.opacity(0.84))
+
+                Text(selectedTag == "全部"
+                     ? "先把感兴趣的人加入候选，后面再继续比较。"
+                     : "当前按标签优先展示，先把感兴趣的人加入候选，后面再继续比较。")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.black.opacity(0.48))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+
+            if totalPendingCount > 0 {
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("\(totalPendingCount)")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(Color(red: 0.83, green: 0.16, blue: 0.26))
+                    Text("已加入候选")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.black.opacity(0.45))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color(red: 0.98, green: 0.93, blue: 0.91))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .background(Color.white.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+        }
     }
 
     private var searchField: some View {
@@ -164,90 +226,148 @@ struct AddBruhView: View {
             .tracking(1.5)
     }
 
-    private func cards(for candidates: [AddBruhCandidate]) -> some View {
-        Group {
-            if candidates.isEmpty {
-                Text("没有匹配的鸽们，换个 tag 或关键词试试")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.black.opacity(0.4))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-            } else {
-                VStack(spacing: 10) {
-                    ForEach(candidates) { candidate in
-                        HStack(spacing: 12) {
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(candidate.color)
-                                .frame(width: 44, height: 44)
-                                .overlay {
-                                    if let avatarAssetName = candidate.avatarAssetName,
-                                       UIImage(named: avatarAssetName) != nil {
-                                        Image(avatarAssetName)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 44, height: 44)
-                                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                    } else {
-                                        Text(candidate.emoji)
-                                            .font(.system(size: 24))
-                                    }
-                                }
+    private var discoveryEmptyState: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("没有找到匹配的鸽们")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.black.opacity(0.68))
+            Text("换个关键词或标签，再继续看看。")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.black.opacity(0.42))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 16)
+        .background(Color.white.opacity(0.64))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(candidate.name)
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(Color.black.opacity(0.88))
-                                Text(candidate.subtitle)
-                                    .font(.system(size: 13, weight: .regular))
-                                    .foregroundStyle(Color.black.opacity(0.36))
-                                    .lineLimit(2)
-
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 6) {
-                                        ForEach(candidate.tags, id: \.self) { tag in
-                                            Button {
-                                                selectedTag = tag
-                                            } label: {
-                                                Text(tag)
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .foregroundStyle(selectedTag == tag ? .white : Color.black.opacity(0.48))
-                                                    .padding(.horizontal, 8)
-                                                    .frame(height: 20)
-                                                    .background(selectedTag == tag ? Color(red: 0.84, green: 0.15, blue: 0.24) : Color.black.opacity(0.06))
-                                                    .clipShape(Capsule())
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                }
+    private func cards(for candidates: [AddBruhCandidate], section: CandidateSection) -> some View {
+        VStack(spacing: 10) {
+            ForEach(candidates) { candidate in
+                HStack(spacing: 12) {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(candidate.color)
+                        .frame(width: 44, height: 44)
+                        .overlay {
+                            if let avatarAssetName = candidate.avatarAssetName,
+                               UIImage(named: avatarAssetName) != nil {
+                                Image(avatarAssetName)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 44, height: 44)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            } else {
+                                Text(candidate.emoji)
+                                    .font(.system(size: 24))
                             }
-
-                            Spacer(minLength: 0)
-
-                            let isPending = pendingNames.contains(candidate.name)
-                            Button {
-                                pendingNames.insert(candidate.name)
-                            } label: {
-                                Text(isPending ? "等待中" : "+ 添加")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(isPending ? Color(red: 0.47, green: 0.48, blue: 0.52) : Color(red: 0.83, green: 0.16, blue: 0.26))
-                                    .padding(.horizontal, 18)
-                                    .frame(height: 38)
-                                    .background(isPending ? Color(red: 0.88, green: 0.88, blue: 0.90) : Color(red: 0.94, green: 0.86, blue: 0.84))
-                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            }
-                            .disabled(isPending)
-                            .buttonStyle(.plain)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(Color.white.opacity(0.72))
-                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(candidate.name)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.black.opacity(0.88))
+                        Text(candidate.subtitle)
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(Color.black.opacity(0.36))
+                            .lineLimit(2)
+
+                        Text("说明：\(detailText(for: candidate, section: section))")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color(red: 0.76, green: 0.20, blue: 0.28))
+                            .lineLimit(2)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(candidate.tags, id: \.self) { tag in
+                                    Button {
+                                        selectedTag = tag
+                                    } label: {
+                                        Text(tag)
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundStyle(selectedTag == tag ? .white : Color.black.opacity(0.48))
+                                            .padding(.horizontal, 8)
+                                            .frame(height: 20)
+                                            .background(selectedTag == tag ? Color(red: 0.84, green: 0.15, blue: 0.24) : Color.black.opacity(0.06))
+                                            .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
                     }
+
+                    Spacer(minLength: 0)
+
+                    let isPending = pendingNames.contains(candidate.name)
+                    Button {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                            _ = pendingNames.insert(candidate.name)
+                        }
+                    } label: {
+                        Text(isPending ? "已加入候选" : "想认识")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(isPending ? Color(red: 0.47, green: 0.48, blue: 0.52) : Color(red: 0.83, green: 0.16, blue: 0.26))
+                            .padding(.horizontal, 18)
+                            .frame(height: 38)
+                            .background(isPending ? Color(red: 0.88, green: 0.88, blue: 0.90) : Color(red: 0.94, green: 0.86, blue: 0.84))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .disabled(isPending)
+                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color(.sRGB, red: 1, green: 1, blue: 1, opacity: 0.72))
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             }
         }
+    }
+
+    private func matchesCurrentFilter(_ candidate: AddBruhCandidate) -> Bool {
+        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let matchTag = selectedTag == "全部" || candidate.tags.contains(selectedTag)
+        let matchSearch: Bool
+        if keyword.isEmpty {
+            matchSearch = true
+        } else {
+            matchSearch = candidate.name.lowercased().contains(keyword)
+                || candidate.subtitle.lowercased().contains(keyword)
+                || candidate.tags.joined(separator: " ").lowercased().contains(keyword)
+        }
+        return matchTag && matchSearch
+    }
+
+    private func detailText(for candidate: AddBruhCandidate, section: CandidateSection) -> String {
+        switch section {
+        case .pending:
+            return "已加入候选，后续可以继续比较和筛选"
+        case .featured:
+            if selectedTag != "全部", candidate.tags.contains(selectedTag) {
+                return "匹配你正在浏览的\(selectedTag)标签"
+            }
+            if let topicTag = candidate.tags.first(where: { topicTags.contains($0) }) {
+                return "适合作为\(topicTag)方向的起点"
+            }
+            return "适合作为当前探索的起点"
+        case .explore:
+            if selectedTag != "全部", candidate.tags.contains(selectedTag) {
+                return "匹配你正在浏览的\(selectedTag)标签"
+            }
+            if let topicTag = candidate.tags.first(where: { topicTags.contains($0) }) {
+                return "可从\(topicTag)方向继续探索"
+            }
+            if let regionTag = candidate.tags.first(where: { regionTags.contains($0) }) {
+                return "可先从\(regionTag)范围继续筛选"
+            }
+            return "适合加入候选后再进一步比较"
+        }
+    }
+
+    private enum CandidateSection {
+        case pending
+        case featured
+        case explore
     }
 }
 
