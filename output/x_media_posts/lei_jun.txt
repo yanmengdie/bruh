@@ -1,0 +1,91 @@
+feed_required_fields: persona_id, display_name, avatar_name, location_label, source_type, content, published_at, source_url, media_urls, video_url
+persona_id: lei_jun
+display_name: 田车
+handle: @leijun
+avatar_name: Avatar_Leijun
+location_label: 北京
+source_type: x
+exported_at: 2026-04-09T19:38:34.822Z
+post_count: 5
+
+[post_1]
+post_id: 2036442921872806282
+published_at: 2026-03-24T14:00:02+00:00
+content: Our Q4 2025 results are out! Revenue reached RMB457.3 billion, up 25.0% YoY. Adjusted net profit rose to RMB39.2 billion, up 43.8% YoY. As AI accelerates the "Human × Car × Home" ecosystem, R&D expenses reached RMB 33.1 billion, up 37.8% YoY. R&D personnel hit a record high of 25,457.
+source_url: https://x.com/leijun/status/2036442921872806282
+media_count: 2
+video_url:
+media_items:
+- photo | 1080x1440 | https://pbs.twimg.com/media/HELmCrKXMAE-fjS.jpg
+- photo | 1080x1440 | https://pbs.twimg.com/media/HELmC3WXAAEq4sT.jpg
+media_urls:
+- https://pbs.twimg.com/media/HELmCrKXMAE-fjS.jpg
+- https://pbs.twimg.com/media/HELmC3WXAAEq4sT.jpg
+
+[post_2]
+post_id: 2034600797590245843
+published_at: 2026-03-19T12:00:05+00:00
+content: The new-gen Xiaomi SU7 collection is completed with Viridian Green, Radiant Purple, Dawn Pink and Mineral Gray. Which is your favorite? https://t.co/ogtiL32ifL
+source_url: https://x.com/leijun/status/2034600797590245843
+media_count: 4
+video_url:
+media_items:
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxaoGbWYAA20_I.jpg
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxaoY5W8AAIomL.jpg
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxaovpXkAAlZXd.jpg
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxapCKWMAAfnoz.jpg
+media_urls:
+- https://pbs.twimg.com/media/HDxaoGbWYAA20_I.jpg
+- https://pbs.twimg.com/media/HDxaoY5W8AAIomL.jpg
+- https://pbs.twimg.com/media/HDxaovpXkAAlZXd.jpg
+- https://pbs.twimg.com/media/HDxapCKWMAAfnoz.jpg
+
+[post_3]
+post_id: 2034593251626242426
+published_at: 2026-03-19T11:30:06+00:00
+content: The new-gen Xiaomi SU7 brings new vibrancy. Sporty hues: Blazing Red & Brilliant Magenta. Classic picks: Obsidian Black & Pearl White. https://t.co/7YnMQXhixc
+source_url: https://x.com/leijun/status/2034593251626242426
+media_count: 4
+video_url:
+media_items:
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxTww9WQAA54gI.jpg
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxTxG2W0AAhN_g.jpg
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxTxcnWUAABc7f.jpg
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxTxyzXsAAfsWR.jpg
+media_urls:
+- https://pbs.twimg.com/media/HDxTww9WQAA54gI.jpg
+- https://pbs.twimg.com/media/HDxTxG2W0AAhN_g.jpg
+- https://pbs.twimg.com/media/HDxTxcnWUAABc7f.jpg
+- https://pbs.twimg.com/media/HDxTxyzXsAAfsWR.jpg
+
+[post_4]
+post_id: 2034586958211568120
+published_at: 2026-03-19T11:05:06+00:00
+content: Let me introduce you the new-gen Xiaomi SU7! Our new Coastal Blue is inspired by Italy’s Blue Grotto. The warm Cream Beige interior completes the vibe - love it? https://t.co/nvof1N9TH7
+source_url: https://x.com/leijun/status/2034586958211568120
+media_count: 4
+video_url:
+media_items:
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxOCZUXUAAdBaw.jpg
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxOC1OW8AA9mMH.jpg
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxODITWUAEh4CK.jpg
+- photo | 2100x1575 | https://pbs.twimg.com/media/HDxODeQW0AA8eEZ.jpg
+media_urls:
+- https://pbs.twimg.com/media/HDxOCZUXUAAdBaw.jpg
+- https://pbs.twimg.com/media/HDxOC1OW8AA9mMH.jpg
+- https://pbs.twimg.com/media/HDxODITWUAEh4CK.jpg
+- https://pbs.twimg.com/media/HDxODeQW0AA8eEZ.jpg
+
+[post_5]
+post_id: 1990760335049937050
+published_at: 2025-11-18T12:33:45+00:00
+content: Our Q3 2025 results are out! Revenue reached RMB113.1 billion - our fourth straight quarter above RMB100 billion, up 22.3% YoY. Adjusted net profit rose to RMB11.3 billion, up 80.9%. Our EV and AI innovation businesses delivered RMB29 billion in revenue, with 108,796 vehicles delivered this quarter. R&D spending reached RMB9.1 billion, up 52.1%, and our R&D team has grown to 24,871 people. We expect to invest over RMB30 billion for the full year.
+source_url: https://x.com/leijun/status/1990760335049937050
+media_count: 2
+video_url:
+media_items:
+- photo | 1080x1440 | https://pbs.twimg.com/media/G6CZ-MjX0AE2WlS.jpg
+- photo | 1080x1440 | https://pbs.twimg.com/media/G6CZ-W3XQAA_Cuz.jpg
+media_urls:
+- https://pbs.twimg.com/media/G6CZ-MjX0AE2WlS.jpg
+- https://pbs.twimg.com/media/G6CZ-W3XQAA_Cuz.jpg

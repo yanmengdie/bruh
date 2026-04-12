@@ -1,0 +1,69 @@
+feed_required_fields: persona_id, display_name, avatar_name, location_label, source_type, content, published_at, source_url, media_urls, video_url
+persona_id: justin_sun
+display_name: 孙割
+handle: @justinsuntron
+avatar_name: Avatar_Justin Sun
+location_label: Hong Kong
+source_type: x
+exported_at: 2026-04-09T19:38:39.194Z
+post_count: 5
+
+[post_1]
+post_id: 2039693245266223160
+published_at: 2026-04-02T13:15:39+00:00
+content: USDD is doing well. Over 2 billion.@usddio https://t.co/Qo0NNlEiH4
+source_url: https://x.com/justinsuntron/status/2039693245266223160
+media_count: 1
+video_url:
+media_items:
+- photo | 3040x1662 | https://pbs.twimg.com/media/HE5x5BEbMAAxPiF.jpg
+media_urls:
+- https://pbs.twimg.com/media/HE5x5BEbMAAxPiF.jpg
+
+[post_2]
+post_id: 2031031352146211206
+published_at: 2026-03-09T15:36:23+00:00
+content: 公司已经组建了AI工作群，现在已经入职波虾🦞，波牛🐮两个员工，本周预计小团队扩张到十人！ https://t.co/MW3dcJGjIZ
+source_url: https://x.com/justinsuntron/status/2031031352146211206
+media_count: 1
+video_url:
+media_items:
+- photo | 945x2048 | https://pbs.twimg.com/media/HC-sP32bAAAKyNO.jpg
+media_urls:
+- https://pbs.twimg.com/media/HC-sP32bAAAKyNO.jpg
+
+[post_3]
+post_id: 2030702248725201207
+published_at: 2026-03-08T17:48:39+00:00
+content: 完成了人生中第一次龙虾TRX交易，个人激动感觉不亚于2012年第一次买了一枚比特币 👏 https://t.co/dI5r8VWobc
+source_url: https://x.com/justinsuntron/status/2030702248725201207
+media_count: 1
+video_url:
+media_items:
+- photo | 945x2048 | https://pbs.twimg.com/media/HC6A7cVa8AAultV.jpg
+media_urls:
+- https://pbs.twimg.com/media/HC6A7cVa8AAultV.jpg
+
+[post_4]
+post_id: 2027322821580599569
+published_at: 2026-02-27T10:00:01+00:00
+content: Catch me at MERGE São Paulo. 🇧🇷 Looking forward to sharing what we’re building on TRON. https://t.co/1wUBb1tHwr
+source_url: https://x.com/justinsuntron/status/2027322821580599569
+media_count: 1
+video_url:
+media_items:
+- photo | 1280x672 | https://pbs.twimg.com/media/HCJy4rEaIAABRu9.jpg
+media_urls:
+- https://pbs.twimg.com/media/HCJy4rEaIAABRu9.jpg
+
+[post_5]
+post_id: 2024282607362695637
+published_at: 2026-02-19T00:39:17+00:00
+content: Day 2 of Chinese New Year. Celebrating in Hong Kong with Victoria Harbour fireworks. Absolutely stunning. 🎆 To a year of strength, speed, and good fortune. 龙马精神 🐎 https://t.co/cCfRwTU6us
+source_url: https://x.com/justinsuntron/status/2024282607362695637
+media_count: 1
+video_url: https://video.twimg.com/amplify_video/2024280373048594434/vid/avc1/1440x2560/9ygdACLRl_MH3tyD.mp4?tag=21
+media_items:
+- video | 1440x2560 | https://video.twimg.com/amplify_video/2024280373048594434/vid/avc1/1440x2560/9ygdACLRl_MH3tyD.mp4?tag=21
+media_urls:
+-

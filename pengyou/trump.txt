@@ -1,0 +1,69 @@
+feed_required_fields: persona_id, display_name, avatar_name, location_label, source_type, content, published_at, source_url, media_urls, video_url
+persona_id: trump
+display_name: 特离谱
+handle: @realDonaldTrump
+avatar_name: Avatar_Trump
+location_label: United States
+source_type: x
+exported_at: 2026-04-09T19:38:22.442Z
+post_count: 5
+
+[post_1]
+post_id: 2028505632123326484
+published_at: 2026-03-02T16:20:05+00:00
+content: https://t.co/uAxTGrJisv
+source_url: https://x.com/realdonaldtrump/status/2028505632123326484
+media_count: 1
+video_url: https://video.twimg.com/amplify_video/2028504808265744385/vid/avc1/3840x2026/WHLzpB21ED3e_2wi.mp4?tag=21
+media_items:
+- video | 3840x2026 | https://video.twimg.com/amplify_video/2028504808265744385/vid/avc1/3840x2026/WHLzpB21ED3e_2wi.mp4?tag=21
+media_urls:
+-
+
+[post_2]
+post_id: 2027651077865157033
+published_at: 2026-02-28T07:44:23+00:00
+content: https://t.co/BZuJDudLej
+source_url: https://x.com/realdonaldtrump/status/2027651077865157033
+media_count: 1
+video_url: https://video.twimg.com/amplify_video/2027649690032889856/vid/avc1/3840x2026/InXhHRvaG5jNn8QJ.mp4?tag=21
+media_items:
+- video | 3840x2026 | https://video.twimg.com/amplify_video/2027649690032889856/vid/avc1/3840x2026/InXhHRvaG5jNn8QJ.mp4?tag=21
+media_urls:
+-
+
+[post_3]
+post_id: 2015833393917747502
+published_at: 2026-01-26T17:05:08+00:00
+content: MELANIA, the Movie, is a MUST WATCH. Get your tickets today - Selling out, FAST! Photo: Regine Mahaux https://t.co/rjwd5Appkv https://t.co/vFpXfV0Mg0
+source_url: https://x.com/realdonaldtrump/status/2015833393917747502
+media_count: 1
+video_url:
+media_items:
+- photo | 868x1182 | https://pbs.twimg.com/media/G_mtyaXXcAAvj4V.jpg
+media_urls:
+- https://pbs.twimg.com/media/G_mtyaXXcAAvj4V.jpg
+
+[post_4]
+post_id: 2014772963719991311
+published_at: 2026-01-23T18:51:21+00:00
+content: COUNTDOWN: 7 Days until the World will witness an unforgettable, behind-the-scenes, look at one of the most important events of our time. MELANIA: TWENTY DAYS TO HISTORY: https://t.co/rjwd5Appkv https://t.co/AHD0rn1M7C
+source_url: https://x.com/realdonaldtrump/status/2014772963719991311
+media_count: 1
+video_url: https://video.twimg.com/amplify_video/2014772905972776960/vid/avc1/1280x720/m-soU3NaS1n-xyqt.mp4?tag=21
+media_items:
+- video | 1280x720 | https://video.twimg.com/amplify_video/2014772905972776960/vid/avc1/1280x720/m-soU3NaS1n-xyqt.mp4?tag=21
+media_urls:
+-
+
+[post_5]
+post_id: 1993801758326616561
+published_at: 2025-11-26T21:59:16+00:00
+content: https://t.co/oQK0HLgf88
+source_url: https://x.com/realdonaldtrump/status/1993801758326616561
+media_count: 1
+video_url:
+media_items:
+- photo | 1319x916 | https://pbs.twimg.com/media/G6toIexXAAAuXuy.jpg
+media_urls:
+- https://pbs.twimg.com/media/G6toIexXAAAuXuy.jpg

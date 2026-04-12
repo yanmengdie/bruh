@@ -1,0 +1,69 @@
+feed_required_fields: persona_id, display_name, avatar_name, location_label, source_type, content, published_at, source_url, media_urls, video_url
+persona_id: musk
+display_name: 马期克
+handle: @elonmusk
+avatar_name: Avatar_Elon
+location_label: X HQ
+source_type: x
+exported_at: 2026-04-09T19:38:14.428Z
+post_count: 5
+
+[post_1]
+post_id: 2042135870183239802
+published_at: 2026-04-09T07:01:47+00:00
+content: https://t.co/FEMJgzLQzt
+source_url: https://x.com/elonmusk/status/2042135870183239802
+media_count: 1
+video_url: https://video.twimg.com/amplify_video/2042129777360764928/vid/avc1/560x560/AU7ZPdC-Ak9x_0ye.mp4?tag=24
+media_items:
+- video | 560x560 | https://video.twimg.com/amplify_video/2042129777360764928/vid/avc1/560x560/AU7ZPdC-Ak9x_0ye.mp4?tag=24
+media_urls:
+-
+
+[post_2]
+post_id: 2042135446751473938
+published_at: 2026-04-09T07:00:06+00:00
+content: Grok will never go to therapy. Never. https://t.co/brJIgWeyRP
+source_url: https://x.com/elonmusk/status/2042135446751473938
+media_count: 1
+video_url: https://video.twimg.com/amplify_video/2041934051737575424/vid/avc1/1920x1080/-bBa3gi5ICdwbf9s.mp4?tag=21
+media_items:
+- video | 1920x1080 | https://video.twimg.com/amplify_video/2041934051737575424/vid/avc1/1920x1080/-bBa3gi5ICdwbf9s.mp4?tag=21
+media_urls:
+-
+
+[post_3]
+post_id: 2042134561103212707
+published_at: 2026-04-09T06:56:35+00:00
+content: Cybertruck is so awesome 😎 https://t.co/5r99xq5m6V
+source_url: https://x.com/elonmusk/status/2042134561103212707
+media_count: 1
+video_url: https://video.twimg.com/amplify_video/2041888126344331264/vid/avc1/1080x1080/Ihh3bruWugvxvGdU.mp4?tag=21
+media_items:
+- video | 1080x1080 | https://video.twimg.com/amplify_video/2041888126344331264/vid/avc1/1080x1080/Ihh3bruWugvxvGdU.mp4?tag=21
+media_urls:
+-
+
+[post_4]
+post_id: 2042127554224742713
+published_at: 2026-04-09T06:28:44+00:00
+content: Generated with @Grok Imagine https://t.co/44cGoDrcVG
+source_url: https://x.com/elonmusk/status/2042127554224742713
+media_count: 1
+video_url: https://video.twimg.com/amplify_video/2042127469848023040/vid/avc1/720x720/vg-IWJKKlehbi_JG.mp4?tag=24
+media_items:
+- video | 960x960 | https://video.twimg.com/amplify_video/2042127469848023040/vid/avc1/720x720/vg-IWJKKlehbi_JG.mp4?tag=24
+media_urls:
+-
+
+[post_5]
+post_id: 2042125968052302319
+published_at: 2026-04-09T06:22:26+00:00
+content: If only we’d trained Grok on just these 2 books, we’d be done already! https://t.co/Xn6UdaAMxM
+source_url: https://x.com/elonmusk/status/2042125968052302319
+media_count: 1
+video_url:
+media_items:
+- photo | 1152x1160 | https://pbs.twimg.com/media/HFcWvula8AAtzvx.jpg
+media_urls:
+- https://pbs.twimg.com/media/HFcWvula8AAtzvx.jpg

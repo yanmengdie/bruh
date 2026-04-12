@@ -1,0 +1,69 @@
+feed_required_fields: persona_id, display_name, avatar_name, location_label, source_type, content, published_at, source_url, media_urls, video_url
+persona_id: sam_altman
+display_name: 凹凸曼
+handle: @sama
+avatar_name: Avatar_Sam Altman
+location_label: San Francisco
+source_type: x
+exported_at: 2026-04-09T19:38:28.014Z
+post_count: 5
+
+[post_1]
+post_id: 2037610000122839116
+published_at: 2026-03-27T19:17:35+00:00
+content: The first steel beams went up this week at our Michigan Stargate site with Oracle and Related Digital https://t.co/Hl0NBqwfnS
+source_url: https://x.com/sama/status/2037610000122839116
+media_count: 1
+video_url: https://video.twimg.com/amplify_video/2037609606734925824/vid/avc1/3840x2160/fxk-n4cH0Ng2r_WY.mp4?tag=21
+media_items:
+- video | 3840x2160 | https://video.twimg.com/amplify_video/2037609606734925824/vid/avc1/3840x2160/fxk-n4cH0Ng2r_WY.mp4?tag=21
+media_urls:
+-
+
+[post_2]
+post_id: 2033599375256207820
+published_at: 2026-03-16T17:40:48+00:00
+content: The Codex team are hardcore builders and it really comes through in what they create. No surprise all the hardcore builders I know have switched to Codex. Usage of Codex is growing very fast: https://t.co/lRKcNJDY8n
+source_url: https://x.com/sama/status/2033599375256207820
+media_count: 1
+video_url:
+media_items:
+- photo | 730x600 | https://pbs.twimg.com/media/HDjLsPxbEAAnqGl.png
+media_urls:
+- https://pbs.twimg.com/media/HDjLsPxbEAAnqGl.png
+
+[post_3]
+post_id: 2029622732594499630
+published_at: 2026-03-05T18:19:02+00:00
+content: GPT-5.4 is launching, available now in the API and Codex and rolling out over the course of the day in ChatGPT. It's much better at knowledge work and web search, and it has native computer use capabilities. You can steer it mid-response, and it supports 1m tokens of context. https://t.co/DUrHIhXhzc
+source_url: https://x.com/sama/status/2029622732594499630
+media_count: 1
+video_url:
+media_items:
+- photo | 1200x675 | https://pbs.twimg.com/media/HCqqLFAaUAQ43Cd.jpg
+media_urls:
+- https://pbs.twimg.com/media/HCqqLFAaUAQ43Cd.jpg
+
+[post_4]
+post_id: 2024826822060290508
+published_at: 2026-02-20T12:41:48+00:00
+content: Great meeting with PM @narendramodi today to talk about the incredible energy around AI in India. India is our fastest growing market for codex globally, up 4x in weekly users in the past 2 weeks alone. 🇮🇳! https://t.co/MRbw0UkotJ
+source_url: https://x.com/sama/status/2024826822060290508
+media_count: 1
+video_url:
+media_items:
+- photo | 1280x912 | https://pbs.twimg.com/media/HBmhLRaWgAANwWX.jpg
+media_urls:
+- https://pbs.twimg.com/media/HBmhLRaWgAANwWX.jpg
+
+[post_5]
+post_id: 2023453083595141411
+published_at: 2026-02-16T17:43:03+00:00
+content: Best OpenAI sweatshirt ever https://t.co/PS2bSATW35
+source_url: https://x.com/sama/status/2023453083595141411
+media_count: 1
+video_url:
+media_items:
+- photo | 768x1024 | https://pbs.twimg.com/media/HBS_mJObcAM97y7.jpg
+media_urls:
+- https://pbs.twimg.com/media/HBS_mJObcAM97y7.jpg
