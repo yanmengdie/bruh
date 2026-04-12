@@ -371,7 +371,7 @@ struct AddBruhView: View {
 }
 
 private struct AddBruhCandidate: Identifiable {
-    let id = UUID()
+    let id: String
     let name: String
     let subtitle: String
     let color: Color
@@ -387,6 +387,7 @@ private struct AddBruhCandidate: Identifiable {
         tags: [String],
         avatarAssetName: String? = nil
     ) {
+        self.id = name
         self.name = name
         self.subtitle = subtitle
         self.color = color

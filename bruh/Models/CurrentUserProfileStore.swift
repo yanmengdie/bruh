@@ -6,21 +6,25 @@ enum CurrentUserProfileStore {
     static let avatarImageDataKey = "viewer.avatarImageData"
 
     @MainActor
-    static func fetchOrCreate(in context: ModelContext) -> UserProfile {
+    static func fetchOrCreate(in context: ModelContext, userDefaults: UserDefaults = .standard) -> UserProfile {
         var descriptor = FetchDescriptor<UserProfile>(
             predicate: #Predicate { $0.id == userId }
         )
         descriptor.fetchLimit = 1
 
         if let existing = try? context.fetch(descriptor).first {
-            migrateLegacyPreferencesIfNeeded(profile: existing)
+            migrateLegacyPreferencesIfNeeded(profile: existing, userDefaults: userDefaults)
+            if context.hasChanges {
+                try? context.save()
+            }
             return existing
         }
 
         let profile = UserProfile(
             displayName: "You",
             bruhHandle: "@yourboi",
-            selectedInterestIds: legacyOrDefaultInterests()
+            avatarImageData: normalizedAvatarImageData(legacyAvatarImageData(userDefaults: userDefaults)),
+            selectedInterestIds: legacyOrDefaultInterests(userDefaults: userDefaults)
         )
         context.insert(profile)
         if context.hasChanges {
@@ -50,15 +54,16 @@ enum CurrentUserProfileStore {
         displayName: String,
         selectedInterestIds: [String],
         avatarImageData: Data? = nil,
-        in context: ModelContext
+        in context: ModelContext,
+        userDefaults: UserDefaults = .standard
     ) {
-        let profile = fetchOrCreate(in: context)
+        let profile = fetchOrCreate(in: context, userDefaults: userDefaults)
         let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedAvatarData = normalizedAvatarImageData(avatarImageData)
         profile.displayName = trimmedName.isEmpty ? "You" : trimmedName
         profile.selectedInterestIds = normalizedInterestIds(selectedInterestIds)
-        if let avatarImageData {
-            profile.avatarImageData = avatarImageData
-        }
+        profile.avatarImageData = normalizedAvatarData
+        synchronizeAvatarImageData(normalizedAvatarData, userDefaults: userDefaults)
         profile.onboardingCompletedAt = .now
         profile.timezoneIdentifier = TimeZone.current.identifier
         profile.updatedAt = .now
@@ -87,16 +92,15 @@ enum CurrentUserProfileStore {
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        let profile = fetchOrCreate(in: context)
+        let profile = fetchOrCreate(in: context, userDefaults: userDefaults)
+        let normalizedAvatarData = normalizedAvatarImageData(avatarImageData)
         profile.displayName = trimmed
         profile.bruhHandle = bruhHandle(from: trimmed)
         profile.onboardingCompletedAt = profile.onboardingCompletedAt ?? .now
         profile.updatedAt = .now
 
-        if let avatarImageData, !avatarImageData.isEmpty {
-            profile.avatarImageData = avatarImageData
-            userDefaults.set(avatarImageData, forKey: avatarImageDataKey)
-        }
+        profile.avatarImageData = normalizedAvatarData
+        synchronizeAvatarImageData(normalizedAvatarData, userDefaults: userDefaults)
 
         if context.hasChanges {
             try? context.save()
@@ -109,32 +113,44 @@ enum CurrentUserProfileStore {
         in context: ModelContext,
         userDefaults: UserDefaults = .standard
     ) {
-        let profile = fetchOrCreate(in: context)
+        let profile = fetchOrCreate(in: context, userDefaults: userDefaults)
         let normalizedData = avatarImageData.flatMap { $0.isEmpty ? nil : $0 }
 
         profile.avatarImageData = normalizedData
         profile.updatedAt = .now
 
-        if let normalizedData {
-            userDefaults.set(normalizedData, forKey: avatarImageDataKey)
-        } else {
-            userDefaults.removeObject(forKey: avatarImageDataKey)
-        }
+        synchronizeAvatarImageData(normalizedData, userDefaults: userDefaults)
 
         if context.hasChanges {
             try? context.save()
         }
     }
 
-    static func avatarImageData(userDefaults: UserDefaults = .standard) -> Data? {
-        userDefaults.data(forKey: avatarImageDataKey)
-    }
-
     @MainActor
-    private static func migrateLegacyPreferencesIfNeeded(profile: UserProfile) {
-        guard profile.selectedInterestIds.isEmpty else { return }
-        profile.selectedInterestIds = legacyOrDefaultInterests()
-        profile.updatedAt = .now
+    private static func migrateLegacyPreferencesIfNeeded(
+        profile: UserProfile,
+        userDefaults: UserDefaults = .standard
+    ) {
+        var didChange = false
+
+        if profile.selectedInterestIds.isEmpty {
+            profile.selectedInterestIds = legacyOrDefaultInterests(userDefaults: userDefaults)
+            didChange = true
+        }
+
+        let normalizedProfileAvatarImageData = normalizedAvatarImageData(profile.avatarImageData)
+        let normalizedLegacyAvatarImageData = normalizedAvatarImageData(legacyAvatarImageData(userDefaults: userDefaults))
+
+        if normalizedProfileAvatarImageData == nil, let normalizedLegacyAvatarImageData {
+            profile.avatarImageData = normalizedLegacyAvatarImageData
+            didChange = true
+        } else if normalizedProfileAvatarImageData != normalizedLegacyAvatarImageData {
+            synchronizeAvatarImageData(normalizedProfileAvatarImageData, userDefaults: userDefaults)
+        }
+
+        if didChange {
+            profile.updatedAt = .now
+        }
     }
 
     private static func normalizedInterestIds(_ interestIds: [String]) -> [String] {
@@ -161,6 +177,25 @@ enum CurrentUserProfileStore {
         }
 
         return NewsInterest.defaultSelection.map(\.rawValue)
+    }
+
+    private static func legacyAvatarImageData(userDefaults: UserDefaults = .standard) -> Data? {
+        userDefaults.data(forKey: avatarImageDataKey)
+    }
+
+    private static func normalizedAvatarImageData(_ avatarImageData: Data?) -> Data? {
+        avatarImageData.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    private static func synchronizeAvatarImageData(
+        _ avatarImageData: Data?,
+        userDefaults: UserDefaults = .standard
+    ) {
+        if let avatarImageData {
+            userDefaults.set(avatarImageData, forKey: avatarImageDataKey)
+        } else {
+            userDefaults.removeObject(forKey: avatarImageDataKey)
+        }
     }
 
     private static func bruhHandle(from displayName: String) -> String {

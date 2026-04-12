@@ -80,7 +80,7 @@ struct ContactsView: View {
     }
 
     private var currentProfileAvatarImage: UIImage? {
-        guard let data = CurrentUserProfileStore.avatarImageData() else { return nil }
+        guard let data = currentProfile?.avatarImageData else { return nil }
         return UIImage(data: data)
     }
 
@@ -1033,14 +1033,14 @@ private struct ProfileAccountView: View {
 
     private func loadCurrentAvatarIfNeeded() {
         guard profileImage == nil,
-              let data = CurrentUserProfileStore.avatarImageData(),
+              let data = currentProfile?.avatarImageData,
               let image = UIImage(data: data) else { return }
         profileImage = image
     }
 
     private func persistAvatarIfNeeded() {
         let newData = profileImage?.jpegData(compressionQuality: 0.85)
-        guard newData != CurrentUserProfileStore.avatarImageData() else { return }
+        guard newData != currentProfile?.avatarImageData else { return }
         CurrentUserProfileStore.updateAvatarImageData(newData, in: modelContext)
     }
 

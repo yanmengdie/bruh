@@ -284,11 +284,29 @@ struct HomeScreen: View {
         )
     }
 
+    private var canonicalThreadIdByLookupKey: [String: String] {
+        var threadIdsByLookupKey: [String: String] = [:]
+
+        for thread in threads {
+            for key in threadLookupKeys(for: thread) where threadIdsByLookupKey[key] == nil {
+                threadIdsByLookupKey[key] = thread.id
+            }
+        }
+
+        return threadIdsByLookupKey
+    }
+
     private var latestMessageByThreadId: [String: PersonaMessage] {
         var messagesByThreadId: [String: PersonaMessage] = [:]
-        for message in recentMessages where messagesByThreadId[message.threadId] == nil {
-            messagesByThreadId[message.threadId] = message
+
+        for message in recentMessages {
+            guard let threadId = normalizedLookupKey(message.threadId),
+                  messagesByThreadId[threadId] == nil else {
+                continue
+            }
+            messagesByThreadId[threadId] = message
         }
+
         return messagesByThreadId
     }
 
@@ -296,10 +314,11 @@ struct HomeScreen: View {
         var deliveriesByThreadId: [String: ContentDelivery] = [:]
 
         for delivery in messageDeliveries {
-            guard let key = threadKey(for: delivery), deliveriesByThreadId[key] == nil else {
+            guard let threadId = canonicalThreadId(for: delivery),
+                  deliveriesByThreadId[threadId] == nil else {
                 continue
             }
-            deliveriesByThreadId[key] = delivery
+            deliveriesByThreadId[threadId] = delivery
         }
 
         return deliveriesByThreadId
@@ -312,9 +331,9 @@ struct HomeScreen: View {
         var counts: [String: Int] = [:]
 
         for delivery in messageDeliveries {
-            guard let key = threadKey(for: delivery) else { continue }
-            guard delivery.sortDate > (readCutoffByThreadId[key] ?? .distantPast) else { continue }
-            counts[key, default: 0] += 1
+            guard let threadId = canonicalThreadId(for: delivery) else { continue }
+            guard delivery.sortDate > (readCutoffByThreadId[threadId] ?? .distantPast) else { continue }
+            counts[threadId, default: 0] += 1
         }
 
         return counts
@@ -397,28 +416,55 @@ struct HomeScreen: View {
         }
     }
 
-    private func threadKey(for delivery: ContentDelivery) -> String? {
-        if let threadId = delivery.threadId?.trimmingCharacters(in: .whitespacesAndNewlines), !threadId.isEmpty {
-            return threadId
-        }
+    private func threadLookupKeys(for thread: MessageThread) -> [String] {
+        uniqueLookupKeys([thread.id, thread.personaId])
+    }
 
-        if let personaId = delivery.personaId?.trimmingCharacters(in: .whitespacesAndNewlines), !personaId.isEmpty {
-            return personaId
-        }
+    private func deliveryLookupKeys(for delivery: ContentDelivery) -> [String] {
+        uniqueLookupKeys([delivery.threadId, delivery.personaId])
+    }
 
+    private func canonicalThreadId(for delivery: ContentDelivery) -> String? {
+        for key in deliveryLookupKeys(for: delivery) {
+            if let threadId = canonicalThreadIdByLookupKey[key] {
+                return threadId
+            }
+        }
         return nil
     }
 
-    private func latestMessageDelivery(for personaId: String) -> ContentDelivery? {
-        latestDeliveryByThreadId[personaId]
+    private func uniqueLookupKeys(_ rawValues: [String?]) -> [String] {
+        var seen: Set<String> = []
+        var keys: [String] = []
+
+        for rawValue in rawValues {
+            guard let key = normalizedLookupKey(rawValue), seen.insert(key).inserted else {
+                continue
+            }
+            keys.append(key)
+        }
+
+        return keys
     }
 
-    private func latestPersistedMessage(for personaId: String) -> PersonaMessage? {
-        latestMessageByThreadId[personaId]
+    private func normalizedLookupKey(_ rawValue: String?) -> String? {
+        guard let rawValue = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawValue.isEmpty else {
+            return nil
+        }
+        return rawValue
+    }
+
+    private func latestMessageDelivery(for thread: MessageThread) -> ContentDelivery? {
+        latestDeliveryByThreadId[thread.id]
+    }
+
+    private func latestPersistedMessage(for thread: MessageThread) -> PersonaMessage? {
+        latestMessageByThreadId[thread.id]
     }
 
     private func latestPreview(for thread: MessageThread) -> String {
-        if let message = latestPersistedMessage(for: thread.personaId) {
+        if let message = latestPersistedMessage(for: thread) {
             let preview = MessageServiceSupport.messagePreview(
                 text: message.text,
                 imageUrl: message.imageUrl,
@@ -434,7 +480,7 @@ struct HomeScreen: View {
         if !preview.isEmpty {
             return preview
         }
-        if let preview = latestMessageDelivery(for: thread.personaId)?.previewText,
+        if let preview = latestMessageDelivery(for: thread)?.previewText,
            !preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return preview
         }
@@ -442,8 +488,8 @@ struct HomeScreen: View {
     }
 
     private func latestActivityDate(for thread: MessageThread) -> Date {
-        let latestMessageDate = latestPersistedMessage(for: thread.personaId)?.createdAt ?? .distantPast
-        let latestDeliveryDate = latestMessageDelivery(for: thread.personaId)?.sortDate ?? .distantPast
+        let latestMessageDate = latestPersistedMessage(for: thread)?.createdAt ?? .distantPast
+        let latestDeliveryDate = latestMessageDelivery(for: thread)?.sortDate ?? .distantPast
         return max(thread.lastMessageAt, max(latestMessageDate, latestDeliveryDate))
     }
 

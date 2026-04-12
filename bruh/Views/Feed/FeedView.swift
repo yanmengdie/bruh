@@ -11,11 +11,16 @@ struct FeedView: View {
         sort: [SortDescriptor(\PengyouMoment.publishedAt, order: .reverse)],
         animation: .default
     ) private var moments: [PengyouMoment]
+    @Query private var profiles: [UserProfile]
 
     @State private var isPresentingComposer = false
 
+    private var currentProfile: UserProfile? {
+        profiles.first(where: { $0.id == CurrentUserProfileStore.userId })
+    }
+
     private var currentProfileAvatarImage: UIImage? {
-        guard let data = CurrentUserProfileStore.avatarImageData() else { return nil }
+        guard let data = currentProfile?.avatarImageData else { return nil }
         return UIImage(data: data)
     }
 
@@ -318,7 +323,7 @@ private struct PengyouComposerSheet: View {
     }
 
     private var currentProfileAvatarImage: UIImage? {
-        guard let data = CurrentUserProfileStore.avatarImageData() else { return nil }
+        guard let data = currentProfile?.avatarImageData else { return nil }
         return UIImage(data: data)
     }
 
