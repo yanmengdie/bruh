@@ -55,6 +55,7 @@ struct ContactsView: View {
     @State private var presentedInvitation: BruhInvitation?
     @State private var isPresentingAddBruh = false
     @State private var isPresentingTagContacts = false
+    @State private var isPresentingProfileSettings = false
     @State private var editingContact: Contact?
     @State private var draft = ContactDraft()
     @State private var validationError: String?
@@ -165,6 +166,9 @@ struct ContactsView: View {
         .navigationDestination(isPresented: $isPresentingTagContacts) {
             ContactTagsView()
         }
+        .navigationDestination(isPresented: $isPresentingProfileSettings) {
+            ProfileAccountView()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -191,40 +195,46 @@ struct ContactsView: View {
         let profileName = rawProfileName == "You" ? "我" : rawProfileName
         let profileHandle = currentProfile?.bruhHandle ?? "@yourboi"
 
-        return HStack(spacing: 14) {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(red: 0.84, green: 0.81, blue: 0.73))
-                .frame(width: 66, height: 66)
-                .overlay {
-                    if let avatar = currentProfileAvatarImage {
-                        Image(uiImage: avatar)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 66, height: 66)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    } else {
-                        Text("😎")
-                            .font(.system(size: 35))
+        return Button {
+            isPresentingProfileSettings = true
+        } label: {
+            HStack(spacing: 14) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(red: 0.84, green: 0.81, blue: 0.73))
+                    .frame(width: 66, height: 66)
+                    .overlay {
+                        if let avatar = currentProfileAvatarImage {
+                            Image(uiImage: avatar)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 66, height: 66)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        } else {
+                            Text("😎")
+                                .font(.system(size: 35))
+                        }
                     }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(profileName)
+                        .font(.system(size: 21, weight: .bold))
+                        .foregroundStyle(Color.black.opacity(0.86))
+                    Text("鸽们账号：\(profileHandle)")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.black.opacity(0.3))
                 }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(profileName)
-                    .font(.system(size: 21, weight: .bold))
-                    .foregroundStyle(Color.black.opacity(0.86))
-                Text("鸽们账号：\(profileHandle)")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.black.opacity(0.3))
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.black.opacity(0.18))
             }
-
-            Spacer(minLength: 0)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.black.opacity(0.18))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .buttonStyle(.plain)
         .background(Color.white.opacity(0.68))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
@@ -835,5 +845,223 @@ private struct ContactFormView: View {
                 Button("保存", action: onSave)
             }
         }
+    }
+}
+
+private struct ProfileAccountView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Query private var profiles: [UserProfile]
+
+    @State private var profileImage: UIImage?
+    @State private var isPresentingImagePicker = false
+    @State private var isShowingImageSourceOptions = false
+    @State private var imagePickerSourceType: UIImagePickerController.SourceType = .photoLibrary
+    @State private var pickerAlertTitle = ""
+    @State private var pickerAlertMessage = ""
+    @State private var isShowingPickerAlert = false
+
+    private var currentProfile: UserProfile? {
+        profiles.first(where: { $0.id == CurrentUserProfileStore.userId })
+    }
+
+    private var profileName: String {
+        let raw = currentProfile?.displayName ?? "我"
+        return raw == "You" ? "我" : raw
+    }
+
+    private var profileHandle: String {
+        currentProfile?.bruhHandle ?? "@yourboi"
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("我的账号")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(Color.black.opacity(0.88))
+                    .padding(.top, 8)
+
+                profileSummaryCard
+                avatarActionCard
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 28)
+        }
+        .background(AppTheme.messagesBackground)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                AppBackButton {
+                    dismiss()
+                }
+            }
+        }
+        .confirmationDialog("选择头像", isPresented: $isShowingImageSourceOptions, titleVisibility: .visible) {
+            Button("拍照") {
+                presentImagePicker(sourceType: .camera)
+            }
+
+            Button("从相册选择") {
+                presentImagePicker(sourceType: .photoLibrary)
+            }
+
+            Button("取消", role: .cancel) {}
+        }
+        .sheet(isPresented: $isPresentingImagePicker, onDismiss: persistAvatarIfNeeded) {
+            AvatarImagePicker(
+                image: $profileImage,
+                sourceType: imagePickerSourceType
+            )
+            .ignoresSafeArea()
+        }
+        .alert(pickerAlertTitle, isPresented: $isShowingPickerAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text(pickerAlertMessage)
+        }
+        .onAppear {
+            loadCurrentAvatarIfNeeded()
+        }
+        .enableUnifiedSwipeBack()
+    }
+
+    private var profileSummaryCard: some View {
+        HStack(spacing: 14) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(red: 0.90, green: 0.88, blue: 0.84))
+                .frame(width: 84, height: 84)
+                .overlay {
+                    if let profileImage {
+                        Image(uiImage: profileImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 84, height: 84)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    } else {
+                        Text("😎")
+                            .font(.system(size: 42))
+                    }
+                }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(profileName)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Color.black.opacity(0.86))
+                Text("鸽们账号：\(profileHandle)")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.black.opacity(0.34))
+                Text("更换头像后，会同步到联系人、消息和朋友圈。")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.black.opacity(0.42))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var avatarActionCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("头像设置")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color.black.opacity(0.72))
+
+            HStack(spacing: 18) {
+                avatarPickerButton
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("重新设置头像")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(Color.black.opacity(0.84))
+                    Text("支持拍照或从相册选择，逻辑和首次 onboarding 保持一致。")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.black.opacity(0.42))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(18)
+        .background(Color.white.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var avatarPickerButton: some View {
+        Button {
+            isShowingImageSourceOptions = true
+        } label: {
+            ZStack(alignment: .bottomTrailing) {
+                Circle()
+                    .fill(Color(red: 0.90, green: 0.88, blue: 0.84))
+                    .frame(width: 92, height: 92)
+                    .overlay {
+                        Circle()
+                            .stroke(Color.black.opacity(0.12), style: StrokeStyle(lineWidth: 5, dash: [10, 5]))
+                    }
+                    .overlay {
+                        if let profileImage {
+                            Image(uiImage: profileImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 80, height: 80)
+                                .clipShape(Circle())
+                        } else {
+                            Text("📸")
+                                .font(.system(size: 36))
+                        }
+                    }
+
+                Circle()
+                    .fill(Color(red: 0.10, green: 0.11, blue: 0.13))
+                    .frame(width: 30, height: 30)
+                    .overlay {
+                        Image(systemName: "plus")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .offset(x: 2, y: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("重新设置头像")
+    }
+
+    private func loadCurrentAvatarIfNeeded() {
+        guard profileImage == nil,
+              let data = CurrentUserProfileStore.avatarImageData(),
+              let image = UIImage(data: data) else { return }
+        profileImage = image
+    }
+
+    private func persistAvatarIfNeeded() {
+        let newData = profileImage?.jpegData(compressionQuality: 0.85)
+        guard newData != CurrentUserProfileStore.avatarImageData() else { return }
+        CurrentUserProfileStore.updateAvatarImageData(newData, in: modelContext)
+    }
+
+    private func presentImagePicker(sourceType: UIImagePickerController.SourceType) {
+        guard UIImagePickerController.isSourceTypeAvailable(sourceType) else {
+            switch sourceType {
+            case .camera:
+                pickerAlertTitle = "当前设备无法打开相机"
+                pickerAlertMessage = "请在支持相机的设备上重试，或改为从相册选择。"
+            case .photoLibrary, .savedPhotosAlbum:
+                pickerAlertTitle = "当前设备无法访问相册"
+                pickerAlertMessage = "请检查系统权限后重试。"
+            @unknown default:
+                pickerAlertTitle = "当前设备无法选择图片"
+                pickerAlertMessage = "请稍后重试。"
+            }
+            isShowingPickerAlert = true
+            return
+        }
+
+        imagePickerSourceType = sourceType
+        isPresentingImagePicker = true
     }
 }

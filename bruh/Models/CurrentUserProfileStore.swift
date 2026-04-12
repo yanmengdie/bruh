@@ -94,7 +94,31 @@ enum CurrentUserProfileStore {
         profile.updatedAt = .now
 
         if let avatarImageData, !avatarImageData.isEmpty {
+            profile.avatarImageData = avatarImageData
             userDefaults.set(avatarImageData, forKey: avatarImageDataKey)
+        }
+
+        if context.hasChanges {
+            try? context.save()
+        }
+    }
+
+    @MainActor
+    static func updateAvatarImageData(
+        _ avatarImageData: Data?,
+        in context: ModelContext,
+        userDefaults: UserDefaults = .standard
+    ) {
+        let profile = fetchOrCreate(in: context)
+        let normalizedData = avatarImageData.flatMap { $0.isEmpty ? nil : $0 }
+
+        profile.avatarImageData = normalizedData
+        profile.updatedAt = .now
+
+        if let normalizedData {
+            userDefaults.set(normalizedData, forKey: avatarImageDataKey)
+        } else {
+            userDefaults.removeObject(forKey: avatarImageDataKey)
         }
 
         if context.hasChanges {

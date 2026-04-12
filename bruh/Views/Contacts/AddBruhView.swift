@@ -3,8 +3,8 @@ import UIKit
 
 struct AddBruhView: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("contacts.addBruh.pendingNames") private var pendingNamesStorage = ""
     @State private var searchText = ""
-    @State private var pendingNames: Set<String> = []
 
     @State private var selectedTag = "全部"
     private let featuredNames = ["马云", "Tim Cook", "吴京", "Kanye West", "Warren Buffett"]
@@ -57,29 +57,28 @@ struct AddBruhView: View {
         candidates.filter(matchesCurrentFilter)
     }
 
-    private var visiblePendingCandidates: [AddBruhCandidate] {
-        candidates.filter { candidate in
-            pendingNames.contains(candidate.name) && matchesCurrentFilter(candidate)
-        }
+    private var pendingNames: Set<String> {
+        Set(
+            pendingNamesStorage
+                .split(separator: "\n")
+                .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        )
     }
 
     private var totalPendingCount: Int {
         pendingNames.count
     }
 
-    private var availableCandidates: [AddBruhCandidate] {
-        filteredCandidates.filter { !pendingNames.contains($0.name) }
-    }
-
     private var featuredCandidates: [AddBruhCandidate] {
         featuredNames.compactMap { name in
-            availableCandidates.first(where: { $0.name == name })
+            filteredCandidates.first(where: { $0.name == name })
         }
     }
 
     private var moreCandidates: [AddBruhCandidate] {
         let featuredSet = Set(featuredCandidates.map(\.name))
-        return availableCandidates.filter { !featuredSet.contains($0.name) }
+        return filteredCandidates.filter { !featuredSet.contains($0.name) }
     }
 
     var body: some View {
@@ -91,12 +90,6 @@ struct AddBruhView: View {
                 categoryChips
 
                 recommendationIntro
-
-                if !visiblePendingCandidates.isEmpty {
-                    sectionTitle("已加入候选")
-                        .padding(.top, 4)
-                    cards(for: visiblePendingCandidates, section: .pending)
-                }
 
                 if featuredCandidates.isEmpty && moreCandidates.isEmpty {
                     discoveryEmptyState
@@ -125,12 +118,9 @@ struct AddBruhView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button {
+                AppBackButton {
                     dismiss()
-                } label: {
-                    AppBackIcon()
                 }
-                .buttonStyle(.plain)
             }
         }
         .enableUnifiedSwipeBack()
@@ -144,8 +134,8 @@ struct AddBruhView: View {
                     .foregroundStyle(Color.black.opacity(0.84))
 
                 Text(selectedTag == "全部"
-                     ? "先把感兴趣的人加入候选，后面再继续比较。"
-                     : "当前按标签优先展示，先把感兴趣的人加入候选，后面再继续比较。")
+                     ? "点“想认识”后会进入等待中，你可以随时回来继续看。"
+                     : "当前按标签优先展示，点“想认识”后会进入等待中。")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.black.opacity(0.48))
                     .fixedSize(horizontal: false, vertical: true)
@@ -158,7 +148,7 @@ struct AddBruhView: View {
                     Text("\(totalPendingCount)")
                         .font(.system(size: 22, weight: .bold))
                         .foregroundStyle(Color(red: 0.83, green: 0.16, blue: 0.26))
-                    Text("已加入候选")
+                    Text("等待中")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color.black.opacity(0.45))
                 }
@@ -302,10 +292,12 @@ struct AddBruhView: View {
                     let isPending = pendingNames.contains(candidate.name)
                     Button {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
-                            _ = pendingNames.insert(candidate.name)
+                            updatePendingNames { pendingNames in
+                                pendingNames.insert(candidate.name)
+                            }
                         }
                     } label: {
-                        Text(isPending ? "已加入候选" : "想认识")
+                        Text(isPending ? "等待中" : "想认识")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(isPending ? Color(red: 0.47, green: 0.48, blue: 0.52) : Color(red: 0.83, green: 0.16, blue: 0.26))
                             .padding(.horizontal, 18)
@@ -339,9 +331,11 @@ struct AddBruhView: View {
     }
 
     private func detailText(for candidate: AddBruhCandidate, section: CandidateSection) -> String {
+        if pendingNames.contains(candidate.name) {
+            return "已进入等待中，稍后回来继续看看"
+        }
+
         switch section {
-        case .pending:
-            return "已加入候选，后续可以继续比较和筛选"
         case .featured:
             if selectedTag != "全部", candidate.tags.contains(selectedTag) {
                 return "匹配你正在浏览的\(selectedTag)标签"
@@ -364,8 +358,13 @@ struct AddBruhView: View {
         }
     }
 
+    private func updatePendingNames(_ update: (inout Set<String>) -> Void) {
+        var names = pendingNames
+        update(&names)
+        pendingNamesStorage = names.sorted().joined(separator: "\n")
+    }
+
     private enum CandidateSection {
-        case pending
         case featured
         case explore
     }

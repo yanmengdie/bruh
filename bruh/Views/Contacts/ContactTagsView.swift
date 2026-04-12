@@ -81,12 +81,9 @@ struct ContactTagsView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button {
+                AppBackButton {
                     dismiss()
-                } label: {
-                    AppBackIcon()
                 }
-                .buttonStyle(.plain)
             }
         }
         .enableUnifiedSwipeBack()

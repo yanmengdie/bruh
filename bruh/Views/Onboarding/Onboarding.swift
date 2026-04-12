@@ -73,7 +73,7 @@ struct Onboarding: View {
             Button("取消", role: .cancel) {}
         }
         .sheet(isPresented: $isPresentingImagePicker) {
-            OnboardingImagePicker(
+            AvatarImagePicker(
                 image: $profileImage,
                 sourceType: imagePickerSourceType
             )
@@ -433,7 +433,7 @@ enum OnboardingInterestStore {
     }
 }
 
-private struct OnboardingImagePicker: UIViewControllerRepresentable {
+struct AvatarImagePicker: UIViewControllerRepresentable {
     @Environment(\.dismiss) private var dismiss
     @Binding var image: UIImage?
     let sourceType: UIImagePickerController.SourceType

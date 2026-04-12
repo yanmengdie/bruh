@@ -15,9 +15,13 @@ struct AppBackButton: View {
     var body: some View {
         Button(action: action) {
             AppBackIcon()
+                .frame(width: 20, height: 20, alignment: .leading)
+                .padding(.vertical, 12)
+                .padding(.trailing, 18)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(width: 44, height: 44, alignment: .leading)
+        .accessibilityLabel("返回")
     }
 }
 
