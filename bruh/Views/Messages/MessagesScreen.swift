@@ -409,6 +409,7 @@ private struct MessageDetailView: View {
     @State private var effectPlayer: AVPlayer?
     @State private var isShowingExcitedEffect = false
     @State private var hasCheckedEntryEffect = false
+    @State private var hasCompletedInitialScroll = false
     @State private var entryUnreadCount = 0
     @FocusState private var isComposerFocused: Bool
     private let isExcitedEntryEffectEnabled = false
@@ -472,18 +473,21 @@ private struct MessageDetailView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onAppear {
-                    scrollToBottom(with: proxy, animated: false)
+                    scheduleScrollToBottom(with: proxy, animated: false)
                 }
-                .onChange(of: messages.count) {
-                    scrollToBottom(with: proxy)
+                .task(id: latestMessageId) {
+                    guard latestMessageId != nil else { return }
+                    let shouldAnimate = hasCompletedInitialScroll
+                    scheduleScrollToBottom(with: proxy, animated: shouldAnimate)
+                    hasCompletedInitialScroll = true
                 }
                 .onChange(of: isSending) { _, sending in
                     guard sending else { return }
-                    scrollToBottom(with: proxy)
+                    scheduleScrollToBottom(with: proxy)
                 }
                 .onChange(of: isComposerFocused) { _, focused in
                     guard focused else { return }
-                    scrollToBottom(with: proxy)
+                    scheduleScrollToBottom(with: proxy)
                 }
             }
         }
@@ -603,6 +607,10 @@ private struct MessageDetailView: View {
 
     private var latestIncomingMessageId: String? {
         messages.last(where: \.isIncoming)?.id
+    }
+
+    private var latestMessageId: String? {
+        messages.last?.id
     }
 
     private var composerBar: some View {
@@ -770,6 +778,15 @@ private struct MessageDetailView: View {
             }
         } else {
             action()
+        }
+    }
+
+    private func scheduleScrollToBottom(
+        with proxy: ScrollViewProxy,
+        animated: Bool = true
+    ) {
+        DispatchQueue.main.async {
+            scrollToBottom(with: proxy, animated: animated)
         }
     }
 
