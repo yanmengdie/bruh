@@ -58,6 +58,7 @@ extension StarterMessageLifecycle {
                 existing.text = starter.text
                 existing.imageUrl = starter.imageUrl
                 existing.sourceUrl = starter.sourceUrl
+                existing.createdAt = starter.createdAt
                 existing.deliveryState = "sent"
                 existing.sourcePostIds = starter.sourcePostIds
                 existing.isSeedMessage = true
@@ -71,7 +72,7 @@ extension StarterMessageLifecycle {
                     threadStore.updateThread(
                         thread,
                         preview: starterPreview,
-                        at: previousCreatedAt,
+                        at: starter.createdAt,
                         unreadCount: thread.unreadCount
                     )
                 }

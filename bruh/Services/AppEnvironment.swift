@@ -97,3 +97,54 @@ enum AppEnvironment: String, CaseIterable {
         return nil
     }
 }
+
+struct ScopedUserDefaultsStore {
+    let userDefaults: UserDefaults
+    let appEnvironment: AppEnvironment
+
+    init(
+        userDefaults: UserDefaults = .standard,
+        appEnvironment: AppEnvironment = .current
+    ) {
+        self.userDefaults = userDefaults
+        self.appEnvironment = appEnvironment
+    }
+
+    @discardableResult
+    func key(_ baseKey: String) -> String {
+        let scopedKey = appEnvironment.scopedUserDefaultsKey(baseKey)
+        migrateLegacyValueIfNeeded(for: baseKey, scopedKey: scopedKey)
+        return scopedKey
+    }
+
+    func string(for baseKey: String) -> String? {
+        userDefaults.string(forKey: key(baseKey))
+    }
+
+    func data(for baseKey: String) -> Data? {
+        userDefaults.data(forKey: key(baseKey))
+    }
+
+    func bool(for baseKey: String) -> Bool {
+        userDefaults.bool(forKey: key(baseKey))
+    }
+
+    func set(_ value: Any?, for baseKey: String) {
+        let scopedKey = key(baseKey)
+        if let value {
+            userDefaults.set(value, forKey: scopedKey)
+        } else {
+            userDefaults.removeObject(forKey: scopedKey)
+        }
+    }
+
+    func removeObject(for baseKey: String) {
+        userDefaults.removeObject(forKey: appEnvironment.scopedUserDefaultsKey(baseKey))
+    }
+
+    private func migrateLegacyValueIfNeeded(for baseKey: String, scopedKey: String) {
+        guard userDefaults.object(forKey: scopedKey) == nil else { return }
+        guard let legacyValue = userDefaults.object(forKey: baseKey) else { return }
+        userDefaults.set(legacyValue, forKey: scopedKey)
+    }
+}

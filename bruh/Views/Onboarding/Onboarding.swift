@@ -411,8 +411,15 @@ enum OnboardingInterestStore {
     static let userDefaultsKey = "onboarding.selectedInterestTopics"
     private static let defaultSelection: Set<OnboardingInterest> = [.sports, .tech]
 
-    static func load(userDefaults: UserDefaults = .standard) -> Set<OnboardingInterest> {
-        guard let raw = userDefaults.string(forKey: userDefaultsKey), !raw.isEmpty else {
+    static func load(
+        userDefaults: UserDefaults = .standard,
+        appEnvironment: AppEnvironment = .current
+    ) -> Set<OnboardingInterest> {
+        let scopedDefaults = ScopedUserDefaultsStore(
+            userDefaults: userDefaults,
+            appEnvironment: appEnvironment
+        )
+        guard let raw = scopedDefaults.string(for: userDefaultsKey), !raw.isEmpty else {
             return defaultSelection
         }
 
@@ -423,13 +430,21 @@ enum OnboardingInterestStore {
         return values.isEmpty ? defaultSelection : Set(values)
     }
 
-    static func save(_ selection: Set<OnboardingInterest>, userDefaults: UserDefaults = .standard) {
+    static func save(
+        _ selection: Set<OnboardingInterest>,
+        userDefaults: UserDefaults = .standard,
+        appEnvironment: AppEnvironment = .current
+    ) {
+        let scopedDefaults = ScopedUserDefaultsStore(
+            userDefaults: userDefaults,
+            appEnvironment: appEnvironment
+        )
         let serialized = selection
             .map(\.rawValue)
             .sorted()
             .joined(separator: ",")
 
-        userDefaults.set(serialized, forKey: userDefaultsKey)
+        scopedDefaults.set(serialized, for: userDefaultsKey)
     }
 }
 

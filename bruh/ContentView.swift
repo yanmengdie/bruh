@@ -8,15 +8,45 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\ContentDelivery.sortDate, order: .reverse)]) private var deliveries: [ContentDelivery]
     @Query(sort: [SortDescriptor(\PengyouMoment.publishedAt, order: .reverse)]) private var pengyouMoments: [PengyouMoment]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @AppStorage("useHomeScreenMode") private var useHomeScreenMode = true
-    @AppStorage("lastViewedFeedAt") private var lastViewedFeedAtInterval: Double = 0
-    @AppStorage("lastViewedAlbumAt") private var lastViewedAlbumAtInterval: Double = 0
+    @AppStorage private var hasCompletedOnboarding: Bool
+    @AppStorage private var useHomeScreenMode: Bool
+    @AppStorage private var lastViewedFeedAtInterval: Double
+    @AppStorage private var lastViewedAlbumAtInterval: Double
 
     @State private var homePath: [AppDestination] = []
     @State private var selectedTab: MainTab = .contacts
     @State private var messageService = MessageService()
     @State private var bootstrapper = AppBootstrapper()
+
+    init(
+        userDefaults: UserDefaults = .standard,
+        appEnvironment: AppEnvironment = .current
+    ) {
+        let scopedDefaults = ScopedUserDefaultsStore(
+            userDefaults: userDefaults,
+            appEnvironment: appEnvironment
+        )
+        _hasCompletedOnboarding = AppStorage(
+            wrappedValue: false,
+            scopedDefaults.key("hasCompletedOnboarding"),
+            store: userDefaults
+        )
+        _useHomeScreenMode = AppStorage(
+            wrappedValue: true,
+            scopedDefaults.key("useHomeScreenMode"),
+            store: userDefaults
+        )
+        _lastViewedFeedAtInterval = AppStorage(
+            wrappedValue: 0.0,
+            scopedDefaults.key("lastViewedFeedAt"),
+            store: userDefaults
+        )
+        _lastViewedAlbumAtInterval = AppStorage(
+            wrappedValue: 0.0,
+            scopedDefaults.key("lastViewedAlbumAt"),
+            store: userDefaults
+        )
+    }
 
     var body: some View {
         Group {

@@ -42,17 +42,37 @@ enum InterestPreferences {
     private static let defaults = UserDefaults.standard
     private static let keyPrefix = "news_interest_"
 
-    static func isEnabled(_ interest: NewsInterest, userDefaults: UserDefaults = defaults) -> Bool {
-        userDefaults.bool(forKey: keyPrefix + interest.rawValue)
+    static func isEnabled(
+        _ interest: NewsInterest,
+        userDefaults: UserDefaults = defaults,
+        appEnvironment: AppEnvironment = .current
+    ) -> Bool {
+        let scopedDefaults = ScopedUserDefaultsStore(
+            userDefaults: userDefaults,
+            appEnvironment: appEnvironment
+        )
+        return scopedDefaults.bool(for: keyPrefix + interest.rawValue)
     }
 
-    static func set(_ enabled: Bool, for interest: NewsInterest, userDefaults: UserDefaults = defaults) {
-        userDefaults.set(enabled, forKey: keyPrefix + interest.rawValue)
+    static func set(
+        _ enabled: Bool,
+        for interest: NewsInterest,
+        userDefaults: UserDefaults = defaults,
+        appEnvironment: AppEnvironment = .current
+    ) {
+        let scopedDefaults = ScopedUserDefaultsStore(
+            userDefaults: userDefaults,
+            appEnvironment: appEnvironment
+        )
+        scopedDefaults.set(enabled, for: keyPrefix + interest.rawValue)
     }
 
-    static func legacySelectedInterests(userDefaults: UserDefaults = defaults) -> [String] {
+    static func legacySelectedInterests(
+        userDefaults: UserDefaults = defaults,
+        appEnvironment: AppEnvironment = .current
+    ) -> [String] {
         NewsInterest.allCases
-            .filter { isEnabled($0, userDefaults: userDefaults) }
+            .filter { isEnabled($0, userDefaults: userDefaults, appEnvironment: appEnvironment) }
             .map(\.rawValue)
     }
 }

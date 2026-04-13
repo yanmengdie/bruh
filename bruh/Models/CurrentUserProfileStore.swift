@@ -161,7 +161,9 @@ enum CurrentUserProfileStore {
     }
 
     private static func legacyOrDefaultInterests(userDefaults: UserDefaults = .standard) -> [String] {
-        if let onboardingRaw = userDefaults.string(forKey: OnboardingInterestStore.userDefaultsKey), !onboardingRaw.isEmpty {
+        let scopedDefaults = ScopedUserDefaultsStore(userDefaults: userDefaults)
+
+        if let onboardingRaw = scopedDefaults.string(for: OnboardingInterestStore.userDefaultsKey), !onboardingRaw.isEmpty {
             let parsed = onboardingRaw
                 .split(separator: ",")
                 .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -180,7 +182,8 @@ enum CurrentUserProfileStore {
     }
 
     private static func legacyAvatarImageData(userDefaults: UserDefaults = .standard) -> Data? {
-        userDefaults.data(forKey: avatarImageDataKey)
+        let scopedDefaults = ScopedUserDefaultsStore(userDefaults: userDefaults)
+        return scopedDefaults.data(for: avatarImageDataKey)
     }
 
     private static func normalizedAvatarImageData(_ avatarImageData: Data?) -> Data? {
@@ -191,11 +194,8 @@ enum CurrentUserProfileStore {
         _ avatarImageData: Data?,
         userDefaults: UserDefaults = .standard
     ) {
-        if let avatarImageData {
-            userDefaults.set(avatarImageData, forKey: avatarImageDataKey)
-        } else {
-            userDefaults.removeObject(forKey: avatarImageDataKey)
-        }
+        let scopedDefaults = ScopedUserDefaultsStore(userDefaults: userDefaults)
+        scopedDefaults.set(avatarImageData, for: avatarImageDataKey)
     }
 
     private static func bruhHandle(from displayName: String) -> String {

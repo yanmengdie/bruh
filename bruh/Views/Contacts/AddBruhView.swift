@@ -3,7 +3,7 @@ import UIKit
 
 struct AddBruhView: View {
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("contacts.addBruh.pendingNames") private var pendingNamesStorage = ""
+    @AppStorage private var pendingNamesStorage: String
     @State private var searchText = ""
 
     @State private var selectedTag = "全部"
@@ -79,6 +79,21 @@ struct AddBruhView: View {
     private var moreCandidates: [AddBruhCandidate] {
         let featuredSet = Set(featuredCandidates.map(\.name))
         return filteredCandidates.filter { !featuredSet.contains($0.name) }
+    }
+
+    init(
+        userDefaults: UserDefaults = .standard,
+        appEnvironment: AppEnvironment = .current
+    ) {
+        let scopedDefaults = ScopedUserDefaultsStore(
+            userDefaults: userDefaults,
+            appEnvironment: appEnvironment
+        )
+        _pendingNamesStorage = AppStorage(
+            wrappedValue: "",
+            scopedDefaults.key("contacts.addBruh.pendingNames"),
+            store: userDefaults
+        )
     }
 
     var body: some View {

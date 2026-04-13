@@ -1,7 +1,22 @@
 import SwiftUI
 
 struct SettingsScreen: View {
-    @AppStorage("useHomeScreenMode") private var useHomeScreenMode = true
+    @AppStorage private var useHomeScreenMode: Bool
+
+    init(
+        userDefaults: UserDefaults = .standard,
+        appEnvironment: AppEnvironment = .current
+    ) {
+        let scopedDefaults = ScopedUserDefaultsStore(
+            userDefaults: userDefaults,
+            appEnvironment: appEnvironment
+        )
+        _useHomeScreenMode = AppStorage(
+            wrappedValue: true,
+            scopedDefaults.key("useHomeScreenMode"),
+            store: userDefaults
+        )
+    }
 
     var body: some View {
         List {
