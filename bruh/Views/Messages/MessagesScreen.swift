@@ -388,6 +388,8 @@ struct MessagesScreen: View {
 }
 
 private struct MessageDetailView: View {
+    private static let bottomScrollAnchor = "message-detail-bottom-scroll-anchor"
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var messages: [PersonaMessage]
@@ -455,6 +457,10 @@ private struct MessageDetailView: View {
                                 waitingMessageRow
                                     .id("pending-reply-indicator")
                             }
+
+                            Color.clear
+                                .frame(height: 1)
+                                .id(Self.bottomScrollAnchor)
                         }
                     }
                     .padding(.horizontal, 12)
@@ -465,76 +471,29 @@ private struct MessageDetailView: View {
                     }
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .onAppear {
+                    scrollToBottom(with: proxy, animated: false)
+                }
                 .onChange(of: messages.count) {
-                    if let last = messages.last {
-                        withAnimation {
-                            proxy.scrollTo(last.id, anchor: .bottom)
-                        }
-                    }
+                    scrollToBottom(with: proxy)
                 }
                 .onChange(of: isSending) { _, sending in
                     guard sending else { return }
-                    withAnimation {
-                        proxy.scrollTo("pending-reply-indicator", anchor: .bottom)
-                    }
+                    scrollToBottom(with: proxy)
+                }
+                .onChange(of: isComposerFocused) { _, focused in
+                    guard focused else { return }
+                    scrollToBottom(with: proxy)
                 }
             }
-
-            VStack(spacing: 8) {
-                if let inlineErrorMessage {
-                    Text(inlineErrorMessage)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 12)
-                }
-
-                Divider()
-
-                HStack(spacing: 10) {
-                    Button {
-                        send(requestImage: true)
-                    } label: {
-                        Image(systemName: "photo.badge.plus")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 42, height: 42)
-                            .background(Color.white.opacity(0.65))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                    TextField("给\(displayName)发消息...", text: $draft)
-                        .focused($isComposerFocused)
-                        .submitLabel(.send)
-                        .onSubmit {
-                            send()
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 14)
-                        .background(Color.white.opacity(0.65))
-                        .clipShape(Capsule())
-
-                    Button {
-                        send()
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary : .blue)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
-            }
-            .background(.ultraThinMaterial)
         }
         .background(AppTheme.messagesBackground)
         .enableUnifiedSwipeBack()
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            composerBar
+        }
         .sheet(isPresented: $isPresentingSafari) {
             if let presentedSourceURL {
                 InAppSafariView(url: presentedSourceURL)
@@ -583,15 +542,6 @@ private struct MessageDetailView: View {
             effectPlayer = nil
             isShowingExcitedEffect = false
             cleanupAudioPlayer()
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-
-                Button("收起") {
-                    isComposerFocused = false
-                }
-            }
         }
     }
 
@@ -653,6 +603,59 @@ private struct MessageDetailView: View {
 
     private var latestIncomingMessageId: String? {
         messages.last(where: \.isIncoming)?.id
+    }
+
+    private var composerBar: some View {
+        VStack(spacing: 8) {
+            if let inlineErrorMessage {
+                Text(inlineErrorMessage)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 12)
+            }
+
+            Divider()
+
+            HStack(spacing: 10) {
+                Button {
+                    send(requestImage: true)
+                } label: {
+                    Image(systemName: "photo.badge.plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 42, height: 42)
+                        .background(Color.white.opacity(0.65))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(isSending || trimmedDraft.isEmpty)
+
+                TextField("给\(displayName)发消息...", text: $draft)
+                    .focused($isComposerFocused)
+                    .submitLabel(.send)
+                    .onSubmit {
+                        send()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 14)
+                    .background(Color.white.opacity(0.65))
+                    .clipShape(Capsule())
+
+                Button {
+                    send()
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundColor(trimmedDraft.isEmpty ? .secondary : .blue)
+                }
+                .buttonStyle(.plain)
+                .disabled(isSending || trimmedDraft.isEmpty)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
+        }
+        .background(.ultraThinMaterial)
     }
 
     private var headerAvatar: some View {
@@ -725,7 +728,7 @@ private struct MessageDetailView: View {
     }
 
     private func send(requestImage: Bool = false) {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = trimmedDraft
         guard !text.isEmpty, !isSending else { return }
 
         isComposerFocused = false
@@ -746,6 +749,27 @@ private struct MessageDetailView: View {
                 errorMessage = error.localizedDescription
             }
             isSending = false
+        }
+    }
+
+    private var trimmedDraft: String {
+        draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func scrollToBottom(
+        with proxy: ScrollViewProxy,
+        animated: Bool = true
+    ) {
+        let action = {
+            proxy.scrollTo(Self.bottomScrollAnchor, anchor: .bottom)
+        }
+
+        if animated {
+            withAnimation {
+                action()
+            }
+        } else {
+            action()
         }
     }
 
