@@ -28,7 +28,7 @@ Environment variables:
 - required: `SERVICE_ROLE_KEY` / `SUPABASE_SERVICE_ROLE_KEY`
 - required: `BRUH_FUNCTIONS_BASE_URL` / `SUPABASE_FUNCTIONS_BASE_URL`
 - required: `BRUH_SUPABASE_ANON_KEY` / `SUPABASE_ANON_KEY`
-- recommended: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
+- recommended: `OPENAI_API_KEY`
 - recommended: `NANO_BANANA_API_KEY`
 - recommended: `VOICE_API_KEY`
 - recommended: `APIFY_TOKEN`

@@ -4,7 +4,6 @@ import {
   isAcceptedContractCompatible,
   requestedClientVersion,
 } from "../_shared/api_contract.ts";
-import { anthropicModelCandidates } from "../_shared/anthropic.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
   getOptionalScopedEnv,
@@ -115,14 +114,6 @@ Deno.serve(async (request) => {
     }
 
     const { projectUrl, serviceRoleKey } = resolveSupabaseServiceConfig();
-    const anthropicApiKey = getOptionalScopedEnv("ANTHROPIC_API_KEY");
-    const anthropicBaseUrl = getScopedEnvOrDefault(
-      "ANTHROPIC_BASE_URL",
-      "https://api.anthropic.com",
-    ).replace(/\/$/, "");
-    const anthropicModels = anthropicModelCandidates(
-      getOptionalScopedEnv("ANTHROPIC_MODEL"),
-    );
     const openaiApiKey = getOptionalScopedEnv("OPENAI_API_KEY");
     const openaiBaseUrl = getScopedEnvOrDefault(
       "OPENAI_BASE_URL",
@@ -191,9 +182,6 @@ Deno.serve(async (request) => {
     const result = await handlePersistentRequest(
       supabase,
       {
-        anthropicApiKey: anthropicApiKey ?? undefined,
-        anthropicBaseUrl,
-        anthropicModels,
         openaiApiKey: openaiApiKey ?? undefined,
         openaiBaseUrl,
         openaiModel,

@@ -4,7 +4,6 @@ import {
   isAcceptedContractCompatible,
   requestedClientVersion,
 } from "../_shared/api_contract.ts";
-import { anthropicModelCandidates } from "../_shared/anthropic.ts";
 import { resolveCostControls } from "../_shared/cost_controls.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
@@ -89,14 +88,6 @@ Deno.serve(async (request) => {
       "https://api.openai.com/v1",
     ).replace(/\/$/, "");
     const openaiModel = getScopedEnvOrDefault("OPENAI_MODEL", "gpt-4.1-mini");
-    const anthropicApiKey = getOptionalScopedEnv("ANTHROPIC_API_KEY");
-    const anthropicBaseUrl = getScopedEnvOrDefault(
-      "ANTHROPIC_BASE_URL",
-      "https://api.anthropic.com",
-    ).replace(/\/$/, "");
-    const anthropicModels = anthropicModelCandidates(
-      getOptionalScopedEnv("ANTHROPIC_MODEL"),
-    );
     const nanoBananaApiKey = getOptionalScopedEnv("NANO_BANANA_API_KEY");
     const nanoBananaBaseUrl = getScopedEnvOrDefault(
       "NANO_BANANA_BASE_URL",
@@ -204,9 +195,6 @@ Deno.serve(async (request) => {
         openaiApiKey ?? undefined,
         openaiBaseUrl,
         openaiModel,
-        anthropicApiKey ?? undefined,
-        anthropicBaseUrl,
-        anthropicModels,
         personaId,
         items,
         topSummary,

@@ -1,8 +1,8 @@
-import { isTerminalAnthropicError } from "../_shared/anthropic.ts";
 import { sanitizeGeneratedText } from "../_shared/content_safety.ts";
 import type { LLMGenerationMode } from "../_shared/cost_controls.ts";
 import { normalizeAssetUrl } from "../_shared/media.ts";
 import {
+  extractOpenAICompatibleError,
   extractOpenAICompatibleContent,
   formatOpenAICompatiblePayloadSummary,
 } from "../_shared/openai_compatible.ts";
@@ -200,9 +200,6 @@ async function generateSingleStarterText(
   openaiApiKey: string | undefined,
   openaiBaseUrl: string,
   openaiModel: string,
-  anthropicApiKey: string | undefined,
-  anthropicBaseUrl: string,
-  anthropicModels: string[],
   personaId: string,
   item: CandidateStarter,
   topSummary: string,
@@ -266,6 +263,10 @@ async function generateSingleStarterText(
 
       if (responsesRequest.ok) {
         const payload = await responsesRequest.json();
+        const providerError = extractOpenAICompatibleError(payload);
+        if (providerError) {
+          responsesError = providerError;
+        }
         const cleaned = cleanStarterText(
           extractOpenAICompatibleContent(payload),
         );
@@ -282,7 +283,8 @@ async function generateSingleStarterText(
           return cleaned.text;
         }
 
-        responsesError = formatOpenAICompatiblePayloadSummary(payload);
+        responsesError = responsesError ??
+          formatOpenAICompatiblePayloadSummary(payload);
         if (cleaned.blocked) {
           logProviderMetricFailure(
             metric,
@@ -318,6 +320,14 @@ async function generateSingleStarterText(
 
       if (openAIResponse.ok) {
         const payload = await openAIResponse.json();
+        const providerError = extractOpenAICompatibleError(payload);
+        if (providerError) {
+          logProviderMetricFailure(metric, providerError, {
+            apiPath: "chat_completions",
+            responsesError,
+          });
+          throw new Error(providerError);
+        }
         const cleaned = cleanStarterText(
           extractOpenAICompatibleContent(payload),
         );
@@ -363,7 +373,7 @@ async function generateSingleStarterText(
       }
     } catch (error) {
       logProviderMetricFailure(metric, error);
-      // Fall through to Anthropic and then deterministic fallback.
+      // Fall through to deterministic fallback.
     }
   } else {
     logProviderMetricSkipped(
@@ -376,115 +386,6 @@ async function generateSingleStarterText(
         reason: "missing_api_key",
       },
     );
-  }
-
-  if (anthropicApiKey) {
-    if (openaiApiKey) {
-      logProviderMetricFallback(
-        "message-starters",
-        "starter_text",
-        "openai_compatible",
-        "anthropic",
-        {
-          personaId,
-          eventId: item.event.id,
-          reason: "openai_unavailable_or_invalid",
-        },
-      );
-    }
-    for (const anthropicModel of anthropicModels) {
-      const metric = createProviderMetricContext(
-        "message-starters",
-        "starter_text",
-        "anthropic",
-        {
-          personaId,
-          eventId: item.event.id,
-          model: anthropicModel,
-        },
-      );
-      try {
-        const anthropicResponse = await fetch(
-          `${anthropicBaseUrl}/v1/messages`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": anthropicApiKey,
-              "anthropic-version": "2023-06-01",
-            },
-            body: JSON.stringify({
-              model: anthropicModel,
-              max_tokens: 120,
-              temperature: 0.4,
-              system,
-              messages: [{
-                role: "user",
-                content: prompt,
-              }],
-            }),
-          },
-        );
-
-        if (anthropicResponse.ok) {
-          const payload = await anthropicResponse.json();
-          const content = Array.isArray(payload.content)
-            ? payload.content
-              .filter((block: Record<string, unknown>) => block.type === "text")
-              .map((block: Record<string, unknown>) => asString(block.text))
-              .join(" ")
-              .trim()
-            : "";
-
-          const cleaned = cleanStarterText(content);
-          if (!cleaned.blocked && cleaned.text) {
-            logProviderMetricSuccess(metric);
-            if (cleaned.sanitized) {
-              logEdgeEvent("message-starters", "starter_text_sanitized", {
-                personaId,
-                eventId: item.event.id,
-                provider: "anthropic",
-                model: anthropicModel,
-                reasons: cleaned.reasons,
-              });
-            }
-            return cleaned.text;
-          }
-
-          if (cleaned.blocked) {
-            logProviderMetricFailure(
-              metric,
-              "starter text blocked by content safety",
-            );
-            logEdgeEvent("message-starters", "starter_text_blocked", {
-              personaId,
-              eventId: item.event.id,
-              provider: "anthropic",
-              model: anthropicModel,
-              reasons: cleaned.reasons,
-            });
-          }
-          continue;
-        }
-
-        const errorText = await anthropicResponse.text();
-        logProviderMetricFailure(metric, errorText);
-        if (isTerminalAnthropicError(errorText)) {
-          break;
-        }
-      } catch (error) {
-        logProviderMetricFailure(metric, error);
-        if (isTerminalAnthropicError(error)) {
-          break;
-        }
-      }
-    }
-  } else {
-    logProviderMetricSkipped("message-starters", "starter_text", "anthropic", {
-      personaId,
-      eventId: item.event.id,
-      reason: "missing_api_key",
-    });
   }
 
   logProviderMetricFallback(
@@ -505,9 +406,6 @@ export async function generateStarterTexts(
   openaiApiKey: string | undefined,
   openaiBaseUrl: string,
   openaiModel: string,
-  anthropicApiKey: string | undefined,
-  anthropicBaseUrl: string,
-  anthropicModels: string[],
   personaId: string,
   items: CandidateStarter[],
   topSummary: string,
@@ -532,9 +430,6 @@ export async function generateStarterTexts(
           openaiApiKey,
           openaiBaseUrl,
           openaiModel,
-          anthropicApiKey,
-          anthropicBaseUrl,
-          anthropicModels,
           personaId,
           item,
           topSummary,

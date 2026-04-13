@@ -40,12 +40,12 @@ Pipeline and ingestion functions:
 
 Provider metric coverage:
 
-- `generate-message` persona reply generation across `openai_compatible` / `anthropic`
+- `generate-message` persona reply generation via `openai_compatible`
 - `generate-message` message image generation via `nano_banana`
 - `generate-message` voice reply generation via `tts_async`
-- `message-starters` starter text generation across `openai_compatible` / `anthropic`
+- `message-starters` starter text generation via `openai_compatible`
 - `message-starters` starter image generation via `nano_banana`
-- `generate-post-interactions` interaction generation across `anthropic` / `openai_compatible`
+- `generate-post-interactions` interaction generation via `openai_compatible`
 - `ingest-x-posts` X ingestion actor attempts and fallback chain across Apify actors
 
 ## Operational Usage

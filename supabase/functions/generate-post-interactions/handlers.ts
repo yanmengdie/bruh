@@ -1,4 +1,3 @@
-import { logProviderMetricFallback } from "../_shared/provider_metrics.ts";
 import {
   fetchStoredState,
   mapStoredState,
@@ -18,10 +17,7 @@ import {
 import {
   generateInteractionsWithFallback,
   generateThreadReplyWithOpenAICompatible,
-  tryAnthropicReplyInteractions,
-  tryAnthropicSeedInteractions,
 } from "./providers.ts";
-import { logGenerationEvent } from "./helpers.ts";
 import type {
   SanitizedInteractionResult,
   StoredCommentRow,
@@ -29,9 +25,6 @@ import type {
 } from "./types.ts";
 
 export type InteractionProviderConfig = {
-  anthropicApiKey?: string;
-  anthropicBaseUrl: string;
-  anthropicModels: string[];
   openaiApiKey?: string;
   openaiBaseUrl: string;
   openaiModel: string;
@@ -87,26 +80,11 @@ async function generateSeedResult(
   allowedLikes: ReturnType<typeof buildAllowedLikes>,
   allowedCommenters: ReturnType<typeof pickSeedCommenters>,
 ): Promise<SanitizedInteractionResult | null> {
-  const anthropicResult = await tryAnthropicSeedInteractions(
-    providers.anthropicApiKey,
-    providers.anthropicBaseUrl,
-    providers.anthropicModels,
-    payload.personaId,
-    payload.postId,
-    payload.postContent,
-    payload.topic,
-    allowedLikes,
-    allowedCommenters,
-  );
-  if (anthropicResult) {
-    return anthropicResult;
-  }
-
   if (!providers.openaiApiKey) {
     return null;
   }
 
-  const fallback = await generateInteractionsWithFallback(
+  return await generateInteractionsWithFallback(
     providers.openaiApiKey,
     providers.openaiBaseUrl,
     providers.openaiModel,
@@ -119,25 +97,6 @@ async function generateSeedResult(
     allowedLikes,
     allowedCommenters,
   );
-  logProviderMetricFallback(
-    "generate-post-interactions",
-    "interaction_generation",
-    "anthropic",
-    "openai_compatible",
-    {
-      postId: payload.postId,
-      personaId: payload.personaId,
-      mode: "seed",
-      reason: "anthropic_unavailable_or_rejected",
-    },
-  );
-  logGenerationEvent("seed_provider_fallback", {
-    postId: payload.postId,
-    personaId: payload.personaId,
-    provider: "openai_compatible",
-    reason: "anthropic_unavailable_or_rejected",
-  });
-  return fallback;
 }
 
 async function generateReplyResult(
@@ -150,27 +109,11 @@ async function generateReplyResult(
   allowedCommenters: ReturnType<typeof pickReplyParticipants>,
 ): Promise<SanitizedInteractionResult | null> {
   const normalizedExistingComments = normalizeStoredComments(existingComments);
-  const anthropicResult = await tryAnthropicReplyInteractions(
-    providers.anthropicApiKey,
-    providers.anthropicBaseUrl,
-    providers.anthropicModels,
-    payload.personaId,
-    payload.postId,
-    payload.postContent,
-    payload.topic,
-    normalizedExistingComments,
-    payload.viewerComment,
-    allowedCommenters,
-  );
-  if (anthropicResult) {
-    return anthropicResult;
-  }
-
   if (!providers.openaiApiKey) {
     return null;
   }
 
-  const fallback = await generateInteractionsWithFallback(
+  return await generateInteractionsWithFallback(
     providers.openaiApiKey,
     providers.openaiBaseUrl,
     providers.openaiModel,
@@ -183,25 +126,6 @@ async function generateReplyResult(
     [],
     allowedCommenters,
   );
-  logProviderMetricFallback(
-    "generate-post-interactions",
-    "interaction_generation",
-    "anthropic",
-    "openai_compatible",
-    {
-      postId: payload.postId,
-      personaId: payload.personaId,
-      mode: "reply",
-      reason: "anthropic_unavailable_or_rejected",
-    },
-  );
-  logGenerationEvent("reply_provider_fallback", {
-    postId: payload.postId,
-    personaId: payload.personaId,
-    provider: "openai_compatible",
-    reason: "anthropic_unavailable_or_rejected",
-  });
-  return fallback;
 }
 
 export async function handleStatelessRequest(

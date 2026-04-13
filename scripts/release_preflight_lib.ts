@@ -47,9 +47,9 @@ const envRequirements: EnvRequirement[] = [
   },
   {
     name: "LLM provider",
-    description: "at least one persona reply/starter provider",
+    description: "persona reply, starter, and interaction generation",
     required: false,
-    keys: ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"],
+    keys: ["OPENAI_API_KEY"],
   },
   {
     name: "Nano Banana",

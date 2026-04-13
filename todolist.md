@@ -36,6 +36,8 @@
   已完成：补充 `persona_catalog_schema_test.ts`、`news_test.ts`、`fallbacks_test.ts` 三个 Deno 测试，以及 `scripts/api_contract_smoke.swift`、`scripts/content_graph_smoke.swift` 两个 Swift smoke 脚本，并新增 `scripts/run_p1_validation.sh` 一键跑通最小验证链路。
 - [x] 增加后端日志和错误分类，建立最基本的可观测性。
   已完成：新增 `supabase/functions/_shared/observability.ts`，为 `generate-message` 和 `message-starters` 增加 `requestId`、成功/失败结构化日志及 `errorCategory` 返回，便于后续按链路归因和统计异常类型。
+- [x] 收口文本生成 provider，统一到单一 OpenAI-compatible / DeepSeek 链路，移除 Anthropic 运行时依赖。
+  已完成：`generate-message`、`message-starters`、`generate-post-interactions` 三条文本链路已改为只读取 `OPENAI_*` 配置；补上 OpenAI-compatible 包装响应/错误解析，兼容 `body/result/data` 包装与 token 过期、限流等显式错误；线上 `OPENAI_API_KEY` 已更新为可用值，`message-starters` 与 `generate-post-interactions` 已重新部署，Anthropic secrets 也已从项目配置中移除。
 - [x] 明确数据库表职责，梳理 `source_posts`、`feed_items`、`news_events`、`persona_news_scores` 的写入和消费关系。
   已完成：在 `docs/architecture.md` 补充 `5. Backend Storage Responsibilities`，明确各表的生产者、消费者、生命周期和职责边界，减少后续 ingestion/feed/message 链路继续耦合。
 
