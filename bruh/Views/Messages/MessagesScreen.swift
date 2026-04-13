@@ -1315,6 +1315,7 @@ private final class MessageAudioPlaybackController: NSObject, ObservableObject, 
     private var player: AVAudioPlayer?
     private var prepareTask: Task<Void, Never>?
     private var progressTimer: Timer?
+    private var prepareGeneration = 0
 
     func resolveDurationIfNeeded(
         for messageId: String,
@@ -1342,7 +1343,7 @@ private final class MessageAudioPlaybackController: NSObject, ObservableObject, 
 
     func togglePlayback(for messageId: String, url: URL) {
         if loadingMessageId == messageId {
-            prepareTask?.cancel()
+            invalidatePreparation()
             cleanup()
             return
         }
@@ -1369,6 +1370,8 @@ private final class MessageAudioPlaybackController: NSObject, ObservableObject, 
         progress = 0
         isPlaying = false
         lastErrorMessage = nil
+        prepareGeneration += 1
+        let expectedGeneration = prepareGeneration
 
         prepareTask = Task { [weak self] in
             guard let self else { return }
@@ -1378,8 +1381,11 @@ private final class MessageAudioPlaybackController: NSObject, ObservableObject, 
                 print("[Voice] Preparing playback for \(messageId)")
                 let player = try await preparePlayer(for: messageId, remoteURL: url)
                 guard !Task.isCancelled else { return }
+                guard self.prepareGeneration == expectedGeneration else { return }
+                guard self.activeMessageId == messageId else { return }
 
                 self.player = player
+                self.prepareTask = nil
                 self.loadingMessageId = nil
                 self.resolvedDurations[messageId] = player.duration
 
@@ -1392,15 +1398,16 @@ private final class MessageAudioPlaybackController: NSObject, ObservableObject, 
                 }
             } catch {
                 guard !Task.isCancelled else { return }
+                guard self.prepareGeneration == expectedGeneration else { return }
                 print("[Voice] Playback failed for \(messageId): \(error.localizedDescription)")
+                self.prepareTask = nil
                 self.failPlayback(userFacingErrorMessage(for: error))
             }
         }
     }
 
     func cleanup(resetState: Bool = true) {
-        prepareTask?.cancel()
-        prepareTask = nil
+        invalidatePreparation()
 
         stopProgressTimer()
         player?.pause()
@@ -1420,6 +1427,12 @@ private final class MessageAudioPlaybackController: NSObject, ObservableObject, 
 
     deinit {
         prepareTask?.cancel()
+    }
+
+    private func invalidatePreparation() {
+        prepareGeneration += 1
+        prepareTask?.cancel()
+        prepareTask = nil
     }
 
     private func configureAudioSession() throws {
@@ -1613,14 +1626,18 @@ private final class MessageAudioPlaybackController: NSObject, ObservableObject, 
     }
 
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        guard let currentPlayer = self.player, player === currentPlayer else { return }
         stopProgressTimer()
+        prepareTask = nil
         self.player = nil
+        activeMessageId = nil
         progress = 0
         isPlaying = false
         loadingMessageId = nil
     }
 
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        guard let currentPlayer = self.player, player === currentPlayer else { return }
         failPlayback(error?.localizedDescription ?? "Voice playback failed to decode.")
     }
 }

@@ -161,6 +161,8 @@
   已完成：新增 `ScopedUserDefaultsStore`，把 `ContentView` 的 onboarding/home mode/feed&album badge 时间戳、`SettingsScreen` 的 home mode、`AddBruhView` 的 pending names、`OnboardingInterestStore` 的兴趣暂存、`InterestPreferences` 的旧兴趣偏好、legacy invite 状态迁移键以及 `CurrentUserProfileStore` 的头像备份统一切到按 `AppEnvironment` 作用域隔离的 key，并保留从历史全局 key 自动迁移，避免切环境时把已有状态直接清空。同时修复 `StarterMessageRemoteSync` 在复用 canonical starter 时没有覆盖 `createdAt` 的问题，现在远端 starter 更新后，线程预览时间、Home/消息排序与 content graph 同步时间都能保持一致。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./run.sh "iPhone 17"`。
 - [x] 优化 `ContactsView` 的联系人目录与邀请派生状态计算路径，减少联系人、persona 和 invitation 的重复线性扫描。
   已完成：`ContactsView` 现在会一次性构建 `ContactsDerivedState` 与 `InviteContext`，把联系人搜索/排序/分组、邀请 persona 匹配、pending invitation 列表、locked candidate 名单和字母索引 section key 收口到单次派生计算，不再在 `body`、`NewBruhView` 导航和 invite frontier 归一化过程中反复 `filter` / `first(where:)` / `sorted`。同时 `insertIncomingMessage()` 已改为复用 `MessageThreadStore.ensureThread(...)` 与统一 unread/thread preview 更新逻辑，去掉本地重复 thread fetch/create 分支。对应改动保持 UI 行为不变，并已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./scripts/run_p1_validation.sh`。
+- [x] 修复 `MessagesScreen` 语音播放 prepare/finish 回调竞态，避免快速切换语音时旧任务或旧播放器覆盖当前状态。
+  已完成：`MessageAudioPlaybackController` 现在为异步 prepare 引入 generation 校验，切换/取消时会统一失效旧 prepare task；同时在 `AVAudioPlayerDelegate` 回调里只处理当前活跃播放器，并在播放结束后清空 `activeMessageId`，避免旧播放器完成回调误清理新状态，或同一条消息结束后仍残留“激活中”状态。对应改动已通过 `xcodebuild -project bruh.xcodeproj -scheme bruh -destination 'platform=iOS Simulator,name=iPhone 17' build` 和 `./run.sh "iPhone 17"`。
 
 ### P9 真实环境验证
 
