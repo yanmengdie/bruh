@@ -1,4 +1,10 @@
 import { isTerminalAnthropicError } from "../_shared/anthropic.ts";
+import {
+  extractOpenAICompatibleError,
+  extractOpenAICompatibleContent,
+  formatOpenAICompatiblePayloadSummary,
+  isTerminalOpenAICompatibleError,
+} from "../_shared/openai_compatible.ts";
 import { logEdgeEvent } from "../_shared/observability.ts";
 import {
   createProviderMetricContext,
@@ -94,20 +100,6 @@ async function generateWithAnthropic(
   return content;
 }
 
-function extractOpenAICompatibleContent(value: unknown) {
-  if (typeof value === "string") return value.trim();
-  if (!Array.isArray(value)) return "";
-
-  return value
-    .map((item) => {
-      const block = item as Record<string, unknown>;
-      return asString(block.text ?? block.content);
-    })
-    .filter((item) => item.length > 0)
-    .join("\n")
-    .trim();
-}
-
 async function generateWithOpenAICompatible(
   apiKey: string,
   baseUrl: string,
@@ -118,6 +110,48 @@ async function generateWithOpenAICompatible(
   conversation: ConversationTurn[],
   userMessage: string,
 ) {
+  const providerMessages = buildProviderMessages(
+    persona,
+    styleGuide,
+    conversation,
+    userMessage,
+  );
+  let responsesError: string | null = null;
+
+  const responsesRequest = await fetch(`${baseUrl}/responses`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      instructions: system,
+      input: providerMessages.map((message) => ({
+        role: message.role,
+        content: [{ type: "input_text", text: message.content }],
+      })),
+      max_output_tokens: 120,
+      temperature: 0.85,
+    }),
+  });
+
+  if (responsesRequest.ok) {
+    const payload = await responsesRequest.json();
+    const providerError = extractOpenAICompatibleError(payload);
+    if (providerError) {
+      throw new Error(providerError);
+    }
+    const content = extractOpenAICompatibleContent(payload);
+    if (content) {
+      return content;
+    }
+    responsesError =
+      `responses empty: ${formatOpenAICompatiblePayloadSummary(payload)}`;
+  } else {
+    responsesError = `responses failed: ${await responsesRequest.text()}`;
+  }
+
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -128,12 +162,7 @@ async function generateWithOpenAICompatible(
       model,
       messages: [
         { role: "system", content: system },
-        ...buildProviderMessages(
-          persona,
-          styleGuide,
-          conversation,
-          userMessage,
-        ),
+        ...providerMessages,
       ],
       max_tokens: 120,
       temperature: 0.85,
@@ -147,11 +176,18 @@ async function generateWithOpenAICompatible(
   }
 
   const payload = await response.json();
-  const content = extractOpenAICompatibleContent(
-    payload.choices?.[0]?.message?.content,
-  );
+  const providerError = extractOpenAICompatibleError(payload);
+  if (providerError) {
+    throw new Error(providerError);
+  }
+  const content = extractOpenAICompatibleContent(payload);
   if (!content) {
-    throw new Error("OpenAI-compatible provider returned empty content");
+    const summary = formatOpenAICompatiblePayloadSummary(payload);
+    throw new Error(
+      `OpenAI-compatible provider returned empty content. chat=${summary}${
+        responsesError ? `; ${responsesError}` : ""
+      }`,
+    );
   }
 
   return content;
@@ -283,6 +319,9 @@ export async function generatePersonaReplyWithProviders(
           model: openaiModel,
           error: lastError.message,
         });
+        if (isTerminalOpenAICompatibleError(lastError)) {
+          break;
+        }
       }
 
       if (!content && attempt < MAX_GENERATION_RETRIES) {

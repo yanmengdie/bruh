@@ -2,6 +2,10 @@ import { isTerminalAnthropicError } from "../_shared/anthropic.ts";
 import { sanitizeGeneratedText } from "../_shared/content_safety.ts";
 import type { LLMGenerationMode } from "../_shared/cost_controls.ts";
 import { normalizeAssetUrl } from "../_shared/media.ts";
+import {
+  extractOpenAICompatibleContent,
+  formatOpenAICompatiblePayloadSummary,
+} from "../_shared/openai_compatible.ts";
 import { asString, defaultStarterMessage } from "../_shared/news.ts";
 import { logEdgeError, logEdgeEvent } from "../_shared/observability.ts";
 import {
@@ -57,20 +61,6 @@ function safeStarterFallback(personaId: string, title: string) {
   return persona?.primaryLanguage === "en"
     ? "The real implication here is bigger than the headline."
     : "这事真正的影响比 headline 还大。";
-}
-
-function extractOpenAICompatibleContent(value: unknown) {
-  if (typeof value === "string") return value.trim();
-  if (!Array.isArray(value)) return "";
-
-  return value
-    .map((item) => {
-      const block = item as Record<string, unknown>;
-      return asString(block.text ?? block.content);
-    })
-    .filter((item) => item.length > 0)
-    .join("\n")
-    .trim();
 }
 
 function extractImageUrl(payload: Record<string, unknown>) {
@@ -254,6 +244,61 @@ async function generateSingleStarterText(
       },
     );
     try {
+      const responsesRequest = await fetch(`${openaiBaseUrl}/responses`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiApiKey}`,
+        },
+        body: JSON.stringify({
+          model: openaiModel,
+          instructions: system,
+          input: [{
+            role: "user",
+            content: [{ type: "input_text", text: prompt }],
+          }],
+          max_output_tokens: 120,
+          temperature: 0.4,
+        }),
+      });
+
+      let responsesError: string | null = null;
+
+      if (responsesRequest.ok) {
+        const payload = await responsesRequest.json();
+        const cleaned = cleanStarterText(
+          extractOpenAICompatibleContent(payload),
+        );
+        if (!cleaned.blocked && cleaned.text) {
+          logProviderMetricSuccess(metric, { apiPath: "responses" });
+          if (cleaned.sanitized) {
+            logEdgeEvent("message-starters", "starter_text_sanitized", {
+              personaId,
+              eventId: item.event.id,
+              provider: "openai_compatible",
+              reasons: cleaned.reasons,
+            });
+          }
+          return cleaned.text;
+        }
+
+        responsesError = formatOpenAICompatiblePayloadSummary(payload);
+        if (cleaned.blocked) {
+          logProviderMetricFailure(
+            metric,
+            "starter text blocked by content safety",
+          );
+          logEdgeEvent("message-starters", "starter_text_blocked", {
+            personaId,
+            eventId: item.event.id,
+            provider: "openai_compatible",
+            reasons: cleaned.reasons,
+          });
+        }
+      } else {
+        responsesError = await responsesRequest.text();
+      }
+
       const openAIResponse = await fetch(`${openaiBaseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -274,12 +319,10 @@ async function generateSingleStarterText(
       if (openAIResponse.ok) {
         const payload = await openAIResponse.json();
         const cleaned = cleanStarterText(
-          extractOpenAICompatibleContent(
-            payload.choices?.[0]?.message?.content,
-          ),
+          extractOpenAICompatibleContent(payload),
         );
         if (!cleaned.blocked && cleaned.text) {
-          logProviderMetricSuccess(metric);
+          logProviderMetricSuccess(metric, { apiPath: "chat_completions" });
           if (cleaned.sanitized) {
             logEdgeEvent("message-starters", "starter_text_sanitized", {
               personaId,
@@ -295,6 +338,7 @@ async function generateSingleStarterText(
           logProviderMetricFailure(
             metric,
             "starter text blocked by content safety",
+            { apiPath: "chat_completions" },
           );
           logEdgeEvent("message-starters", "starter_text_blocked", {
             personaId,
@@ -302,9 +346,20 @@ async function generateSingleStarterText(
             provider: "openai_compatible",
             reasons: cleaned.reasons,
           });
+        } else {
+          logProviderMetricFailure(
+            metric,
+            `OpenAI-compatible provider returned empty content. chat=${
+              formatOpenAICompatiblePayloadSummary(payload)
+            }${responsesError ? `; responses=${responsesError}` : ""}`,
+            { apiPath: "chat_completions" },
+          );
         }
       } else {
-        logProviderMetricFailure(metric, await openAIResponse.text());
+        logProviderMetricFailure(metric, await openAIResponse.text(), {
+          apiPath: "chat_completions",
+          responsesError,
+        });
       }
     } catch (error) {
       logProviderMetricFailure(metric, error);

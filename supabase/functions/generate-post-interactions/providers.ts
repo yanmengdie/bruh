@@ -1,4 +1,5 @@
 import { isTerminalAnthropicError } from "../_shared/anthropic.ts";
+import { extractOpenAICompatibleContent } from "../_shared/openai_compatible.ts";
 import {
   createProviderMetricContext,
   logProviderMetricFailure,
@@ -85,16 +86,7 @@ export async function generateTextWithOpenAICompatible(
 
   if (responsesRequest.ok) {
     const payload = await responsesRequest.json();
-    const content = Array.isArray(payload.output)
-      ? payload.output
-        .flatMap((item: Record<string, unknown>) =>
-          Array.isArray(item.content) ? item.content : []
-        )
-        .filter((item: Record<string, unknown>) => item.type === "output_text")
-        .map((item: Record<string, unknown>) => asString(item.text))
-        .join("\n")
-        .trim()
-      : "";
+    const content = extractOpenAICompatibleContent(payload);
 
     if (content) {
       const cleaned = cleanGeneratedText(content);
@@ -128,7 +120,7 @@ export async function generateTextWithOpenAICompatible(
   }
 
   const payload = await chatResponse.json();
-  const content = asString(payload.choices?.[0]?.message?.content);
+  const content = extractOpenAICompatibleContent(payload);
   const cleaned = cleanGeneratedText(content);
   if (!cleaned) {
     const error = new Error(
