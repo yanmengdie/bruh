@@ -241,10 +241,12 @@ export function buildVoicePlan(
   options: {
     ttsMode?: TTSMode
     maxCharacters?: number
+    automaticRepliesEnabled?: boolean
   } = {},
 ): VoicePlan {
   const ttsMode = options.ttsMode ?? "enabled"
   const maxCharacters = options.maxCharacters ?? 180
+  const automaticRepliesEnabled = options.automaticRepliesEnabled ?? true
   const speakerId = resolveVoiceSpeakerId(persona)
   const trimmed = content.trim()
   const shouldGenerateVoice = ttsMode !== "disabled" &&
@@ -252,7 +254,7 @@ export function buildVoicePlan(
     trimmed.length > 0 &&
     trimmed.length <= maxCharacters &&
     isConfiguredVoiceSpeakerId(speakerId) &&
-    (forceVoice || (ttsMode !== "force_only" && shouldReplyWithVoice(persona.personaId, content, requestImage)))
+    (forceVoice || (automaticRepliesEnabled && ttsMode !== "force_only" && shouldReplyWithVoice(persona.personaId, content, requestImage)))
 
   if (!shouldGenerateVoice) {
     return {

@@ -17,6 +17,7 @@ import { buildImagePrompt } from "../_shared/image_prompt.ts";
 import {
   classifyError,
   createObservationContext,
+  type EdgeErrorCategory,
   logEdgeError,
   logEdgeEvent,
   logEdgeFailure,
@@ -27,12 +28,10 @@ import {
 import {
   createProviderMetricContext,
   logProviderMetricFailure,
-  logProviderMetricFallback,
   logProviderMetricSkipped,
   logProviderMetricSuccess,
 } from "../_shared/provider_metrics.ts";
 import { resolvePersonaById } from "../_shared/personas.ts";
-import { fallbackPersonaReply } from "./fallbacks.ts";
 import { asString, normalizeBoolean } from "./helpers.ts";
 import {
   buildCombinedNewsContext,
@@ -72,10 +71,86 @@ function extractImageUrl(payload: Record<string, unknown>) {
   return asString(payload.url ?? payload.image_url ?? payload.imageUrl);
 }
 
-function genericSafeReply(primaryLanguage: string) {
-  return primaryLanguage === "en"
-    ? "Say the concrete part first."
-    : "先说具体一点。";
+class EdgeResponseError extends Error {
+  readonly status: number;
+  readonly errorCategory: EdgeErrorCategory;
+
+  constructor(
+    message: string,
+    status: number,
+    errorCategory: EdgeErrorCategory,
+  ) {
+    super(message);
+    this.name = "EdgeResponseError";
+    this.status = status;
+    this.errorCategory = errorCategory;
+  }
+}
+
+function normalizeProviderErrorMessage(message: string) {
+  return message
+    .replace(/^\[[^\]]+\]\s*/u, "")
+    .replace(/^[a-z0-9_/-]+\s*:\s*/iu, "")
+    .trim();
+}
+
+function resolveGenerationFailure(
+  providerErrors: string[],
+  lastError: Error | null,
+) {
+  const message = normalizeProviderErrorMessage(
+    lastError?.message ??
+      providerErrors.at(-1) ??
+      "Provider returned no usable content.",
+  );
+  const lower = message.toLowerCase();
+
+  if (
+    lower.includes("api key missing") ||
+    lower.includes("missing environment") ||
+    lower.includes("llm generation disabled") ||
+    lower.includes("disabled by bruh_llm_generation_mode")
+  ) {
+    return new EdgeResponseError(message, 503, "config");
+  }
+
+  if (
+    lower.includes("token has expired") ||
+    lower.includes("invalid api key") ||
+    lower.includes("incorrect api key") ||
+    lower.includes("authentication") ||
+    lower.includes("unauthorized") ||
+    lower.includes("forbidden") ||
+    lower.includes("returned status 401") ||
+    lower.includes("returned status 403") ||
+    lower.includes("returned status 439")
+  ) {
+    return new EdgeResponseError(message, 401, "auth");
+  }
+
+  if (
+    lower.includes("rate limit") ||
+    lower.includes("too many requests") ||
+    lower.includes("exceeded your current rate limit") ||
+    lower.includes("returned status 429") ||
+    lower.includes("returned status 449")
+  ) {
+    return new EdgeResponseError(message, 429, "provider");
+  }
+
+  if (
+    lower.includes("timed out") ||
+    lower.includes("timeout") ||
+    lower.includes("aborted")
+  ) {
+    return new EdgeResponseError(message, 504, "timeout");
+  }
+
+  return new EdgeResponseError(message, 502, "provider");
+}
+
+function formatSafetyReasons(reasons: string[]) {
+  return reasons.length > 0 ? reasons.join(", ") : "unknown_reason";
 }
 
 async function generateImageWithNanoBanana(
@@ -177,10 +252,8 @@ Deno.serve(async (request) => {
       "nano-banana",
     );
     const voiceApiKey = asString(getOptionalScopedEnv("VOICE_API_KEY")) || null;
-    const voiceApiBaseUrl = (
-      getOptionalScopedEnv("VOICE_API_BASE_URL") ??
-        "https://uu36540-775678b2e148.bjb2.seetacloud.com:8443/api"
-    ).replace(/\/$/, "");
+    const voiceApiBaseUrl =
+      asString(getOptionalScopedEnv("VOICE_API_BASE_URL")) || null;
 
     const body = await request.json().catch(() => ({})) as Record<
       string,
@@ -347,77 +420,45 @@ Deno.serve(async (request) => {
 
     let content = generation.content ?? "";
     const providerErrors = generation.providerErrors;
-    let usedFallback = false;
-    let contentSource: "provider" | "fallback" | "generic" = "provider";
     const lastError = generation.lastError;
     const usedProvider = generation.usedProvider;
     const usedOpenAIModel = generation.usedOpenAIModel;
     const usedAnthropicModel = generation.usedAnthropicModel;
+    const usedFallback = false;
 
     if (!content) {
-      content = fallbackPersonaReply(
-        persona,
-        userMessage,
-        selected,
-        combinedNewsContext,
-      );
-      usedFallback = true;
-      contentSource = "fallback";
-      logProviderMetricFallback(
-        "generate-message",
-        "persona_reply",
-        generation.usedProvider ?? "provider_chain",
-        "deterministic",
-        {
-          requestId,
-          personaId,
-          providerErrorCount: providerErrors.length,
-        },
-      );
-      logEdgeEvent("generate-message", "message_fallback_used", {
+      logEdgeEvent("generate-message", "message_generation_failed", {
         requestId,
         personaId,
         lastError: lastError?.message ?? null,
         selectedContextIds,
         relevantNewsIds,
+        providerErrors,
       });
+      throw resolveGenerationFailure(providerErrors, lastError);
     }
 
     const contentSafety = sanitizeGeneratedText(content, { maxLength: 240 });
     if (contentSafety.blocked) {
-      const blockedSource = contentSource;
-      const fallbackCandidate = contentSource === "provider"
-        ? fallbackPersonaReply(
-          persona,
-          userMessage,
-          selected,
-          combinedNewsContext,
-        )
-        : genericSafeReply(persona.primaryLanguage);
-      const fallbackSafety = sanitizeGeneratedText(fallbackCandidate, {
-        maxLength: 240,
-      });
-
-      content = fallbackSafety.blocked || !fallbackSafety.text
-        ? genericSafeReply(persona.primaryLanguage)
-        : fallbackSafety.text;
-      contentSource = contentSource === "provider" ? "fallback" : "generic";
-      usedFallback = true;
-
       logEdgeEvent("generate-message", "content_safety_blocked", {
         requestId,
         personaId,
-        source: blockedSource,
+        source: "provider",
         reasons: contentSafety.reasons,
         originalLength: contentSafety.originalLength,
       });
+      throw new EdgeResponseError(
+        `Provider returned blocked content: ${formatSafetyReasons(contentSafety.reasons)}`,
+        502,
+        "provider",
+      );
     } else {
       content = contentSafety.text;
       if (contentSafety.sanitized) {
         logEdgeEvent("generate-message", "content_safety_sanitized", {
           requestId,
           personaId,
-          source: contentSource,
+          source: "provider",
           reasons: contentSafety.reasons,
           originalLength: contentSafety.originalLength,
           finalLength: contentSafety.finalLength,
@@ -482,9 +523,10 @@ Deno.serve(async (request) => {
       {
         ttsMode: costControls.ttsMode,
         maxCharacters: costControls.maxTTSCharacters,
+        automaticRepliesEnabled: false,
       },
     );
-    if (voicePlan.shouldGenerate) {
+    if (voicePlan.shouldGenerate && voiceApiBaseUrl) {
       const voiceMetric = createProviderMetricContext(
         "generate-message",
         "voice_reply",
@@ -521,6 +563,17 @@ Deno.serve(async (request) => {
           personaId,
         });
       }
+    } else if (voicePlan.shouldGenerate) {
+      logProviderMetricSkipped(
+        "generate-message",
+        "voice_reply",
+        "tts_async",
+        {
+          requestId,
+          personaId,
+          reason: "missing_base_url",
+        },
+      );
     } else if (forceVoice || costControls.ttsMode !== "disabled") {
       logProviderMetricSkipped(
         "generate-message",
@@ -559,7 +612,7 @@ Deno.serve(async (request) => {
         audioUrl,
         audioDuration,
         voiceLabel,
-        audioError,
+        audioError: debugProviders ? audioError : null,
         audioOnly,
         sourceUrl,
         sourcePostIds: [...selectedContextIds, ...relevantNewsIds],
@@ -583,16 +636,21 @@ Deno.serve(async (request) => {
       { headers: responseHeaders },
     );
   } catch (error) {
-    const errorCategory = classifyError(error);
+    const status = error instanceof EdgeResponseError ? error.status : 500;
+    const errorCategory = error instanceof EdgeResponseError
+      ? error.errorCategory
+      : classifyError(error);
     logEdgeFailure(observation, "request_failed", error, {
       clientVersion,
+      status,
+      errorCategory,
     });
     return Response.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",
         errorCategory,
       },
-      { status: 500, headers: responseHeaders },
+      { status, headers: responseHeaders },
     );
   }
 });

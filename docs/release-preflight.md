@@ -31,6 +31,7 @@ Environment variables:
 - recommended: `OPENAI_API_KEY`
 - recommended: `NANO_BANANA_API_KEY`
 - recommended: `VOICE_API_KEY`
+- recommended: `VOICE_API_BASE_URL`
 - recommended: `APIFY_TOKEN`
 
 Critical backend tables:

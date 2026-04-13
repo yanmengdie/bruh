@@ -83,17 +83,18 @@ struct MessageThreadStore {
     }
 
     func shouldForceVoiceReply(for threadId: String, modelContext: ModelContext) throws -> Bool {
-        var descriptor = FetchDescriptor<PersonaMessage>(
-            predicate: #Predicate { $0.threadId == threadId && $0.isIncoming },
-            sortBy: [SortDescriptor(\PersonaMessage.createdAt, order: .reverse)]
+        let descriptor = FetchDescriptor<PersonaMessage>(
+            predicate: #Predicate {
+                $0.threadId == threadId &&
+                $0.isIncoming &&
+                $0.isSeedMessage == false
+            }
         )
-        descriptor.fetchLimit = 1
 
-        guard let latestIncoming = try modelContext.fetch(descriptor).first else {
-            return true
-        }
+        let replyCount = try modelContext.fetch(descriptor).count
 
-        return !MessageServiceSupport.hasPlayableAudio(latestIncoming)
+        // Alternate voice replies instead of retrying voice on every text reply.
+        return replyCount % 2 == 1
     }
 
     func starterMessage(for personaId: String, modelContext: ModelContext) throws -> PersonaMessage? {

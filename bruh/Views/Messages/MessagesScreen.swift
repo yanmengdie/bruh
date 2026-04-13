@@ -838,7 +838,6 @@ private struct MessageDetailView: View {
                         incomingAvatar
                         messageContentView(
                             content: content,
-                            audioError: message.audioError,
                             isIncoming: true,
                             deliveryState: message.deliveryState,
                             themeColor: personaTheme
@@ -854,7 +853,6 @@ private struct MessageDetailView: View {
                     Spacer(minLength: 40)
                     messageContentView(
                         content: content,
-                        audioError: message.audioError,
                         isIncoming: false,
                         deliveryState: message.deliveryState,
                         themeColor: personaTheme
@@ -876,7 +874,6 @@ private struct MessageDetailView: View {
     @ViewBuilder
     private func messageContentView(
         content: MessageContent,
-        audioError: String?,
         isIncoming: Bool,
         deliveryState: String,
         themeColor: Color
@@ -907,14 +904,6 @@ private struct MessageDetailView: View {
                     deliveryState: deliveryState,
                     themeColor: themeColor
                 )
-            }
-
-            if let voiceError = normalizedVoiceError(audioError), !content.hasPlayableAudio {
-                Text("语音未生成：\(voiceError)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.red.opacity(0.88))
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: isIncoming ? .leading : .trailing)
             }
         }
     }
@@ -957,13 +946,6 @@ private struct MessageDetailView: View {
 
     private var incomingAvatar: some View {
         avatarCircle(size: AppTheme.messageIncomingAvatarSize)
-    }
-
-    private func normalizedVoiceError(_ value: String?) -> String? {
-        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
-            return nil
-        }
-        return trimmed
     }
 
     private func bubble(
@@ -1231,13 +1213,6 @@ private enum MessageContent {
     case text(String, imageUrl: URL?)
     case webPreview(URL)
     case audio(URL, duration: TimeInterval?, messageId: String)
-
-    var hasPlayableAudio: Bool {
-        if case .audio = self {
-            return true
-        }
-        return false
-    }
 }
 
 private struct TypingIndicatorBubble: View {

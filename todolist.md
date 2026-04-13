@@ -38,6 +38,8 @@
   已完成：新增 `supabase/functions/_shared/observability.ts`，为 `generate-message` 和 `message-starters` 增加 `requestId`、成功/失败结构化日志及 `errorCategory` 返回，便于后续按链路归因和统计异常类型。
 - [x] 收口文本生成 provider，统一到单一 OpenAI-compatible / DeepSeek 链路，移除 Anthropic 运行时依赖。
   已完成：`generate-message`、`message-starters`、`generate-post-interactions` 三条文本链路已改为只读取 `OPENAI_*` 配置；补上 OpenAI-compatible 包装响应/错误解析，兼容 `body/result/data` 包装与 token 过期、限流等显式错误；线上 `OPENAI_API_KEY` 已更新为可用值，`message-starters` 与 `generate-post-interactions` 已重新部署，Anthropic secrets 也已从项目配置中移除。
+- [x] 收口聊天链路的错误与语音策略，去掉假回复，降低 TTS 对主链路的干扰。
+  已完成：`generate-message` 不再在 provider 失败、限流、鉴权、空返回或安全层拦截时合成 deterministic fallback 文本，而是直接返回结构化 `error/errorCategory`；客户端消息发送失败时因此会保留真实错误，不再插入假 incoming reply。`MessageThreadStore` 已改为按非 seed incoming message 稳定交替语音节奏，约每两条回复尝试一条语音；`MessagesScreen` 不再把后台 TTS 失败露成用户可见错误。线上同时确认当前项目未配置 `VOICE_API_BASE_URL`，旧默认地址实际返回 404；现已改成未配置时直接跳过 TTS，不再白打无效请求，并补充发布前环境检查说明。
 - [x] 明确数据库表职责，梳理 `source_posts`、`feed_items`、`news_events`、`persona_news_scores` 的写入和消费关系。
   已完成：在 `docs/architecture.md` 补充 `5. Backend Storage Responsibilities`，明确各表的生产者、消费者、生命周期和职责边界，减少后续 ingestion/feed/message 链路继续耦合。
 
@@ -54,7 +56,7 @@
 - [x] 增加 feature flag，方便后续灰度 persona、排序、starter 策略。
   已完成：新增 `supabase/functions/_shared/feature_flags.ts` 和 `feature_flags_test.ts`，统一解析 `BRUH_ENABLED_PERSONA_IDS`、`BRUH_STARTER_SELECTION_STRATEGY`、`BRUH_STARTER_IMAGE_MODE`、`BRUH_STARTER_SOURCE_URL_MODE`、`BRUH_FEED_READ_SOURCE`、`BRUH_FEED_RANKING_STRATEGY` 六类后端 feature flag，默认值保持现状不变；`build-news-events`、`message-starters`、`feed` 已接入该层，支持 persona allowlist、starter 策略回退、feed 数据源切换和排序实验；新增 `docs/feature-flags.md` 说明 rollout 方式。
 - [x] 增加成本控制和降级策略，覆盖 LLM、TTS、抓取链路。
-  已完成：新增 `supabase/functions/_shared/cost_controls.ts` 和 `cost_controls_test.ts`，统一解析 `BRUH_LLM_GENERATION_MODE`、`BRUH_TTS_MODE`、`BRUH_TTS_MAX_CHARACTERS`、`BRUH_MESSAGE_IMAGE_MODE`、`BRUH_X_INGEST_MODE`、`BRUH_X_INGEST_MAX_USERNAMES_PER_RUN`、`BRUH_X_INGEST_MAX_POSTS_PER_USER` 七类成本控制开关；`generate-message` 现在支持 LLM fallback-only、TTS 降级和消息图片 kill switch，`message-starters` 支持直接退回 deterministic starter 文案，`ingest-x-posts` 支持整条抓取链路停用和硬限流；新增 `docs/cost-controls.md` 说明降级策略和 rollout 示例。
+  已完成：新增 `supabase/functions/_shared/cost_controls.ts` 和 `cost_controls_test.ts`，统一解析 `BRUH_LLM_GENERATION_MODE`、`BRUH_TTS_MODE`、`BRUH_TTS_MAX_CHARACTERS`、`BRUH_MESSAGE_IMAGE_MODE`、`BRUH_X_INGEST_MODE`、`BRUH_X_INGEST_MAX_USERNAMES_PER_RUN`、`BRUH_X_INGEST_MAX_POSTS_PER_USER` 七类成本控制开关；`generate-message` 现在支持 LLM/TTS/消息图片 kill switch，并在文本 provider 不可用时直接返回结构化错误而不是假回复；`message-starters` 支持直接退回 deterministic starter 文案，`ingest-x-posts` 支持整条抓取链路停用和硬限流；新增 `docs/cost-controls.md` 说明降级策略和 rollout 示例。
 - [x] 做安全清理、数据生命周期治理和开发文档沉淀。
   已完成：新增 `scripts/check_sensitive_strings.sh` 并接入 CI 与本地验证脚本，建立最小 secret hygiene 基线；新增 `supabase/migrations/0019_backend_retention_cleanup.sql`，提供 service-role 手动执行的 `run_backend_retention_cleanup(...)` 清理入口，覆盖 `source_posts/feed_items`、`news_events/persona_news_scores/news_event_articles`、`news_articles`、`pipeline_job_locks` 四类后端数据；新增 `docs/security-and-lifecycle.md`，把安全约束、保留窗口和清理 runbook 沉淀下来。
 
@@ -89,7 +91,7 @@
 - [x] 做安全治理，清理硬编码配置，检查脚本里潜在敏感信息，梳理 publishable key 和内部服务边界。
   已完成：前面阶段已经去掉 `scripts/ingest_x.py` 的硬编码 prod 凭据并建立 `check_sensitive_strings.sh`，本轮继续补上 `scripts/check_client_boundary.sh`，专门扫描 `bruh/` 和 `bruh.xcodeproj/project.pbxproj`，阻止 `SERVICE_ROLE_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`VOICE_API_KEY`、`NANO_BANANA_API_KEY`、`APIFY_TOKEN` 等服务端密钥或 provider 凭据进入 iOS app surface；同时在 `docs/security-and-lifecycle.md` 明确只有 publishable / anon Supabase key 可以出现在客户端，其余密钥必须留在 backend。该检查已接入本地验证脚本和 CI。
 - [x] 做内容治理和风控，生成内容、persona 回复、外部抓取内容都加最基础的审核和异常拦截层。
-  已完成：新增 `supabase/functions/_shared/content_safety.ts` 和 `content_safety_test.ts`，统一清理控制字符、普通 HTML、危险脚本/markup、明显 prompt injection 和模型自我泄露语句；`generate-message`、`message-starters`、`generate-post-interactions` 现在会在返回前先过共享安全层，命中异常时回退到现有 deterministic fallback，不改 UI。`ingest-top-news`、`ingest-x-posts`、`ingest-xhs-posts` 也已在入库前接入同一套规则，遇到危险内容直接拦截，普通脏数据则做裁剪/清洗并记录结构化日志；新增 `docs/content-governance.md` 说明策略，并把测试接入 CI 与本地验证脚本。
+  已完成：新增 `supabase/functions/_shared/content_safety.ts` 和 `content_safety_test.ts`，统一清理控制字符、普通 HTML、危险脚本/markup、明显 prompt injection 和模型自我泄露语句；`generate-message`、`message-starters`、`generate-post-interactions` 现在会在返回前先过共享安全层，其中 `generate-message` 命中异常时会直接返回结构化 provider 错误，不再伪造聊天回复，其余链路仍按原有 fallback 或拦截策略处理。`ingest-top-news`、`ingest-x-posts`、`ingest-xhs-posts` 也已在入库前接入同一套规则，遇到危险内容直接拦截，普通脏数据则做裁剪/清洗并记录结构化日志；新增 `docs/content-governance.md` 说明策略，并把测试接入 CI 与本地验证脚本。
 - [x] 做归档与数据生命周期治理，明确旧 feed、旧事件、旧媒体、旧日志保留多久、何时清理。
   已完成：前面阶段已新增 `supabase/migrations/0019_backend_retention_cleanup.sql` 和 `docs/security-and-lifecycle.md`，明确 `source_posts/feed_items`、`news_events/persona_news_scores/news_event_articles`、`news_articles`、`pipeline_job_locks` 的保留窗口与手动清理入口 `run_backend_retention_cleanup(...)`；当前策略是先保守落人工 cleanup runbook，再根据线上运行情况决定是否接 cron，生命周期基线已建立。
 - [x] 做开发者文档，补齐架构、数据流、cron 流、部署方式、persona 配置规则，让后续协作成本下降。
