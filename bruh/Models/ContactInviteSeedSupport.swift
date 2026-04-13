@@ -49,11 +49,12 @@ func defaultEmail(for personaId: String) -> String {
 }
 
 func legacyInviteStateByPersonaId(userDefaults: UserDefaults = .standard) -> [String: ContactRelationshipStatus] {
-    let trumpAccepted = userDefaults.bool(forKey: "invite_trump_accepted")
-    let trumpIgnored = userDefaults.bool(forKey: "invite_trump_ignored")
-    let muskAccepted = userDefaults.bool(forKey: "invite_musk_accepted")
-    let muskIgnored = userDefaults.bool(forKey: "invite_musk_ignored")
-    let muskUnlocked = userDefaults.bool(forKey: "invite_musk_unlocked")
+    let scopedDefaults = ScopedUserDefaultsStore(userDefaults: userDefaults)
+    let trumpAccepted = scopedDefaults.bool(for: "invite_trump_accepted")
+    let trumpIgnored = scopedDefaults.bool(for: "invite_trump_ignored")
+    let muskAccepted = scopedDefaults.bool(for: "invite_musk_accepted")
+    let muskIgnored = scopedDefaults.bool(for: "invite_musk_ignored")
+    let muskUnlocked = scopedDefaults.bool(for: "invite_musk_unlocked")
 
     var result: [String: ContactRelationshipStatus] = [:]
     result["trump"] = trumpAccepted ? .accepted : (trumpIgnored ? .ignored : .pending)
