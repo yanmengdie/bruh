@@ -128,3 +128,13 @@ Deno.test("isTerminalOpenAICompatibleError recognizes expired-token failures", (
     throw new Error("Expected expired-token error to be terminal");
   }
 });
+
+Deno.test("isTerminalOpenAICompatibleError recognizes rate-limit failures", () => {
+  const terminal = isTerminalOpenAICompatibleError(
+    new Error("OpenAI-compatible provider returned status 449: You exceeded your current rate limit"),
+  );
+
+  if (!terminal) {
+    throw new Error("Expected rate-limit error to be terminal");
+  }
+});

@@ -2,6 +2,7 @@ import {
   extractOpenAICompatibleContent,
   extractOpenAICompatibleError,
   formatOpenAICompatiblePayloadSummary,
+  isTerminalOpenAICompatibleError,
 } from "../_shared/openai_compatible.ts";
 import {
   createProviderMetricContext,
@@ -274,6 +275,9 @@ export async function generateInteractionsWithFallback(
           provider: "openai_compatible",
           error: lastError,
         });
+        if (isTerminalOpenAICompatibleError(lastError)) {
+          break;
+        }
         if (attempt < MAX_GENERATION_RETRIES) {
           await delay(200 * attempt);
         }
@@ -432,6 +436,9 @@ export async function generateThreadReplyWithOpenAICompatible(
         provider: "openai_compatible",
         error: lastError,
       });
+      if (isTerminalOpenAICompatibleError(lastError)) {
+        break;
+      }
       if (attempt < MAX_GENERATION_RETRIES) {
         await delay(200 * attempt);
       }

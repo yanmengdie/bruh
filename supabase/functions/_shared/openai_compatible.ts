@@ -206,11 +206,16 @@ export function isTerminalOpenAICompatibleError(error: unknown) {
 
   return [
     "api token has expired",
+    "rate limit",
+    "too many requests",
+    "exceeded your current rate limit",
     "invalid api key",
     "incorrect api key",
     "authentication",
     "unauthorized",
     "forbidden",
+    "returned status 429",
+    "returned status 449",
     "returned status 401",
     "returned status 403",
     "returned status 439",
