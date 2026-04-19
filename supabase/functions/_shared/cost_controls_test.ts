@@ -9,19 +9,19 @@ class MapEnv {
   }
 }
 
-Deno.test("resolveCostControls preserves current defaults when unset", () => {
+Deno.test("resolveCostControls defaults voice replies to disabled when unset", () => {
   const controls = resolveCostControls(new MapEnv({}))
 
   if (
     controls.llmGenerationMode !== "enabled" ||
-    controls.ttsMode !== "enabled" ||
+    controls.ttsMode !== "disabled" ||
     controls.maxTTSCharacters !== 180 ||
     controls.messageImageMode !== "enabled" ||
     controls.xIngestMode !== "enabled" ||
     controls.maxXUsernamesPerRun !== defaultUsernames.length ||
     controls.maxXPostsPerUser !== 20
   ) {
-    throw new Error("expected cost control defaults to preserve current behavior")
+    throw new Error("expected voice replies to default to disabled")
   }
 })
 

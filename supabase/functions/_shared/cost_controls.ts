@@ -64,7 +64,7 @@ export function resolveCostControls(env: EnvReader = Deno.env): CostControls {
       "BRUH_TTS_MODE",
       getOptionalScopedEnv("BRUH_TTS_MODE", { env }),
       ["enabled", "force_only", "disabled"],
-      "enabled",
+      "disabled",
     ),
     maxTTSCharacters: parseInteger(
       "BRUH_TTS_MAX_CHARACTERS",

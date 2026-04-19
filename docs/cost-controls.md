@@ -2,12 +2,12 @@
 
 ## Goal
 
-Add low-risk guardrails for expensive backend paths without changing the default product behavior.
+Add low-risk guardrails for expensive backend paths while keeping voice replies off by default.
 
-Current defaults preserve existing behavior:
+Current defaults are:
 
 - LLM generation stays enabled
-- TTS stays enabled with the existing `180` character gate
+- TTS stays disabled unless `BRUH_TTS_MODE` is explicitly enabled
 - message image generation stays enabled when requested
 - X ingestion stays enabled
 - X ingestion still allows the full default username set and up to `20` posts per user
@@ -54,6 +54,12 @@ Keep voice replies only for explicitly forced requests:
 ```bash
 export BRUH_TTS_MODE__STAGING=force_only
 export BRUH_TTS_MAX_CHARACTERS__STAGING=120
+```
+
+Re-enable voice replies for normal chat:
+
+```bash
+export BRUH_TTS_MODE__PROD=enabled
 ```
 
 Reduce X scraping spend:
