@@ -11,6 +11,7 @@ import {
   getScopedEnvOrDefault,
   resolveSupabaseServiceConfig,
 } from "../_shared/environment.ts";
+import { normalizeOpenAIReasoningEffort } from "../_shared/openai_compatible.ts";
 import { resolveBackendFeatureFlags } from "../_shared/feature_flags.ts";
 import { defaultStarterMessage, topNewsSummaryBlock } from "../_shared/news.ts";
 import {
@@ -33,7 +34,9 @@ import {
 } from "./selection.ts";
 import type { PersonaScoreRow, StarterEventRow } from "./types.ts";
 
-Deno.serve(async (request) => {
+const port = Number(Deno.env.get("PORT") ?? "8000");
+
+Deno.serve({ port }, async (request) => {
   const baseResponseHeaders = contractHeaders(
     corsHeaders,
     "message-starters.v1",
@@ -88,6 +91,9 @@ Deno.serve(async (request) => {
       "https://api.openai.com/v1",
     ).replace(/\/$/, "");
     const openaiModel = getScopedEnvOrDefault("OPENAI_MODEL", "gpt-4.1-mini");
+    const openaiReasoningEffort = normalizeOpenAIReasoningEffort(
+      getOptionalScopedEnv("OPENAI_REASONING_EFFORT"),
+    );
     const nanoBananaApiKey = getOptionalScopedEnv("NANO_BANANA_API_KEY");
     const nanoBananaBaseUrl = getScopedEnvOrDefault(
       "NANO_BANANA_BASE_URL",
@@ -195,6 +201,7 @@ Deno.serve(async (request) => {
         openaiApiKey ?? undefined,
         openaiBaseUrl,
         openaiModel,
+        openaiReasoningEffort,
         personaId,
         items,
         topSummary,

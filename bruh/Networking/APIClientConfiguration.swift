@@ -16,6 +16,7 @@ struct APIClientConfiguration {
     ) {
         let resolvedEnvironment = appEnvironment ?? AppEnvironment.resolve(environment: environment, bundle: bundle)
         self.appEnvironment = resolvedEnvironment
+        let defaultFunctionsBaseURL = "https://frequencies-main-saver-eggs.trycloudflare.com/functions/v1"
         self.functionsBaseURL = Self.resolveString(
             override: functionsBaseURL,
             environmentKeys: ["BRUH_FUNCTIONS_BASE_URL", "SUPABASE_FUNCTIONS_BASE_URL"],
@@ -23,7 +24,7 @@ struct APIClientConfiguration {
             appEnvironment: resolvedEnvironment,
             environment: environment,
             bundle: bundle,
-            defaultValue: "https://mrxctelezutprdeemqla.supabase.co/functions/v1"
+            defaultValue: defaultFunctionsBaseURL
         ).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
         self.anonKey = Self.resolveString(
@@ -33,7 +34,7 @@ struct APIClientConfiguration {
             appEnvironment: resolvedEnvironment,
             environment: environment,
             bundle: bundle,
-            defaultValue: "sb_publishable_ry_i_qMeMDzxeE7qhSl1UA_XcAwgQL1"
+            defaultValue: "bruh-local-anon"
         )
     }
 

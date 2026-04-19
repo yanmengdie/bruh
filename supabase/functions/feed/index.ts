@@ -93,7 +93,9 @@ function mapFeed(rows: FeedRow[], rankingStrategy: FeedRankingStrategy) {
   }));
 }
 
-Deno.serve(async (request) => {
+const port = Number(Deno.env.get("PORT") ?? "8000");
+
+Deno.serve({ port }, async (request) => {
   const baseResponseHeaders = contractHeaders(feedBaseHeaders, "feed.v1");
 
   if (request.method === "OPTIONS") {

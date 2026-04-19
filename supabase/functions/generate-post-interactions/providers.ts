@@ -3,6 +3,7 @@ import {
   extractOpenAICompatibleError,
   formatOpenAICompatiblePayloadSummary,
   isTerminalOpenAICompatibleError,
+  type OpenAIReasoningEffort,
 } from "../_shared/openai_compatible.ts";
 import {
   createProviderMetricContext,
@@ -52,6 +53,7 @@ export async function generateTextWithOpenAICompatible(
   apiKey: string,
   baseUrl: string,
   model: string,
+  reasoningEffort: OpenAIReasoningEffort | null,
   system: string,
   prompt: string,
   metricDetails: Record<string, unknown> = {},
@@ -79,6 +81,7 @@ export async function generateTextWithOpenAICompatible(
         role: "user",
         content: [{ type: "input_text", text: prompt }],
       }],
+      ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
       max_output_tokens: 90,
     }),
   });
@@ -116,6 +119,7 @@ export async function generateTextWithOpenAICompatible(
         { role: "system", content: system },
         { role: "user", content: prompt },
       ],
+      ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
       max_tokens: 90,
     }),
   });
@@ -156,6 +160,7 @@ export async function generateInteractionsWithFallback(
   apiKey: string,
   baseUrl: string,
   model: string,
+  reasoningEffort: OpenAIReasoningEffort | null,
   authorId: string,
   postId: string,
   postContent: string,
@@ -238,6 +243,7 @@ export async function generateInteractionsWithFallback(
           apiKey,
           baseUrl,
           model,
+          reasoningEffort,
           system,
           prompt,
           {
@@ -340,6 +346,7 @@ export async function generateThreadReplyWithOpenAICompatible(
   apiKey: string,
   baseUrl: string,
   model: string,
+  reasoningEffort: OpenAIReasoningEffort | null,
   postAuthorId: string,
   replyAuthorId: string,
   postId: string,
@@ -401,6 +408,7 @@ export async function generateThreadReplyWithOpenAICompatible(
         apiKey,
         baseUrl,
         model,
+        reasoningEffort,
         system,
         prompt,
         {

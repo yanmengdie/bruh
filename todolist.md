@@ -20,7 +20,7 @@
 - [x] 核对客户端和后端契约，补齐缺失接口、清理漂移字段。
   已完成：已核对 `feed`、`generate-message`、`message-starters`、`generate-post-interactions` 四条客户端链路，补了更明确的 HTTP/解码错误、历史字段兼容和缺省值兜底，并删除了客户端里无实现也无调用的 `generateAvatar` 死接口。
 - [x] 产出一份项目架构说明，明确 persona、content graph、iOS app、backend pipeline 的模块边界。
-  已完成：新增 `docs/architecture.md`，明确 shared persona catalog、iOS app layer、local content graph、Supabase backend pipeline 的职责和数据流。
+  已完成：新增 `docs/architecture.md`，明确 shared persona catalog、iOS app layer、local content graph、self-hosted backend pipeline 的职责和数据流。
 
 ### P1 核心链路收敛
 
@@ -170,10 +170,24 @@
 
 ### P9 真实环境验证
 
-- [ ] 配置 `.env.staging.local` 或 `.env.prod.local`，用真实 Supabase URL、service-role、functions base URL 和 anon key 跑通 `./scripts/run_release_preflight.sh`。
-  说明：当前 preflight 脚本和 env loader 已就绪，但本机尚未提供真实环境密钥；没有这些值时只能验证本地代码与脚本，不可能完成关键表探测和 backend health 判断。
-- [ ] 用真实环境执行 `./scripts/run_backend_health_snapshot.sh --strict`，确认 `pipeline_job_locks`、`news_articles`、`news_events`、`persona_news_scores`、`feed_items`、`source_posts` 的 freshness 和 job 状态达标。
-  说明：这是下一阶段最有价值的非 UI 工作，能把“结构上可运行”推进到“真实环境上可发布”。
+- [x] 建立一条可控的自建 dev functions 链路，绕过 hosted Supabase 上不稳定的 provider 环境，确保消息/开场白/互动可以真实联调。
+  已完成：在 `210.73.43.5:17322` 对应服务器上补齐本地 `generate-message`、`message-starters`、`generate-post-interactions` 三个 Deno + systemd 服务，并把 `feed` 一起挂到统一 gateway；当前 dev 默认通过 Cloudflare Quick Tunnel `https://frequencies-main-saver-eggs.trycloudflare.com/functions/v1` 访问。服务器端 `.env` 已切到 `https://aiapis.help/v1` 的 OpenAI-compatible provider，并验证 `gpt-5.2` 虽可见但当前账号无可用 channel，因此实际落地为可工作的 `gpt-5.4 + high reasoning`。三条接口已完成真实请求 smoke：`generate-message`、`message-starters`、`generate-post-interactions` 均返回实时生成内容，不再受 hosted 侧旧 provider 配置影响。
+- [x] 将当前 Supabase `public` 数据库快照迁移到自有服务器上的本地 PostgreSQL，作为后续完全去 Supabase 的数据基线。
+  已完成：服务器 `210.73.43.5:17322` 已安装本地 PostgreSQL 16，并创建 `bruh` 数据库与专用应用用户；当前 `public` schema 已按现有迁移重建（剔除了 Supabase 专属 `pg_cron/pg_net` 调度层，保留核心表、索引和 `claim_pipeline_job` / `complete_pipeline_job` / `run_backend_retention_cleanup` 三个函数），同时通过 Supabase REST 导出并导入了真实数据快照。当前本地行数校验结果为 `personas=14`、`persona_accounts=9`、`source_posts=166`、`feed_items=166`、`feed_comments=104`、`feed_likes=79`、`news_articles=616`、`news_events=590`、`news_event_articles=591`、`persona_news_scores=6960`。连接串已仅保存在服务器 `'/opt/bruh-selfhost/runtime/postgres.env'`。随后又补齐了本地 PostgREST 兼容层与内部 `/rest/v1` gateway，当前 functions 实际已通过 `PROJECT_URL=http://127.0.0.1:3000` 读写这套本地 PostgreSQL，而不是继续依赖 hosted Supabase 数据库。
+- [x] 将 app-facing functions、pipeline functions 和 cron 调度完整迁到自有服务器，摆脱 Supabase Functions 与 Supabase Cron。
+  已完成：服务器已部署 `feed`、`generate-message`、`message-starters`、`generate-post-interactions`、`build-feed`、`build-news-events`、`ingest-top-news`、`ingest-x-posts`、`ingest-xhs-posts` 九个本地 systemd 服务，并通过统一 functions gateway 暴露 `/functions/v1/*`。原先 Supabase `pg_cron/pg_net` 调度已经被 `/etc/cron.d/bruh-selfhost` 替代，当前定时任务在服务器本地直接调用函数，不再依赖 hosted Supabase 调度层。
+- [x] 核对当前仓库是否仍依赖 Supabase Auth / Storage / Realtime 等托管能力，判断是否还有隐藏迁移项。
+  已完成：从 iOS、functions、脚本和 `supabase/config.toml` 的实际调用看，当前业务没有使用 Supabase Auth、Storage、Realtime；现存 Supabase 相关命名主要是 `supabase/functions` 目录和 `supabase-js` / env key 的兼容层，并不代表还依赖 hosted Supabase 的托管运行时。
+- [ ] 配置 `.env.staging.local` 或 `.env.prod.local`，用真实 self-hosted REST gateway、compat service-role JWT、functions base URL 和 compat anon key 跑通 `./scripts/run_release_preflight.sh`。
+  说明：当前 preflight 脚本和 env loader 已就绪，但本机尚未提供一套稳定的“正式自建入口”配置；在仍使用 Cloudflare Quick Tunnel 的情况下，env 可以临时填当前 URL 做验证，但这不适合作为长期发布配置。
+- [ ] 用真实 self-hosted 环境执行 `./scripts/run_backend_health_snapshot.sh --strict`，确认 `pipeline_job_locks`、`news_articles`、`news_events`、`persona_news_scores`、`feed_items`、`source_posts` 的 freshness 和 job 状态达标。
+  说明：这是删除 hosted Supabase 前最有价值的发布门禁，能把“服务都跑起来了”推进到“这套自建环境可稳定发布”。
+- [ ] 为自建 backend 建立稳定公网入口，替换当前临时 Cloudflare Quick Tunnel。
+  说明：当前 tunnel URL `https://frequencies-main-saver-eggs.trycloudflare.com` 可用但不是稳定生产地址，机器或 tunnel 进程重启后 URL 可能变化；在没有固定域名/固定公网入口前，不建议直接删除 hosted Supabase 并进入长期依赖。
+- [ ] 补齐仍无法从 Supabase 后台反解出来的第三方明文密钥，只保留在自建服务器环境中。
+  说明：OpenAI 相关配置已迁入服务器并验证可用，但若后续要恢复 X 抓取、TTS 或图片生成，还需要用户提供 `APIFY_TOKEN`、`VOICE_*`、`NANO_BANANA_*` 等明文值；这些值不能从 Supabase secrets digest 直接恢复。
+- [ ] 处理 `ingest-top-news` 的外网连通问题，或替换目前服务器抓不到的 RSS 源。
+  说明：当前自建函数与数据库都已迁走，但服务器到 BBC RSS 的 HTTPS 请求仍会超时；这不是 Supabase 依赖问题，而是服务器出网到该源的链路问题，删除 hosted Supabase 后也仍然需要单独解决。
 
 ### 时间映射
 

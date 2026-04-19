@@ -193,7 +193,9 @@ function resolvePublishedAt(note: IncomingNote, index: number): string {
   return new Date(Date.now() - index * 1000).toISOString();
 }
 
-Deno.serve(async (request) => {
+const port = Number(Deno.env.get("PORT") ?? "8000");
+
+Deno.serve({ port }, async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

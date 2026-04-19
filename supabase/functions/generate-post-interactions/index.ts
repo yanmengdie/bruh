@@ -10,6 +10,7 @@ import {
   getScopedEnvOrDefault,
   resolveSupabaseServiceConfig,
 } from "../_shared/environment.ts";
+import { normalizeOpenAIReasoningEffort } from "../_shared/openai_compatible.ts";
 import {
   classifyError,
   createObservationContext,
@@ -26,7 +27,9 @@ import {
 } from "./storage.ts";
 import type { InteractionRequestPayload } from "./handlers.ts";
 
-Deno.serve(async (request) => {
+const port = Number(Deno.env.get("PORT") ?? "8000");
+
+Deno.serve({ port }, async (request) => {
   const baseResponseHeaders = contractHeaders(
     corsHeaders,
     "generate-post-interactions.v1",
@@ -120,6 +123,9 @@ Deno.serve(async (request) => {
       "https://api.codexzh.com/v1",
     ).replace(/\/$/, "");
     const openaiModel = getScopedEnvOrDefault("OPENAI_MODEL", "gpt-5.2");
+    const openaiReasoningEffort = normalizeOpenAIReasoningEffort(
+      getOptionalScopedEnv("OPENAI_REASONING_EFFORT"),
+    );
 
     const body = await request.json().catch(() => ({})) as Record<
       string,
@@ -172,6 +178,7 @@ Deno.serve(async (request) => {
           openaiApiKey: openaiApiKey ?? undefined,
           openaiBaseUrl,
           openaiModel,
+          openaiReasoningEffort,
         },
         payload,
       );
@@ -185,6 +192,7 @@ Deno.serve(async (request) => {
         openaiApiKey: openaiApiKey ?? undefined,
         openaiBaseUrl,
         openaiModel,
+        openaiReasoningEffort,
       },
       payload,
     );

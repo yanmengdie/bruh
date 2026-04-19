@@ -52,11 +52,13 @@ Important:
 - Release builds default to `prod`
 - local/demo fallback flags now default to `true` only for Debug + `dev`
 
-## Supabase Edge Functions
+## Backend Functions
 
-Edge Functions resolve `BRUH_APP_ENV` from environment variables and then apply the same scoped lookup.
+The repo keeps `supabase/functions` and `supabase-js` naming for compatibility, but the active backend can be either hosted Supabase or a self-hosted PostgREST-compatible gateway.
 
-Shared Supabase keys:
+Backend functions resolve `BRUH_APP_ENV` from environment variables and then apply the same scoped lookup.
+
+Shared backend keys:
 
 - `PROJECT_URL`
 - `SERVICE_ROLE_KEY`
@@ -65,6 +67,13 @@ Aliases also supported:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+
+Compatibility note:
+
+- `PROJECT_URL` / `SUPABASE_URL` should point to a PostgREST-compatible REST endpoint.
+- `SERVICE_ROLE_KEY` / `SUPABASE_SERVICE_ROLE_KEY` can be either a hosted Supabase service-role key or a self-hosted compatibility JWT.
+- `BRUH_FUNCTIONS_BASE_URL` should point to the public functions gateway, usually ending with `/functions/v1`.
+- `BRUH_SUPABASE_ANON_KEY` remains the client-side compatibility key name even when the backend is fully self-hosted.
 
 Provider keys can also be scoped:
 
@@ -119,7 +128,7 @@ Supported wrappers:
 - `scripts/run_backend_health_snapshot.sh`
 - `scripts/run_release_preflight.sh`
 
-Required for ingestion:
+Required for ingestion and backend health checks:
 
 - `SUPABASE_URL` or `PROJECT_URL`
 - `SUPABASE_SERVICE_ROLE_KEY` or `SERVICE_ROLE_KEY`
@@ -154,29 +163,29 @@ cp scripts/preflight.env.template .env.staging.local
 
 ## Suggested Local Setup
 
-Example `dev` values:
+Example self-hosted `dev` values:
 
 ```bash
 export BRUH_APP_ENV=dev
 
-export PROJECT_URL__DEV=https://your-dev-project.supabase.co
-export SERVICE_ROLE_KEY__DEV=...
-export BRUH_FUNCTIONS_BASE_URL__DEV=https://your-dev-project.supabase.co/functions/v1
-export BRUH_SUPABASE_ANON_KEY__DEV=...
+export PROJECT_URL__DEV=http://127.0.0.1:3000
+export SERVICE_ROLE_KEY__DEV=your-local-service-role-jwt
+export BRUH_FUNCTIONS_BASE_URL__DEV=https://backend.example.com/functions/v1
+export BRUH_SUPABASE_ANON_KEY__DEV=your-local-anon-jwt
 
 export OPENAI_API_KEY__DEV=...
 export OPENAI_MODEL__DEV=gpt-4.1-mini
 ```
 
-Example `staging` values:
+Example self-hosted `staging` values:
 
 ```bash
 export BRUH_APP_ENV=staging
 
-export PROJECT_URL__STAGING=https://your-staging-project.supabase.co
-export SERVICE_ROLE_KEY__STAGING=...
-export BRUH_FUNCTIONS_BASE_URL__STAGING=https://your-staging-project.supabase.co/functions/v1
-export BRUH_SUPABASE_ANON_KEY__STAGING=...
+export PROJECT_URL__STAGING=https://rest.example.com
+export SERVICE_ROLE_KEY__STAGING=your-staging-service-role-jwt
+export BRUH_FUNCTIONS_BASE_URL__STAGING=https://api.example.com/functions/v1
+export BRUH_SUPABASE_ANON_KEY__STAGING=your-staging-anon-jwt
 ```
 
 Equivalent local file setup:
@@ -188,3 +197,5 @@ cp scripts/preflight.env.template .env.prod.local
 Then replace the placeholder values in `.env.prod.local` with real secrets that stay ignored by Git.
 
 Do not commit real secrets or real service-role keys into the repository.
+
+See [self-hosted-backend.md](./self-hosted-backend.md) for the current cutover status, runtime topology, and the deletion checklist for the hosted Supabase project.

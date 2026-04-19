@@ -12,6 +12,7 @@ import {
   getScopedEnvOrDefault,
   resolveSupabaseServiceConfig,
 } from "../_shared/environment.ts";
+import { normalizeOpenAIReasoningEffort } from "../_shared/openai_compatible.ts";
 import { normalizeAssetUrl, normalizeSourceUrl } from "../_shared/media.ts";
 import { buildImagePrompt } from "../_shared/image_prompt.ts";
 import {
@@ -187,7 +188,9 @@ async function generateImageWithNanoBanana(
   return imageUrl;
 }
 
-Deno.serve(async (request) => {
+const port = Number(Deno.env.get("PORT") ?? "8000");
+
+Deno.serve({ port }, async (request) => {
   const baseResponseHeaders = contractHeaders(
     corsHeaders,
     "generate-message.v1",
@@ -242,6 +245,9 @@ Deno.serve(async (request) => {
       "https://api.openai.com/v1",
     ).replace(/\/$/, "");
     const openaiModel = getScopedEnvOrDefault("OPENAI_MODEL", "gpt-4.1-mini");
+    const openaiReasoningEffort = normalizeOpenAIReasoningEffort(
+      getOptionalScopedEnv("OPENAI_REASONING_EFFORT"),
+    );
     const nanoBananaApiKey = getOptionalScopedEnv("NANO_BANANA_API_KEY");
     const nanoBananaBaseUrl = getScopedEnvOrDefault(
       "NANO_BANANA_BASE_URL",
@@ -392,6 +398,7 @@ Deno.serve(async (request) => {
         styleGuide,
         conversation,
         userMessage,
+        openaiReasoningEffort,
         openaiApiKey: openaiApiKey ?? undefined,
         openaiBaseUrl,
         openaiModel,

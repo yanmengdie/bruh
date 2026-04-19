@@ -10,8 +10,8 @@ import {
   writeOutputFile,
 } from "./_shared.mjs"
 
-const defaultFunctionsURL = "https://mrxctelezutprdeemqla.supabase.co/functions/v1"
-const defaultAnonKey = "sb_publishable_ry_i_qMeMDzxeE7qhSl1UA_XcAwgQL1"
+const defaultFunctionsURL = "https://frequencies-main-saver-eggs.trycloudflare.com/functions/v1"
+const defaultAnonKey = "bruh-local-anon"
 
 function isUsableNoteImage(url) {
   return typeof url === "string" &&

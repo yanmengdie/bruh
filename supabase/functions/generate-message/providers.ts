@@ -3,6 +3,7 @@ import {
   extractOpenAICompatibleContent,
   formatOpenAICompatiblePayloadSummary,
   isTerminalOpenAICompatibleError,
+  type OpenAIReasoningEffort,
 } from "../_shared/openai_compatible.ts";
 import { logEdgeEvent } from "../_shared/observability.ts";
 import {
@@ -33,6 +34,7 @@ type ProviderGenerationParams = {
   styleGuide: string;
   conversation: ConversationTurn[];
   userMessage: string;
+  openaiReasoningEffort?: OpenAIReasoningEffort | null;
   openaiApiKey?: string;
   openaiBaseUrl: string;
   openaiModel: string;
@@ -50,6 +52,7 @@ async function generateWithOpenAICompatible(
   styleGuide: string,
   conversation: ConversationTurn[],
   userMessage: string,
+  reasoningEffort?: OpenAIReasoningEffort | null,
 ) {
   const providerMessages = buildProviderMessages(
     persona,
@@ -72,6 +75,7 @@ async function generateWithOpenAICompatible(
         role: message.role,
         content: [{ type: "input_text", text: message.content }],
       })),
+      ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
       max_output_tokens: 120,
       temperature: 0.85,
     }),
@@ -105,6 +109,7 @@ async function generateWithOpenAICompatible(
         { role: "system", content: system },
         ...providerMessages,
       ],
+      ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
       max_tokens: 120,
       temperature: 0.85,
     }),
@@ -174,6 +179,7 @@ export async function generatePersonaReplyWithProviders(
     styleGuide,
     conversation,
     userMessage,
+    openaiReasoningEffort,
     openaiApiKey,
     openaiBaseUrl,
     openaiModel,
@@ -219,6 +225,7 @@ export async function generatePersonaReplyWithProviders(
             styleGuide,
             conversation,
             userMessage,
+            openaiReasoningEffort,
           ),
         );
         if (candidate) {

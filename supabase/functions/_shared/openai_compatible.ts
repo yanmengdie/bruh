@@ -160,6 +160,23 @@ function firstObject(value: unknown): Record<string, unknown> | null {
   return first as Record<string, unknown>;
 }
 
+export type OpenAIReasoningEffort = "low" | "medium" | "high";
+
+export function normalizeOpenAIReasoningEffort(
+  value: unknown,
+): OpenAIReasoningEffort | null {
+  if (typeof value !== "string") return null;
+
+  switch (value.trim().toLowerCase()) {
+    case "low":
+    case "medium":
+    case "high":
+      return value.trim().toLowerCase() as OpenAIReasoningEffort;
+    default:
+      return null;
+  }
+}
+
 export function extractOpenAICompatibleContent(payload: unknown): string {
   const output: string[] = [];
   const seen = new Set<string>();

@@ -47,7 +47,7 @@ Validation gates:
 
 - backend health must be `healthy` or `running`
 - required environment variables must resolve for the active `BRUH_APP_ENV`
-- critical tables must be queryable with service-role credentials
+- critical tables must be queryable through the configured PostgREST-compatible backend
 - local contract/smoke validation must pass through `scripts/run_p1_validation.sh`
 
 ## Suggested Runbook
@@ -61,6 +61,7 @@ Validation gates:
 
 ## Notes
 
+- The env var names keep Supabase-compatible aliases for historical reasons, but the target backend may be fully self-hosted.
 - Optional provider keys show up as warnings, not hard failures.
 - Missing required environment variables or unhealthy backend state will fail `--strict`.
 - The preflight is intentionally read-only for backend data. It does not claim job locks or mutate tables.

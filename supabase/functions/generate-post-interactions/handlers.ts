@@ -28,6 +28,7 @@ export type InteractionProviderConfig = {
   openaiApiKey?: string;
   openaiBaseUrl: string;
   openaiModel: string;
+  openaiReasoningEffort?: "low" | "medium" | "high" | null;
 };
 
 export type InteractionRequestPayload = {
@@ -88,6 +89,7 @@ async function generateSeedResult(
     providers.openaiApiKey,
     providers.openaiBaseUrl,
     providers.openaiModel,
+    providers.openaiReasoningEffort ?? null,
     payload.personaId,
     payload.postId,
     payload.postContent,
@@ -117,6 +119,7 @@ async function generateReplyResult(
     providers.openaiApiKey,
     providers.openaiBaseUrl,
     providers.openaiModel,
+    providers.openaiReasoningEffort ?? null,
     payload.personaId,
     payload.postId,
     payload.postContent,
@@ -131,7 +134,10 @@ async function generateReplyResult(
 export async function handleStatelessRequest(
   providers: Pick<
     InteractionProviderConfig,
-    "openaiApiKey" | "openaiBaseUrl" | "openaiModel"
+    | "openaiApiKey"
+    | "openaiBaseUrl"
+    | "openaiModel"
+    | "openaiReasoningEffort"
   >,
   payload: InteractionRequestPayload,
 ): Promise<InteractionHandlerResult> {
@@ -175,6 +181,7 @@ export async function handleStatelessRequest(
       providers.openaiApiKey,
       providers.openaiBaseUrl,
       providers.openaiModel,
+      providers.openaiReasoningEffort ?? null,
       payload.personaId,
       payload.postId,
       payload.postContent,
@@ -231,6 +238,7 @@ export async function handleStatelessRequest(
     providers.openaiApiKey,
     providers.openaiBaseUrl,
     providers.openaiModel,
+    providers.openaiReasoningEffort ?? null,
     payload.personaId,
     payload.replyTargetAuthorId,
     payload.postId,

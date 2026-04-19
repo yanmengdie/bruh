@@ -5,6 +5,7 @@ import {
   extractOpenAICompatibleError,
   extractOpenAICompatibleContent,
   formatOpenAICompatiblePayloadSummary,
+  type OpenAIReasoningEffort,
 } from "../_shared/openai_compatible.ts";
 import { asString, defaultStarterMessage } from "../_shared/news.ts";
 import { logEdgeError, logEdgeEvent } from "../_shared/observability.ts";
@@ -200,6 +201,7 @@ async function generateSingleStarterText(
   openaiApiKey: string | undefined,
   openaiBaseUrl: string,
   openaiModel: string,
+  openaiReasoningEffort: OpenAIReasoningEffort | null,
   personaId: string,
   item: CandidateStarter,
   topSummary: string,
@@ -254,6 +256,9 @@ async function generateSingleStarterText(
             role: "user",
             content: [{ type: "input_text", text: prompt }],
           }],
+          ...(openaiReasoningEffort
+            ? { reasoning: { effort: openaiReasoningEffort } }
+            : {}),
           max_output_tokens: 120,
           temperature: 0.4,
         }),
@@ -313,6 +318,9 @@ async function generateSingleStarterText(
             { role: "system", content: system },
             { role: "user", content: prompt },
           ],
+          ...(openaiReasoningEffort
+            ? { reasoning_effort: openaiReasoningEffort }
+            : {}),
           max_tokens: 120,
           temperature: 0.4,
         }),
@@ -406,6 +414,7 @@ export async function generateStarterTexts(
   openaiApiKey: string | undefined,
   openaiBaseUrl: string,
   openaiModel: string,
+  openaiReasoningEffort: OpenAIReasoningEffort | null,
   personaId: string,
   items: CandidateStarter[],
   topSummary: string,
@@ -430,6 +439,7 @@ export async function generateStarterTexts(
           openaiApiKey,
           openaiBaseUrl,
           openaiModel,
+          openaiReasoningEffort,
           personaId,
           item,
           topSummary,

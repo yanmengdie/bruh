@@ -9,7 +9,7 @@ The system is split into four layers:
 1. Persona catalog
 2. iOS app state and presentation
 3. Local content graph
-4. Supabase-backed content and generation pipeline
+4. Self-hosted content and generation pipeline
 
 The main rule is:
 
@@ -123,7 +123,7 @@ Boundary:
 - `ContentGraphStore` is the only place that should translate those records into graph objects.
 - channel-specific visibility rules belong in selectors or graph policy, not in views.
 
-### Supabase Backend Pipeline
+### Self-Hosted Backend Pipeline
 
 Storage:
 
@@ -133,7 +133,15 @@ Storage:
 - `persona_news_scores`
 - interaction tables used by feed comments/likes
 
-Edge functions:
+Runtime:
+
+- PostgreSQL 16 on the self-hosted server
+- PostgREST-compatible REST gateway for `supabase-js` compatibility
+- function gateway that exposes app-facing endpoints under `/functions/v1`
+- systemd services for each backend function
+- cron-driven ingestion/build jobs on the server
+
+Functions:
 
 - `feed`
 - `build-feed`
@@ -145,6 +153,7 @@ Edge functions:
 Boundary:
 
 - Backend owns external ingestion, ranking, prompt assembly, and remote generation.
+- The repo still uses `supabase/functions` and `supabase-js` naming for compatibility, but the runtime can target a self-hosted PostgREST gateway instead of hosted Supabase.
 - Backend shared helpers also own content-safety normalization for generated text and external input before it is reused as prompt context.
 - Backend shared helpers also own request/job observability primitives such as `requestId`, structured terminal events, and duration logging.
 - iOS should consume stable DTOs only.
@@ -221,6 +230,7 @@ Boundary:
 - feed ranking inputs
 - persona-news matching
 - remote text/image/voice generation
+- database/job coordination for the self-hosted runtime
 
 ## 5. Backend Storage Responsibilities
 
