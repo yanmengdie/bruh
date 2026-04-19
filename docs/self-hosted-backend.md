@@ -107,14 +107,20 @@ Hosted Supabase only exposes secret digests, not plaintext values.
 Already restored:
 
 - OpenAI-compatible provider config
+- X cookie/session credentials for the self-hosted ingest path
+
+Current X ingest runtime on the server:
+
+- `BRUH_X_INGEST_PROVIDER=self_hosted_service`
+- `BRUH_X_INGEST_MODE=enabled`
+- `bruh-x-scrape-service.service` healthy on `127.0.0.1:8789`
+- `ingest-x-posts` end-to-end verified against local PostgreSQL on April 19, 2026 UTC
 
 Still needs plaintext from the operator if those features are required:
 
-- `APIFY_TOKEN`
 - `VOICE_*`
 - `NANO_BANANA_*`
-- `TWITTER_AUTH_TOKEN`
-- `TWITTER_CT0`
+- `APIFY_TOKEN` only if you intentionally switch `BRUH_X_INGEST_PROVIDER` back to `apify`
 
 ### 3. One news source is blocked by server outbound connectivity
 

@@ -4,6 +4,15 @@
 
 Replace the current `Apify` dependency in `ingest-x-posts` with a self-hosted crawler running on the same server.
 
+## Current Server Status
+
+The self-hosted path is now active on the Ubuntu server:
+
+- `BRUH_X_INGEST_PROVIDER=self_hosted_service`
+- `BRUH_X_INGEST_MODE=enabled`
+- `bruh-x-scrape-service.service` serves `http://127.0.0.1:8789`
+- `ingest-x-posts` was end-to-end verified on April 19, 2026 UTC, including `source_posts` inserts into local PostgreSQL
+
 ## Current Shape
 
 The repo now supports two X ingest providers:

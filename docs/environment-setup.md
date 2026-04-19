@@ -102,6 +102,12 @@ Supported `BRUH_X_INGEST_PROVIDER` values:
 - `apify`
 - `self_hosted_service`
 
+Provider-specific notes:
+
+- `APIFY_TOKEN` is only required when `BRUH_X_INGEST_PROVIDER=apify`.
+- `TWITTER_AUTH_TOKEN` / `TWITTER_CT0` are only required when `BRUH_X_INGEST_PROVIDER=self_hosted_service` and the crawler implementation uses `twitter-cli`.
+- `BRUH_X_INGEST_MODE` must still be `enabled` or the function will skip before calling either provider.
+
 Feature flags can also be scoped:
 
 - `BRUH_ENABLED_PERSONA_IDS`
