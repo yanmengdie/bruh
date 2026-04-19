@@ -63,12 +63,6 @@ const envRequirements: EnvRequirement[] = [
     required: false,
     keys: ["VOICE_API_KEY"],
   },
-  {
-    name: "Apify token",
-    description: "X ingestion actor access",
-    required: false,
-    keys: ["APIFY_TOKEN"],
-  },
 ];
 
 const criticalTables = [
@@ -165,7 +159,7 @@ export function resolvePreflightEnvChecks(
   env: EnvReader,
   deploymentEnvironment = resolveDeploymentEnvironment(env),
 ): ReleasePreflightEnvCheck[] {
-  return envRequirements.map((requirement) => {
+  const checks = envRequirements.map((requirement) => {
     const resolved = resolveEnvValue(
       env,
       requirement.keys,
@@ -198,6 +192,67 @@ export function resolvePreflightEnvChecks(
         : `optional; not configured (${candidates})`,
     } satisfies ReleasePreflightEnvCheck;
   });
+
+  const ingestProvider = resolveEnvValue(
+    env,
+    ["BRUH_X_INGEST_PROVIDER"],
+    deploymentEnvironment,
+  )?.value?.trim().toLowerCase() ?? "apify";
+
+  if (ingestProvider === "self_hosted_service") {
+    const serviceUrl = resolveEnvValue(
+      env,
+      [
+        "BRUH_X_SELF_HOSTED_SERVICE_URL",
+        "X_INGEST_SERVICE_URL",
+        "BRUH_X_SCRAPER_SERVICE_URL",
+      ],
+      deploymentEnvironment,
+    );
+    checks.push(serviceUrl
+      ? {
+        name: "Self-hosted X ingest service",
+        description: "local crawler service URL for X ingestion",
+        required: false,
+        level: "pass",
+        foundKey: serviceUrl.key,
+        summary: `resolved from ${serviceUrl.key}`,
+      }
+      : {
+        name: "Self-hosted X ingest service",
+        description: "local crawler service URL for X ingestion",
+        required: false,
+        level: "warn",
+        foundKey: null,
+        summary:
+          "optional; not configured (BRUH_X_SELF_HOSTED_SERVICE_URL / X_INGEST_SERVICE_URL / BRUH_X_SCRAPER_SERVICE_URL)",
+      });
+  } else {
+    const apifyToken = resolveEnvValue(
+      env,
+      ["APIFY_TOKEN"],
+      deploymentEnvironment,
+    );
+    checks.push(apifyToken
+      ? {
+        name: "Apify token",
+        description: "X ingestion actor access",
+        required: false,
+        level: "pass",
+        foundKey: apifyToken.key,
+        summary: `resolved from ${apifyToken.key}`,
+      }
+      : {
+        name: "Apify token",
+        description: "X ingestion actor access",
+        required: false,
+        level: "warn",
+        foundKey: null,
+        summary: "optional; not configured (APIFY_TOKEN)",
+      });
+  }
+
+  return checks;
 }
 
 async function probeCriticalTable(

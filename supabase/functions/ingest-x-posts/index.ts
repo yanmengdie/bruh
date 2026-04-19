@@ -33,9 +33,11 @@ import {
   defaultUsernames,
   normalizeUsername,
   resolvePersona,
+  resolvePersonaById,
 } from "../_shared/personas.ts";
 
 type ApifyItem = Record<string, unknown>;
+type XIngestProvider = "apify" | "self_hosted_service";
 
 type ActorAttempt = {
   name: string;
@@ -54,6 +56,7 @@ type ActorRunResult = {
   matchedAttempt: string | null;
   summaries: ActorAttemptSummary[];
   items: ApifyItem[];
+  posts: NormalizedPost[];
   blockedReason: string | null;
 };
 
@@ -63,6 +66,7 @@ type ActorExecution = {
   usernames: string[];
   summaries: ActorAttemptSummary[];
   items: ApifyItem[];
+  posts: NormalizedPost[];
   blockedReason: string | null;
 };
 
@@ -86,6 +90,17 @@ type ContentSafetyStats = {
   sanitized: number;
 };
 
+type SelfHostedIngestResponse = {
+  ok?: unknown;
+  provider?: unknown;
+  matchedAttempt?: unknown;
+  blockedReason?: unknown;
+  summaries?: unknown;
+  items?: unknown;
+  posts?: unknown;
+  error?: unknown;
+};
+
 function extractString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
@@ -103,6 +118,58 @@ function extractItemArray(value: unknown): ApifyItem[] {
   return value.filter((item) =>
     item && typeof item === "object"
   ) as ApifyItem[];
+}
+
+function extractStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => extractString(item)).filter((item): item is string =>
+    item !== null
+  );
+}
+
+function extractAttemptSummaries(value: unknown): ActorAttemptSummary[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.map((item) => {
+    const record = extractRecord(item);
+    if (!record) return null;
+
+    const name = extractString(record.name);
+    const status = extractString(record.status);
+    if (!name || !status) return null;
+
+    const itemCountValue = typeof record.itemCount === "number"
+      ? record.itemCount
+      : Number.parseInt(String(record.itemCount ?? "0"), 10);
+
+    return {
+      name,
+      status,
+      statusMessage: extractString(record.statusMessage),
+      itemCount: Number.isFinite(itemCountValue) ? itemCountValue : 0,
+    } satisfies ActorAttemptSummary;
+  }).filter((item): item is ActorAttemptSummary => item !== null);
+}
+
+function resolveXIngestProvider(): XIngestProvider {
+  const raw = getScopedEnvOrDefault("BRUH_X_INGEST_PROVIDER", "apify")
+    .trim()
+    .toLowerCase();
+
+  switch (raw) {
+    case "apify":
+      return "apify";
+    case "self_hosted":
+    case "self-hosted":
+    case "self_hosted_service":
+    case "self-hosted-service":
+    case "selfhosted":
+      return "self_hosted_service";
+    default:
+      throw new Error(
+        `Unsupported BRUH_X_INGEST_PROVIDER '${raw}'. Expected 'apify' or 'self_hosted_service'.`,
+      );
+  }
 }
 
 function extractAuthorUsername(item: ApifyItem): string | null {
@@ -804,6 +871,270 @@ function normalizePost(
   };
 }
 
+function coercePreNormalizedPost(raw: unknown): NormalizedPost | null {
+  const record = extractRecord(raw);
+  if (!record) return null;
+
+  const id = extractString(record.id);
+  const content = extractString(record.content);
+  const rawAuthorUsername = extractString(
+    record.rawAuthorUsername ?? record.raw_author_username,
+  );
+  const personaId = extractString(record.personaId ?? record.persona_id);
+
+  if (!id || !content || !rawAuthorUsername) {
+    return null;
+  }
+
+  const persona = resolvePersonaById(personaId ?? "") ??
+    resolvePersona(rawAuthorUsername);
+  if (!persona) {
+    return null;
+  }
+
+  const publishedAtValue = extractString(
+    record.publishedAt ?? record.published_at,
+  );
+  if (!publishedAtValue) {
+    return null;
+  }
+
+  const publishedAt = new Date(publishedAtValue);
+  if (Number.isNaN(publishedAt.getTime())) {
+    return null;
+  }
+
+  const importanceScoreValue = typeof (record.importanceScore ??
+      record.importance_score) === "number"
+    ? record.importanceScore ?? record.importance_score
+    : Number.parseFloat(String(record.importanceScore ??
+      record.importance_score ?? "0.5"));
+
+  const mediaUrls = normalizeMediaUrls(
+    extractStringArray(record.mediaUrls ?? record.media_urls),
+  );
+  const videoUrl = normalizeAssetUrl(
+    extractString(record.videoUrl ?? record.video_url),
+  );
+  const sourceUrl = normalizeSourceUrl(
+    extractString(record.sourceUrl ?? record.source_url),
+  );
+  const rawPayload = extractRecord(record.rawPayload ?? record.raw_payload) ??
+    {
+      serviceNormalized: true,
+      sourceUrl,
+      mediaUrls,
+      videoUrl,
+    } satisfies ApifyItem;
+
+  return {
+    id,
+    personaId: persona.personaId,
+    content,
+    sourceType: "x",
+    sourceUrl,
+    topic: extractString(record.topic),
+    importanceScore: Number.isFinite(importanceScoreValue)
+      ? Number(importanceScoreValue)
+      : 0.5,
+    mediaUrls,
+    videoUrl,
+    publishedAt: publishedAt.toISOString(),
+    rawAuthorUsername: normalizeUsername(rawAuthorUsername),
+    rawPayload,
+  };
+}
+
+function normalizePreNormalizedPost(
+  raw: unknown,
+  contentSafety: ContentSafetyStats,
+): NormalizedPost | null {
+  const coerced = coercePreNormalizedPost(raw);
+  if (!coerced) {
+    return null;
+  }
+
+  const contentSafetyResult = sanitizeExternalContent(coerced.content, {
+    maxLength: 320,
+  });
+  if (contentSafetyResult.blocked || !contentSafetyResult.text) {
+    contentSafety.blocked += 1;
+    return null;
+  }
+  if (contentSafetyResult.sanitized) {
+    contentSafety.sanitized += 1;
+  }
+
+  return {
+    ...coerced,
+    content: contentSafetyResult.text,
+  };
+}
+
+async function runSelfHostedService(
+  usernames: string[],
+  limitPerUser: number,
+): Promise<ActorRunResult> {
+  const configuredUrl = getOptionalScopedEnv(
+    "BRUH_X_SELF_HOSTED_SERVICE_URL",
+    {
+      aliases: [
+        "X_INGEST_SERVICE_URL",
+        "BRUH_X_SCRAPER_SERVICE_URL",
+      ],
+    },
+  );
+  if (!configuredUrl) {
+    throw new Error(
+      "Missing BRUH_X_SELF_HOSTED_SERVICE_URL for self-hosted X ingestion.",
+    );
+  }
+
+  const token = getOptionalScopedEnv(
+    "BRUH_X_SELF_HOSTED_SERVICE_TOKEN",
+    {
+      aliases: [
+        "X_INGEST_SERVICE_TOKEN",
+        "BRUH_X_SCRAPER_SERVICE_TOKEN",
+      ],
+    },
+  );
+  const timeoutMsRaw = Number.parseInt(
+    getScopedEnvOrDefault(
+      "BRUH_X_SELF_HOSTED_SERVICE_TIMEOUT_MS",
+      "120000",
+      {
+        aliases: [
+          "X_INGEST_SERVICE_TIMEOUT_MS",
+        ],
+      },
+    ),
+    10,
+  );
+  const timeoutMs = Number.isFinite(timeoutMsRaw) && timeoutMsRaw > 0
+    ? timeoutMsRaw
+    : 120000;
+
+  const url = new URL(configuredUrl);
+  if (url.pathname === "/" || url.pathname === "") {
+    url.pathname = "/fetch";
+  }
+
+  const metric = createProviderMetricContext(
+    "ingest-x-posts",
+    "x_ingest_actor",
+    "self_hosted:service",
+    {
+      baseUrl: url.origin,
+    },
+  );
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        usernames,
+        limitPerUser,
+      }),
+      signal: controller.signal,
+    });
+
+    const responseText = await response.text();
+    let payload: SelfHostedIngestResponse | null = null;
+    try {
+      payload = responseText
+        ? JSON.parse(responseText) as SelfHostedIngestResponse
+        : null;
+    } catch {
+      payload = null;
+    }
+
+    if (!response.ok) {
+      const message = extractString(payload?.error) ??
+        extractString(payload?.blockedReason) ??
+        (responseText ||
+          `Self-hosted X ingest service returned ${response.status}`);
+      logProviderMetricFailure(metric, message, {
+        status: "HTTP_ERROR",
+        httpStatus: response.status,
+      });
+      return {
+        actorId: "self_hosted:service",
+        matchedAttempt: null,
+        summaries: [{
+          name: "self_hosted_service",
+          status: "HTTP_ERROR",
+          statusMessage: message,
+          itemCount: 0,
+        }],
+        items: [],
+        posts: [],
+        blockedReason: message,
+      };
+    }
+
+    const items = extractItemArray(payload?.items);
+    const posts = Array.isArray(payload?.posts) ? payload?.posts : [];
+    const summaries = extractAttemptSummaries(payload?.summaries);
+    const blockedReason = extractString(payload?.blockedReason);
+    const providerId = extractString(payload?.provider) ??
+      "self_hosted:service";
+    const matchedAttempt = extractString(payload?.matchedAttempt);
+    const itemCount = posts.length > 0 ? posts.length : items.length;
+
+    logProviderMetricSuccess(metric, {
+      providerId,
+      matchedAttempt,
+      itemCount,
+    });
+
+    return {
+      actorId: providerId,
+      matchedAttempt,
+      summaries: summaries.length > 0
+        ? summaries
+        : [{
+          name: "self_hosted_service",
+          status: blockedReason ? "PARTIAL" : "SUCCEEDED",
+          statusMessage: blockedReason,
+          itemCount,
+      }],
+      items,
+      posts: posts
+        .map((post) => coercePreNormalizedPost(post))
+        .filter((post): post is NormalizedPost => post !== null),
+      blockedReason,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logProviderMetricFailure(metric, message, {
+      status: "REQUEST_FAILED",
+    });
+    return {
+      actorId: "self_hosted:service",
+      matchedAttempt: null,
+      summaries: [{
+        name: "self_hosted_service",
+        status: "REQUEST_FAILED",
+        statusMessage: message,
+        itemCount: 0,
+      }],
+      items: [],
+      posts: [],
+      blockedReason: message,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function runActor(
   token: string,
   usernames: string[],
@@ -826,6 +1157,7 @@ async function runActor(
         matchedAttempt: null,
         summaries,
         items: [],
+        posts: [],
         blockedReason: result.summary.statusMessage,
       };
     }
@@ -836,6 +1168,7 @@ async function runActor(
         matchedAttempt: attempt.name,
         summaries,
         items: result.items,
+        posts: [],
         blockedReason: null,
       };
     }
@@ -846,6 +1179,7 @@ async function runActor(
     matchedAttempt: null,
     summaries,
     items: [] as ApifyItem[],
+    posts: [],
     blockedReason: null,
   };
 }
@@ -896,6 +1230,7 @@ async function runTimelineActor(
         matchedAttempt: null,
         summaries,
         items: [],
+        posts: [],
         blockedReason: result.summary.statusMessage,
       };
     }
@@ -908,6 +1243,7 @@ async function runTimelineActor(
         matchedAttempt: strategy.attempt.name,
         summaries,
         items: transformedItems,
+        posts: [],
         blockedReason: null,
       };
     }
@@ -933,6 +1269,7 @@ async function runTimelineActor(
     matchedAttempt: null,
     summaries,
     items: [],
+    posts: [],
     blockedReason: null,
   };
 }
@@ -952,7 +1289,7 @@ Deno.serve({ port }, async (request) => {
   try {
     const { projectUrl, serviceRoleKey } = resolveSupabaseServiceConfig();
     const costControls = resolveCostControls();
-    const apifyToken = getOptionalScopedEnv("APIFY_TOKEN");
+    const xIngestProvider = resolveXIngestProvider();
 
     if (costControls.xIngestMode !== "enabled") {
       logEdgeSuccess(observation, "job_skipped", {
@@ -967,18 +1304,6 @@ Deno.serve({ port }, async (request) => {
           xIngestMode: costControls.xIngestMode,
         },
         { headers: corsHeaders },
-      );
-    }
-
-    if (!apifyToken) {
-      logEdgeFailure(
-        observation,
-        "request_failed",
-        "Missing environment variables",
-      );
-      return Response.json(
-        { error: "Missing environment variables" },
-        { status: 500, headers: corsHeaders },
       );
     }
 
@@ -1024,6 +1349,7 @@ Deno.serve({ port }, async (request) => {
         : Math.min(Math.max(limitPerUserRaw, 1), costControls.maxXPostsPerUser);
       const debugSample = body.debugSample === true;
       const contentSafety = { blocked: 0, sanitized: 0 };
+      const executions: ActorExecution[] = [];
 
       if (usernames.length === 0) {
         await completePipelineJob(
@@ -1045,48 +1371,74 @@ Deno.serve({ port }, async (request) => {
         );
       }
 
-      const timelineUsernames = usernames.filter((username) =>
-        shouldUseTimelineActor(username)
-      );
-      const defaultActorUsernames = usernames.filter((username) =>
-        !shouldUseTimelineActor(username)
-      );
+      if (xIngestProvider === "apify") {
+        const apifyToken = getOptionalScopedEnv("APIFY_TOKEN");
+        if (!apifyToken) {
+          throw new Error(
+            "Missing APIFY_TOKEN while BRUH_X_INGEST_PROVIDER=apify.",
+          );
+        }
 
-      const executions: ActorExecution[] = [];
-
-      if (defaultActorUsernames.length > 0) {
-        const result = await runActor(
-          apifyToken,
-          defaultActorUsernames,
-          limitPerUser,
+        const timelineUsernames = usernames.filter((username) =>
+          shouldUseTimelineActor(username)
         );
+        const defaultActorUsernames = usernames.filter((username) =>
+          !shouldUseTimelineActor(username)
+        );
+
+        if (defaultActorUsernames.length > 0) {
+          const result = await runActor(
+            apifyToken,
+            defaultActorUsernames,
+            limitPerUser,
+          );
+          executions.push({
+            actorId: result.actorId,
+            matchedAttempt: result.matchedAttempt,
+            usernames: defaultActorUsernames,
+            summaries: result.summaries,
+            items: result.items,
+            posts: result.posts,
+            blockedReason: result.blockedReason,
+          });
+        }
+
+        if (timelineUsernames.length > 0) {
+          const result = await runTimelineActor(
+            apifyToken,
+            timelineUsernames,
+            limitPerUser,
+          );
+          executions.push({
+            actorId: result.actorId,
+            matchedAttempt: result.matchedAttempt,
+            usernames: timelineUsernames,
+            summaries: result.summaries,
+            items: result.items,
+            posts: result.posts,
+            blockedReason: result.blockedReason,
+          });
+        }
+      } else {
+        const result = await runSelfHostedService(usernames, limitPerUser);
         executions.push({
           actorId: result.actorId,
           matchedAttempt: result.matchedAttempt,
-          usernames: defaultActorUsernames,
+          usernames,
           summaries: result.summaries,
           items: result.items,
-          blockedReason: result.blockedReason,
-        });
-      }
-
-      if (timelineUsernames.length > 0) {
-        const result = await runTimelineActor(
-          apifyToken,
-          timelineUsernames,
-          limitPerUser,
-        );
-        executions.push({
-          actorId: result.actorId,
-          matchedAttempt: result.matchedAttempt,
-          usernames: timelineUsernames,
-          summaries: result.summaries,
-          items: result.items,
+          posts: result.posts,
           blockedReason: result.blockedReason,
         });
       }
 
       const items = executions.flatMap((execution) => execution.items);
+      const serviceNormalizedPosts = executions.flatMap((execution) =>
+        execution.posts
+      );
+      const totalFetched = serviceNormalizedPosts.length > 0
+        ? serviceNormalizedPosts.length
+        : items.length;
       const blockedReasons = executions
         .filter((execution) => execution.blockedReason)
         .map((execution) => ({
@@ -1105,7 +1457,7 @@ Deno.serve({ port }, async (request) => {
         logEdgeSuccess(observation, "job_succeeded", {
           debugSample: true,
           actorCount: executions.length,
-          totalFetched: items.length,
+          totalFetched,
         });
         return Response.json(
           {
@@ -1119,10 +1471,12 @@ Deno.serve({ port }, async (request) => {
             })),
             blockedReason: blockedReasons.length > 0 ? blockedReasons : null,
             usernames,
-            totalFetched: items.length,
+            totalFetched,
             maxUsernamesPerRun: costControls.maxXUsernamesPerRun,
             maxPostsPerUser: costControls.maxXPostsPerUser,
-            sample: items.slice(0, 3),
+            sample: serviceNormalizedPosts.length > 0
+              ? serviceNormalizedPosts.slice(0, 3)
+              : items.slice(0, 3),
           },
           { headers: corsHeaders },
         );
@@ -1169,9 +1523,13 @@ Deno.serve({ port }, async (request) => {
       }
 
       const posts = limitPostsPerUser(
-        items
-          .map((item) => normalizePost(item, contentSafety))
-          .filter((item): item is NormalizedPost => item !== null),
+        serviceNormalizedPosts.length > 0
+          ? serviceNormalizedPosts
+            .map((post) => normalizePreNormalizedPost(post, contentSafety))
+            .filter((post): post is NormalizedPost => post !== null)
+          : items
+            .map((item) => normalizePost(item, contentSafety))
+            .filter((item): item is NormalizedPost => item !== null),
         limitPerUser,
       );
 
@@ -1179,7 +1537,7 @@ Deno.serve({ port }, async (request) => {
         logEdgeEvent("ingest-x-posts", "content_safety_applied", {
           blocked: contentSafety.blocked,
           sanitized: contentSafety.sanitized,
-          fetchedItems: items.length,
+          fetchedItems: totalFetched,
         });
       }
 
@@ -1231,12 +1589,13 @@ Deno.serve({ port }, async (request) => {
         !existingIdSet.has(post.id)
       ).length;
       const updated = posts.length - inserted;
-      const skipped = items.length - posts.length;
+      const skipped = totalFetched - posts.length;
 
       await completePipelineJob(supabase, "ingest-x-posts", lock.ownerId, true);
       logEdgeSuccess(observation, "job_succeeded", {
         actorCount: executions.length,
-        totalFetched: items.length,
+        provider: xIngestProvider,
+        totalFetched,
         normalized: posts.length,
         inserted,
         updated,
@@ -1255,7 +1614,8 @@ Deno.serve({ port }, async (request) => {
             matchedAttempt: execution.matchedAttempt,
           })),
           usernames,
-          totalFetched: items.length,
+          provider: xIngestProvider,
+          totalFetched,
           normalized: posts.length,
           inserted,
           updated,

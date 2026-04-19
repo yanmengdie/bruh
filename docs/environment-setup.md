@@ -86,6 +86,21 @@ Provider keys can also be scoped:
 - `VOICE_API_KEY`
 - `VOICE_API_BASE_URL`
 - `APIFY_TOKEN`
+- `TWITTER_AUTH_TOKEN`
+- `TWITTER_CT0`
+- `TWITTER_BIN`
+
+X ingestion provider keys can also be scoped:
+
+- `BRUH_X_INGEST_PROVIDER`
+- `BRUH_X_SELF_HOSTED_SERVICE_URL`
+- `BRUH_X_SELF_HOSTED_SERVICE_TOKEN`
+- `BRUH_X_SELF_HOSTED_SERVICE_TIMEOUT_MS`
+
+Supported `BRUH_X_INGEST_PROVIDER` values:
+
+- `apify`
+- `self_hosted_service`
 
 Feature flags can also be scoped:
 
@@ -140,6 +155,9 @@ Optional:
 - `HTTP_PROXY`
 - `HTTPS_PROXY`
 - `TWITTER_BIN`
+- `BRUH_X_INGEST_PROVIDER`
+- `BRUH_X_SELF_HOSTED_SERVICE_URL`
+- `BRUH_X_SELF_HOSTED_SERVICE_TOKEN`
 
 Useful operational command:
 
@@ -175,6 +193,9 @@ export BRUH_SUPABASE_ANON_KEY__DEV=your-local-anon-jwt
 
 export OPENAI_API_KEY__DEV=...
 export OPENAI_MODEL__DEV=gpt-4.1-mini
+export BRUH_X_INGEST_PROVIDER__DEV=self_hosted_service
+export BRUH_X_SELF_HOSTED_SERVICE_URL__DEV=http://127.0.0.1:8789/fetch
+export BRUH_X_SELF_HOSTED_SERVICE_TOKEN__DEV=replace-me
 ```
 
 Example self-hosted `staging` values:
@@ -199,3 +220,4 @@ Then replace the placeholder values in `.env.prod.local` with real secrets that 
 Do not commit real secrets or real service-role keys into the repository.
 
 See [self-hosted-backend.md](./self-hosted-backend.md) for the current cutover status, runtime topology, and the deletion checklist for the hosted Supabase project.
+See [self-hosted-x-ingest.md](./self-hosted-x-ingest.md) for the self-hosted X crawler deployment flow that replaces Apify.

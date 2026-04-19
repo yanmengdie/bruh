@@ -113,6 +113,8 @@ Still needs plaintext from the operator if those features are required:
 - `APIFY_TOKEN`
 - `VOICE_*`
 - `NANO_BANANA_*`
+- `TWITTER_AUTH_TOKEN`
+- `TWITTER_CT0`
 
 ### 3. One news source is blocked by server outbound connectivity
 
@@ -150,3 +152,5 @@ The remaining blockers to deletion are operational, not architectural:
 - stable public ingress
 - any missing third-party plaintext secrets
 - final preflight/health verification against the self-hosted environment
+
+For X ingestion specifically, the repo now also supports replacing `Apify` with a self-hosted scrape service on the same server. See [self-hosted-x-ingest.md](./self-hosted-x-ingest.md).

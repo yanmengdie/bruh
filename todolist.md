@@ -178,6 +178,8 @@
   已完成：服务器已部署 `feed`、`generate-message`、`message-starters`、`generate-post-interactions`、`build-feed`、`build-news-events`、`ingest-top-news`、`ingest-x-posts`、`ingest-xhs-posts` 九个本地 systemd 服务，并通过统一 functions gateway 暴露 `/functions/v1/*`。原先 Supabase `pg_cron/pg_net` 调度已经被 `/etc/cron.d/bruh-selfhost` 替代，当前定时任务在服务器本地直接调用函数，不再依赖 hosted Supabase 调度层。
 - [x] 核对当前仓库是否仍依赖 Supabase Auth / Storage / Realtime 等托管能力，判断是否还有隐藏迁移项。
   已完成：从 iOS、functions、脚本和 `supabase/config.toml` 的实际调用看，当前业务没有使用 Supabase Auth、Storage、Realtime；现存 Supabase 相关命名主要是 `supabase/functions` 目录和 `supabase-js` / env key 的兼容层，并不代表还依赖 hosted Supabase 的托管运行时。
+- [x] 把 X 抓取链路抽象成可替换 provider，并补一条同服务器自建抓取服务入口，降低对 Apify 账单和支付方式的依赖。
+  已完成：`ingest-x-posts` 现在支持 `BRUH_X_INGEST_PROVIDER=apify|self_hosted_service`，自建模式下会调用同服务器上的 `scripts/x_scrape_service.py` HTTP 服务而不是直接访问 Apify。这个服务复用了仓库里原有的 `twitter` CLI + `TWITTER_AUTH_TOKEN/TWITTER_CT0` 思路，只负责抓取和返回标准化帖子，真正的内容清洗、去重和 `source_posts` 写入仍由 `ingest-x-posts` 主链路负责，因此后续即使再把抓取实现从 `twitter` CLI 换成 Playwright，也不需要改 feed/DB 主流程。同时补充了 `scripts/run_x_scrape_service.sh` 与相关环境文档，便于在现有 Ubuntu 服务器上直接起服务。
 - [ ] 配置 `.env.staging.local` 或 `.env.prod.local`，用真实 self-hosted REST gateway、compat service-role JWT、functions base URL 和 compat anon key 跑通 `./scripts/run_release_preflight.sh`。
   说明：当前 preflight 脚本和 env loader 已就绪，但本机尚未提供一套稳定的“正式自建入口”配置；在仍使用 Cloudflare Quick Tunnel 的情况下，env 可以临时填当前 URL 做验证，但这不适合作为长期发布配置。
 - [ ] 用真实 self-hosted 环境执行 `./scripts/run_backend_health_snapshot.sh --strict`，确认 `pipeline_job_locks`、`news_articles`、`news_events`、`persona_news_scores`、`feed_items`、`source_posts` 的 freshness 和 job 状态达标。
