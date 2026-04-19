@@ -20,7 +20,8 @@ import {
   categorizeFeedScore,
   inferInterestTags,
   parseFeedsFromBody,
-  parseRssItems,
+  parseFeedItems,
+  scoreFeedSourceSignal,
   scoreNewsRecency,
   stableHash,
 } from "../_shared/news.ts";
@@ -38,14 +39,7 @@ type NewsArticleUpsertRow = {
   published_at: string;
   fetched_at: string;
   importance_score: number;
-  raw_payload: {
-    guid: string;
-    title: string;
-    link: string;
-    description: string;
-    pubDate: string;
-    eventKey: string;
-  };
+  raw_payload: Record<string, unknown>;
 };
 
 const port = Number(Deno.env.get("PORT") ?? "8000");
@@ -133,8 +127,8 @@ Deno.serve({ port }, async (request) => {
             continue;
           }
 
-          const xml = await response.text();
-          const items = parseRssItems(xml);
+          const payloadText = await response.text();
+          const items = parseFeedItems(feed, payloadText);
           const normalized: NewsArticleUpsertRow[] = items
             .flatMap((item) => {
               const articleUrl = normalizeSourceUrl(item.link);
@@ -175,12 +169,15 @@ Deno.serve({ port }, async (request) => {
                 feed.category,
               );
               const importanceScore = categorizeFeedScore(feed.category) +
-                scoreNewsRecency(publishedAt);
+                scoreNewsRecency(publishedAt) +
+                scoreFeedSourceSignal(item);
 
               return [{
                 id,
                 source_name: feed.sourceName,
-                source_type: "rss",
+                source_type: feed.kind === "baidu_hot_search"
+                  ? "hot_list"
+                  : "rss",
                 feed_slug: feed.slug,
                 title: titleSafety.text,
                 summary,
@@ -196,6 +193,11 @@ Deno.serve({ port }, async (request) => {
                   link: articleUrl,
                   description: summary,
                   pubDate: item.pubDate,
+                  rank: item.rank ?? null,
+                  hotScore: item.hotScore ?? null,
+                  imageUrl: item.imageUrl ?? null,
+                  sourceKind: feed.kind ?? "rss",
+                  sourceName: feed.sourceName,
                   eventKey: buildEventKey(titleSafety.text, feed.category),
                 },
               }];

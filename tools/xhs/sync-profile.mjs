@@ -13,6 +13,16 @@ import {
 const defaultFunctionsURL = "https://frequencies-main-saver-eggs.trycloudflare.com/functions/v1"
 const defaultAnonKey = "bruh-local-anon"
 
+function readBooleanArg(value, fallback) {
+  if (typeof value === "boolean") return value
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase()
+    if (["1", "true", "yes", "y", "on"].includes(normalized)) return true
+    if (["0", "false", "no", "n", "off"].includes(normalized)) return false
+  }
+  return fallback
+}
+
 function isUsableNoteImage(url) {
   return typeof url === "string" &&
     /xhscdn\.com/i.test(url) &&
@@ -51,10 +61,10 @@ async function main() {
   const query = String(args.query ?? args.q ?? "科技薯").trim()
   const limitRaw = Number.parseInt(String(args.limit ?? "5"), 10)
   const limit = Number.isNaN(limitRaw) ? 5 : Math.min(Math.max(limitRaw, 1), 10)
-  const headless = args.headful !== true
+  const headless = !readBooleanArg(args.headful, false)
   const cookieString = process.env.XHS_COOKIE ?? ""
-  const shouldIngest = args.ingest === true
-  const shouldBuildFeed = args["build-feed"] !== false
+  const shouldIngest = readBooleanArg(args.ingest, false)
+  const shouldBuildFeed = readBooleanArg(args["build-feed"], true)
   const functionsURL = process.env.SUPABASE_FUNCTIONS_URL ?? defaultFunctionsURL
   const anonKey = process.env.SUPABASE_ANON_KEY ?? defaultAnonKey
 

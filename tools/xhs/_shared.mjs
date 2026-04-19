@@ -37,6 +37,25 @@ export async function ensureLocalDirs() {
   await fs.mkdir(OUTPUT_DIR, { recursive: true })
 }
 
+async function readStorageState(storageStateFile) {
+  const targetPath = String(storageStateFile ?? "").trim()
+  if (!targetPath) return null
+
+  try {
+    const raw = await fs.readFile(path.resolve(targetPath), "utf8")
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== "object") {
+      throw new Error("Invalid XHS storage state payload.")
+    }
+    return parsed
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return null
+    }
+    throw error
+  }
+}
+
 function parseCookieString(cookieString) {
   return cookieString
     .split(";")
@@ -58,14 +77,37 @@ function parseCookieString(cookieString) {
     .filter(Boolean)
 }
 
-export async function createContext({ headless = false, cookieString = "" } = {}) {
+export async function createContext({
+  headless = false,
+  cookieString = "",
+  storageStateFile = process.env.XHS_STORAGE_STATE_FILE ?? "",
+} = {}) {
+  const storageState = await readStorageState(storageStateFile)
   await ensureLocalDirs()
-  const context = await chromium.launchPersistentContext(AUTH_DIR, {
-    headless,
-    locale: "zh-CN",
-    viewport: { width: 1440, height: 1200 },
-    userAgent: XHS_USER_AGENT,
-  })
+
+  let context = null
+  if (storageState) {
+    const browser = await chromium.launch({ headless })
+    context = await browser.newContext({
+      storageState,
+      locale: "zh-CN",
+      viewport: { width: 1440, height: 1200 },
+      userAgent: XHS_USER_AGENT,
+    })
+
+    const originalClose = context.close.bind(context)
+    context.close = async (...args) => {
+      await originalClose(...args)
+      await browser.close()
+    }
+  } else {
+    context = await chromium.launchPersistentContext(AUTH_DIR, {
+      headless,
+      locale: "zh-CN",
+      viewport: { width: 1440, height: 1200 },
+      userAgent: XHS_USER_AGENT,
+    })
+  }
 
   if (cookieString.trim()) {
     const cookies = parseCookieString(cookieString)

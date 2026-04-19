@@ -5,6 +5,19 @@ export type FeedDefinition = {
   url: string
   sourceName: string
   category: string
+  kind?: "rss" | "baidu_hot_search"
+}
+
+export type ParsedFeedItem = {
+  title: string
+  link: string
+  guid: string
+  description: string
+  pubDate: string
+  rank?: number
+  hotScore?: number
+  imageUrl?: string
+  rawPayload?: Record<string, unknown>
 }
 
 export type ParsedNewsArticle = {
@@ -48,28 +61,11 @@ const entityKeywords: Record<string, string[]> = Object.fromEntries(
 
 export const defaultNewsFeeds: FeedDefinition[] = [
   {
-    slug: "bbc-politics",
-    url: "https://feeds.bbci.co.uk/news/politics/rss.xml",
-    sourceName: "BBC",
-    category: "politics",
-  },
-  {
-    slug: "bbc-business",
-    url: "https://feeds.bbci.co.uk/news/business/rss.xml",
-    sourceName: "BBC",
-    category: "finance",
-  },
-  {
-    slug: "bbc-technology",
-    url: "https://feeds.bbci.co.uk/news/technology/rss.xml",
-    sourceName: "BBC",
-    category: "tech",
-  },
-  {
-    slug: "bbc-world",
-    url: "https://feeds.bbci.co.uk/news/world/rss.xml",
-    sourceName: "BBC",
-    category: "world",
+    slug: "baidu-hot-search",
+    url: "https://top.baidu.com/board",
+    sourceName: "百度热搜",
+    category: "hot",
+    kind: "baidu_hot_search",
   },
 ]
 
@@ -109,7 +105,7 @@ export function extractTag(block: string, tag: string) {
   return match ? stripHtml(match[1]) : ""
 }
 
-export function parseRssItems(xml: string) {
+export function parseRssItems(xml: string): ParsedFeedItem[] {
   const normalized = decodeHtmlEntities(xml)
   return [...normalized.matchAll(/<item\b[\s\S]*?>([\s\S]*?)<\/item>/gi)].map((match) => {
     const item = match[1]
@@ -120,6 +116,107 @@ export function parseRssItems(xml: string) {
     const pubDate = extractTag(item, "pubDate")
     return { title, link, guid, description, pubDate }
   })
+}
+
+function asNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value !== "string") return null
+  const parsed = Number.parseFloat(value.trim())
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function asUnixSecondsIso(value: unknown) {
+  const numeric = asNumber(value)
+  if (numeric == null) return ""
+
+  const millis = numeric > 1_000_000_000_000 ? numeric : numeric * 1000
+  const date = new Date(millis)
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString()
+}
+
+export function parseBaiduHotSearchItems(html: string): ParsedFeedItem[] {
+  const match = html.match(/<!--s-data:(.+?)-->/s)
+  if (!match?.[1]) return []
+
+  let payload: Record<string, unknown> | null = null
+  try {
+    payload = JSON.parse(match[1]) as Record<string, unknown>
+  } catch {
+    return []
+  }
+
+  const data = payload.data && typeof payload.data === "object"
+    ? payload.data as Record<string, unknown>
+    : null
+  const cards = Array.isArray(data?.cards) ? data.cards : []
+  const realtimeCard = cards.find((card) => {
+    if (!card || typeof card !== "object") return false
+    const record = card as Record<string, unknown>
+    return record.component === "hotList" && record.typeName === "realtime"
+  }) as Record<string, unknown> | undefined
+
+  if (!realtimeCard) return []
+
+  const cardPublishedAt = asUnixSecondsIso(realtimeCard.updateTime) ||
+    new Date().toISOString()
+  const rawItems = [
+    ...(Array.isArray(realtimeCard.topContent) ? realtimeCard.topContent : []),
+    ...(Array.isArray(realtimeCard.content) ? realtimeCard.content : []),
+  ]
+
+  const seen = new Set<string>()
+  const items: ParsedFeedItem[] = []
+  for (const rawItem of rawItems) {
+    if (!rawItem || typeof rawItem !== "object") continue
+    const item = rawItem as Record<string, unknown>
+    const title = asString(item.word) || asString(item.query)
+    const link = asString(item.appUrl) || asString(item.url) || asString(item.rawUrl)
+    if (!title || !link) continue
+
+    const guid = `baidu-hot:${asString(item.query) || title}`
+    if (seen.has(guid)) continue
+    seen.add(guid)
+
+    const rank = asNumber(item.index)
+    const hotScore = asNumber(item.hotScore)
+    items.push({
+      title,
+      link,
+      guid,
+      description: asString(item.desc) || title,
+      pubDate: cardPublishedAt,
+      rank: rank == null ? undefined : rank + 1,
+      hotScore: hotScore == null ? undefined : hotScore,
+      imageUrl: asString(item.img) || undefined,
+      rawPayload: item,
+    })
+  }
+
+  return items
+}
+
+export function parseFeedItems(feed: FeedDefinition, payload: string) {
+  switch (feed.kind ?? "rss") {
+    case "baidu_hot_search":
+      return parseBaiduHotSearchItems(payload)
+    case "rss":
+    default:
+      return parseRssItems(payload)
+  }
+}
+
+export function scoreFeedSourceSignal(item: ParsedFeedItem) {
+  let score = 0
+
+  if (typeof item.rank === "number" && item.rank > 0) {
+    score += Math.max(0, 1.25 - (item.rank - 1) * 0.08)
+  }
+
+  if (typeof item.hotScore === "number" && item.hotScore > 0) {
+    score += Math.max(0, Math.min(Math.log10(item.hotScore) - 5, 1.8))
+  }
+
+  return Number(score.toFixed(3))
 }
 
 export function normalizeHeadline(value: string) {
@@ -212,6 +309,8 @@ export function categorizeFeedScore(category: string) {
       return 1.2
     case "tech":
       return 1.1
+    case "hot":
+      return 1.3
     default:
       return 0.9
   }
@@ -221,17 +320,24 @@ export function parseFeedsFromBody(body: Record<string, unknown>) {
   const customFeeds = Array.isArray(body.feeds) ? body.feeds : []
   if (customFeeds.length === 0) return defaultNewsFeeds
 
-  const parsed = customFeeds
-    .map((item) => {
-      const row = item as Record<string, unknown>
-      const slug = asString(row.slug)
-      const url = asString(row.url)
-      const sourceName = asString(row.sourceName)
-      const category = asString(row.category)
-      if (!slug || !url || !sourceName || !category) return null
-      return { slug, url, sourceName, category }
+  const parsed: FeedDefinition[] = []
+  for (const item of customFeeds) {
+    const row = item as Record<string, unknown>
+    const slug = asString(row.slug)
+    const url = asString(row.url)
+    const sourceName = asString(row.sourceName)
+    const category = asString(row.category)
+    const kind = asString(row.kind)
+    if (!slug || !url || !sourceName || !category) continue
+
+    parsed.push({
+      slug,
+      url,
+      sourceName,
+      category,
+      kind: kind === "baidu_hot_search" ? "baidu_hot_search" : "rss",
     })
-    .filter((item): item is FeedDefinition => item !== null)
+  }
 
   return parsed.length > 0 ? parsed : defaultNewsFeeds
 }
