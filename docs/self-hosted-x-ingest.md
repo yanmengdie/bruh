@@ -2,7 +2,7 @@
 
 ## Goal
 
-Replace the current `Apify` dependency in `ingest-x-posts` with a self-hosted crawler running on the same server.
+Retire the former `Apify` dependency in `ingest-x-posts` and keep X ingestion on a self-hosted crawler running on the same server.
 
 ## Current Server Status
 
@@ -15,12 +15,11 @@ The self-hosted path is now active on the Ubuntu server:
 
 ## Current Shape
 
-The repo now supports two X ingest providers:
+The repo now supports one active X ingest provider:
 
-- `apify`
 - `self_hosted_service`
 
-Switch with:
+Configure it with:
 
 ```bash
 export BRUH_X_INGEST_PROVIDER=self_hosted_service

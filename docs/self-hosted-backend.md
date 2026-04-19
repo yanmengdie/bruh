@@ -120,7 +120,6 @@ Still needs plaintext from the operator if those features are required:
 
 - `VOICE_*`
 - `NANO_BANANA_*`
-- `APIFY_TOKEN` only if you intentionally switch `BRUH_X_INGEST_PROVIDER` back to `apify`
 
 ### 3. One news source is blocked by server outbound connectivity
 

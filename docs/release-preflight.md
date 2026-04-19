@@ -32,7 +32,6 @@ Environment variables:
 - recommended: `NANO_BANANA_API_KEY`
 - recommended: `VOICE_API_KEY`
 - recommended: `VOICE_API_BASE_URL`
-- recommended: `APIFY_TOKEN` when `BRUH_X_INGEST_PROVIDER=apify`
 - recommended: `BRUH_X_SELF_HOSTED_SERVICE_URL` when `BRUH_X_INGEST_PROVIDER=self_hosted_service`
 
 Critical backend tables:

@@ -35,7 +35,7 @@ Deno.test("resolvePreflightEnvChecks prefers scoped values and warns on optional
   }
 });
 
-Deno.test("resolvePreflightEnvChecks switches X ingest warning based on provider", () => {
+Deno.test("resolvePreflightEnvChecks validates self-hosted X ingest settings", () => {
   const checks = resolvePreflightEnvChecks(
     envReader({
       PROJECT_URL__PROD: "http://127.0.0.1:3000",
@@ -55,9 +55,27 @@ Deno.test("resolvePreflightEnvChecks switches X ingest warning based on provider
     throw new Error("expected self-hosted X ingest service to pass");
   }
 
-  const apifyToken = checks.find((check) => check.name === "Apify token");
-  if (apifyToken) {
-    throw new Error("expected Apify token check to be omitted in self-hosted mode");
+  const provider = checks.find((check) => check.name === "X ingest provider");
+  if (provider?.level !== "pass") {
+    throw new Error("expected X ingest provider to resolve to self-hosted");
+  }
+});
+
+Deno.test("resolvePreflightEnvChecks fails when Apify provider is still configured", () => {
+  const checks = resolvePreflightEnvChecks(
+    envReader({
+      PROJECT_URL__PROD: "http://127.0.0.1:3000",
+      SERVICE_ROLE_KEY__PROD: "service-role",
+      BRUH_FUNCTIONS_BASE_URL__PROD: "https://api.example.com/functions/v1",
+      BRUH_SUPABASE_ANON_KEY__PROD: "anon",
+      BRUH_X_INGEST_PROVIDER__PROD: "apify",
+    }),
+    "prod",
+  );
+
+  const provider = checks.find((check) => check.name === "X ingest provider");
+  if (provider?.level !== "fail") {
+    throw new Error("expected Apify provider to fail preflight");
   }
 });
 

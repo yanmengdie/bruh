@@ -193,64 +193,68 @@ export function resolvePreflightEnvChecks(
     } satisfies ReleasePreflightEnvCheck;
   });
 
-  const ingestProvider = resolveEnvValue(
+  const ingestProviderConfig = resolveEnvValue(
     env,
     ["BRUH_X_INGEST_PROVIDER"],
     deploymentEnvironment,
-  )?.value?.trim().toLowerCase() ?? "apify";
+  );
+  const ingestProvider = ingestProviderConfig?.value?.trim().toLowerCase() ??
+    "self_hosted_service";
 
-  if (ingestProvider === "self_hosted_service") {
-    const serviceUrl = resolveEnvValue(
-      env,
-      [
-        "BRUH_X_SELF_HOSTED_SERVICE_URL",
-        "X_INGEST_SERVICE_URL",
-        "BRUH_X_SCRAPER_SERVICE_URL",
-      ],
-      deploymentEnvironment,
-    );
-    checks.push(serviceUrl
-      ? {
-        name: "Self-hosted X ingest service",
-        description: "local crawler service URL for X ingestion",
-        required: false,
-        level: "pass",
-        foundKey: serviceUrl.key,
-        summary: `resolved from ${serviceUrl.key}`,
-      }
-      : {
-        name: "Self-hosted X ingest service",
-        description: "local crawler service URL for X ingestion",
-        required: false,
-        level: "warn",
-        foundKey: null,
-        summary:
-          "optional; not configured (BRUH_X_SELF_HOSTED_SERVICE_URL / X_INGEST_SERVICE_URL / BRUH_X_SCRAPER_SERVICE_URL)",
-      });
-  } else {
-    const apifyToken = resolveEnvValue(
-      env,
-      ["APIFY_TOKEN"],
-      deploymentEnvironment,
-    );
-    checks.push(apifyToken
-      ? {
-        name: "Apify token",
-        description: "X ingestion actor access",
-        required: false,
-        level: "pass",
-        foundKey: apifyToken.key,
-        summary: `resolved from ${apifyToken.key}`,
-      }
-      : {
-        name: "Apify token",
-        description: "X ingestion actor access",
-        required: false,
-        level: "warn",
-        foundKey: null,
-        summary: "optional; not configured (APIFY_TOKEN)",
-      });
-  }
+  const supportedProviders = new Set([
+    "self_hosted",
+    "self-hosted",
+    "self_hosted_service",
+    "self-hosted-service",
+    "selfhosted",
+  ]);
+
+  checks.push(supportedProviders.has(ingestProvider)
+    ? {
+      name: "X ingest provider",
+      description: "active X ingestion backend",
+      required: false,
+      level: "pass",
+      foundKey: ingestProviderConfig?.key ?? "default:self_hosted_service",
+      summary: "resolved to self_hosted_service",
+    }
+    : {
+      name: "X ingest provider",
+      description: "active X ingestion backend",
+      required: false,
+      level: "fail",
+      foundKey: null,
+      summary:
+        `unsupported provider '${ingestProvider}'; expected self_hosted_service`,
+    });
+
+  const serviceUrl = resolveEnvValue(
+    env,
+    [
+      "BRUH_X_SELF_HOSTED_SERVICE_URL",
+      "X_INGEST_SERVICE_URL",
+      "BRUH_X_SCRAPER_SERVICE_URL",
+    ],
+    deploymentEnvironment,
+  );
+  checks.push(serviceUrl
+    ? {
+      name: "Self-hosted X ingest service",
+      description: "local crawler service URL for X ingestion",
+      required: false,
+      level: "pass",
+      foundKey: serviceUrl.key,
+      summary: `resolved from ${serviceUrl.key}`,
+    }
+    : {
+      name: "Self-hosted X ingest service",
+      description: "local crawler service URL for X ingestion",
+      required: false,
+      level: "warn",
+      foundKey: null,
+      summary:
+        "optional; not configured (BRUH_X_SELF_HOSTED_SERVICE_URL / X_INGEST_SERVICE_URL / BRUH_X_SCRAPER_SERVICE_URL)",
+    });
 
   return checks;
 }
