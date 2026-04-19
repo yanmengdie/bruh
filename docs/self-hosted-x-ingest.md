@@ -78,6 +78,44 @@ export BRUH_X_SELF_HOSTED_SERVICE_TOKEN=replace-me
 
 Then call the ingest function as usual.
 
+## Secure Cookie Upload Flow
+
+If you do not want to paste `TWITTER_AUTH_TOKEN` / `TWITTER_CT0` manually into chat, use the local helper:
+
+```bash
+node scripts/push_x_cookies_to_server.mjs
+```
+
+What it does:
+
+1. starts a real local Microsoft Edge instance with a temporary profile and CDP port
+2. waits for you to log into X yourself
+3. reads `auth_token` and `ct0` locally without printing them
+4. uploads them directly to the server over SSH
+5. restarts `bruh-x-scrape-service.service`
+
+Required on the local machine:
+
+- `tools/xhs/node_modules/playwright`
+- `Microsoft Edge.app`
+- SSH access to the self-hosted server
+
+The helper defaults to:
+
+- host: `210.73.43.5`
+- port: `17322`
+- user: `root`
+
+Override with:
+
+- `BRUH_SELFHOST_SSH_HOST`
+- `BRUH_SELFHOST_SSH_PORT`
+- `BRUH_SELFHOST_SSH_USER`
+- `BRUH_SELFHOST_SSH_PASSWORD`
+- `BRUH_X_LOGIN_MODE`
+- `BRUH_X_LOGIN_CDP_PORT`
+- `BRUH_X_LOGIN_EXECUTABLE_PATH`
+
 ## Deployment Notes
 
 - On the self-hosted server, `ingest-x-posts` can call the crawler over `127.0.0.1`, so the crawler does not need a public port.
