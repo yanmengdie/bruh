@@ -180,6 +180,8 @@
   已完成：从 iOS、functions、脚本和 `supabase/config.toml` 的实际调用看，当前业务没有使用 Supabase Auth、Storage、Realtime；现存 Supabase 相关命名主要是 `supabase/functions` 目录和 `supabase-js` / env key 的兼容层，并不代表还依赖 hosted Supabase 的托管运行时。
 - [x] 把 X 抓取链路抽象成可替换 provider，并补一条同服务器自建抓取服务入口，降低对 Apify 账单和支付方式的依赖。
   已完成：`ingest-x-posts` 现在支持 `BRUH_X_INGEST_PROVIDER=apify|self_hosted_service`，自建模式下会调用同服务器上的 `scripts/x_scrape_service.py` HTTP 服务而不是直接访问 Apify。这个服务复用了仓库里原有的 `twitter` CLI + `TWITTER_AUTH_TOKEN/TWITTER_CT0` 思路，只负责抓取和返回标准化帖子，真正的内容清洗、去重和 `source_posts` 写入仍由 `ingest-x-posts` 主链路负责，因此后续即使再把抓取实现从 `twitter` CLI 换成 Playwright，也不需要改 feed/DB 主流程。同时补充了 `scripts/run_x_scrape_service.sh` 与相关环境文档，便于在现有 Ubuntu 服务器上直接起服务。
+- [x] 把小红书抓取改成服务器侧自动化任务，避免依赖本地手工运行脚本。
+  已完成：服务器已补齐 `tools/xhs` 运行依赖、Playwright 与 Chromium，并新增 `scripts/run_xhs_sync.sh` 与 `scripts/push_xhs_auth_to_server.mjs`。当前不再尝试把 Mac 上的整套浏览器 profile 直接复制到 Linux，而是把本地登录态导出为 Playwright `storageState` 并同步到服务器 `/opt/bruh-selfhost/runtime/xhs-storage-state.json`，稳定性更高；`run_xhs_sync.sh` 会自动加载服务器 `.env`、调用本地 `ingest-xhs-posts`，并在 cron 中以 `45 * * * *` 定时运行。已在服务器手动验证成功抓取并入库 `影石刘靖康` 的 5 条最新小红书内容，随后由 `55 * * * *` 的统一 `build-feed` 重建 feed。
 - [ ] 配置 `.env.staging.local` 或 `.env.prod.local`，用真实 self-hosted REST gateway、compat service-role JWT、functions base URL 和 compat anon key 跑通 `./scripts/run_release_preflight.sh`。
   说明：当前 preflight 脚本和 env loader 已就绪，但本机尚未提供一套稳定的“正式自建入口”配置；在仍使用 Cloudflare Quick Tunnel 的情况下，env 可以临时填当前 URL 做验证，但这不适合作为长期发布配置。
 - [ ] 用真实 self-hosted 环境执行 `./scripts/run_backend_health_snapshot.sh --strict`，确认 `pipeline_job_locks`、`news_articles`、`news_events`、`persona_news_scores`、`feed_items`、`source_posts` 的 freshness 和 job 状态达标。
@@ -188,8 +190,8 @@
   说明：当前 tunnel URL `https://frequencies-main-saver-eggs.trycloudflare.com` 可用但不是稳定生产地址，机器或 tunnel 进程重启后 URL 可能变化；在没有固定域名/固定公网入口前，不建议直接删除 hosted Supabase 并进入长期依赖。
 - [ ] 补齐仍无法从 Supabase 后台反解出来的第三方明文密钥，只保留在自建服务器环境中。
   说明：OpenAI 相关配置已迁入服务器并验证可用，但若后续要恢复 X 抓取、TTS 或图片生成，还需要用户提供 `APIFY_TOKEN`、`VOICE_*`、`NANO_BANANA_*` 等明文值；这些值不能从 Supabase secrets digest 直接恢复。
-- [ ] 处理 `ingest-top-news` 的外网连通问题，或替换目前服务器抓不到的 RSS 源。
-  说明：当前自建函数与数据库都已迁走，但服务器到 BBC RSS 的 HTTPS 请求仍会超时；这不是 Supabase 依赖问题，而是服务器出网到该源的链路问题，删除 hosted Supabase 后也仍然需要单独解决。
+- [x] 处理 `ingest-top-news` 的外网连通问题，替换目前服务器抓不到的 RSS 源。
+  已完成：确认服务器到 `feeds.bbci.co.uk` 的 `80/443` 出口都超时后，已将默认热榜源从 BBC RSS 切换为服务器可直连的 `baidu-hot-search`，并在 `ingest-top-news` 中补齐对应解析和热度加权逻辑。服务器实测 `invoke_function.sh ingest-top-news '{"timeoutMs":20000}'` 已稳定返回 `feeds=[{"feed":"baidu-hot-search","ok":true,"fetched":11}]`，当前新闻抓取默认不再依赖 BBC。
 
 ### 时间映射
 
