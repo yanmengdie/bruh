@@ -12,9 +12,12 @@ import {
 } from "../_shared/feature_flags.ts";
 import {
   extractNormalizedVideoUrl,
-  normalizeMediaUrls,
   normalizeSourceUrl,
 } from "../_shared/media.ts";
+import {
+  buildProxiedAssetUrl,
+  buildProxiedMediaUrls,
+} from "../_shared/media_proxy.ts";
 import {
   classifyError,
   createObservationContext,
@@ -62,6 +65,11 @@ function resolveVideoUrl(item: FeedRow): string | null {
   return extractNormalizedVideoUrl(item);
 }
 
+function wouldCreateThreeInRow(rows: FeedRow[], personaId: string) {
+  const tail = rows.slice(-2)
+  return tail.length === 2 && tail.every((row) => row.persona_id === personaId)
+}
+
 function sortFeedRows(rows: FeedRow[], rankingStrategy: FeedRankingStrategy) {
   const sorted = rows.slice();
   if (rankingStrategy === "importance") {
@@ -78,8 +86,47 @@ function sortFeedRows(rows: FeedRow[], rankingStrategy: FeedRankingStrategy) {
   );
 }
 
-function mapFeed(rows: FeedRow[], rankingStrategy: FeedRankingStrategy) {
-  return sortFeedRows(rows, rankingStrategy).map((item) => ({
+function diversifyFeedRows(rows: FeedRow[], limit: number) {
+  const pending = rows.slice()
+  const selected: FeedRow[] = []
+  const counts = new Map<string, number>()
+  const maxItemsPerPersona = Math.max(3, Math.ceil(limit / 4))
+
+  while (pending.length > 0 && selected.length < limit) {
+    let pickIndex = pending.findIndex((row) => {
+      const count = counts.get(row.persona_id) ?? 0
+      return count < maxItemsPerPersona && !wouldCreateThreeInRow(selected, row.persona_id)
+    })
+
+    if (pickIndex === -1) {
+      pickIndex = pending.findIndex((row) => {
+        const count = counts.get(row.persona_id) ?? 0
+        return count < maxItemsPerPersona
+      })
+    }
+
+    if (pickIndex === -1) {
+      pickIndex = pending.findIndex((row) => !wouldCreateThreeInRow(selected, row.persona_id))
+    }
+
+    if (pickIndex === -1) {
+      pickIndex = 0
+    }
+
+    const [row] = pending.splice(pickIndex, 1)
+    selected.push(row)
+    counts.set(row.persona_id, (counts.get(row.persona_id) ?? 0) + 1)
+  }
+
+  return selected
+}
+
+function selectFeedRows(rows: FeedRow[], rankingStrategy: FeedRankingStrategy, limit: number) {
+  return diversifyFeedRows(sortFeedRows(rows, rankingStrategy), limit)
+}
+
+function mapFeed(rows: FeedRow[], rankingStrategy: FeedRankingStrategy, request: Request, limit: number) {
+  return selectFeedRows(rows, rankingStrategy, limit).map((item) => ({
     id: resolveFeedId(item),
     personaId: item.persona_id,
     content: item.content,
@@ -88,8 +135,8 @@ function mapFeed(rows: FeedRow[], rankingStrategy: FeedRankingStrategy) {
     topic: item.topic,
     importanceScore: item.importance_score,
     publishedAt: item.published_at,
-    mediaUrls: normalizeMediaUrls(item.media_urls),
-    videoUrl: resolveVideoUrl(item),
+    mediaUrls: buildProxiedMediaUrls(item.media_urls, request),
+    videoUrl: buildProxiedAssetUrl(resolveVideoUrl(item), request),
   }));
 }
 
@@ -140,6 +187,7 @@ Deno.serve({ port }, async (request) => {
     const limit = Number.isNaN(limitParam)
       ? 20
       : Math.min(Math.max(limitParam, 1), 100);
+    const selectionWindow = Math.min(Math.max(limit * 4, 40), 200)
 
     if (since) {
       const sinceDate = new Date(since);
@@ -163,7 +211,7 @@ Deno.serve({ port }, async (request) => {
       .in("persona_id", featureFlags.enabledPersonaIds)
       .order("published_at", { ascending: false })
       .order("id", { ascending: false })
-      .limit(limit);
+      .limit(selectionWindow);
 
     if (since) {
       sourceQuery = sourceQuery.gt(
@@ -195,6 +243,8 @@ Deno.serve({ port }, async (request) => {
         const payload = mapFeed(
           (sourcePosts ?? []) as FeedRow[],
           featureFlags.feedRankingStrategy,
+          request,
+          limit,
         );
         logEdgeSuccess(observation, "request_succeeded", {
           itemCount: payload.length,
@@ -216,7 +266,7 @@ Deno.serve({ port }, async (request) => {
       .in("persona_id", featureFlags.enabledPersonaIds)
       .order("published_at", { ascending: false })
       .order("source_post_id", { ascending: false })
-      .limit(limit);
+      .limit(selectionWindow);
 
     if (since) {
       fallbackQuery = fallbackQuery.gt(
@@ -247,6 +297,8 @@ Deno.serve({ port }, async (request) => {
     const payload = mapFeed(
       (feedItems ?? []) as FeedRow[],
       featureFlags.feedRankingStrategy,
+      request,
+      limit,
     );
     logEdgeSuccess(observation, "request_succeeded", {
       itemCount: payload.length,
