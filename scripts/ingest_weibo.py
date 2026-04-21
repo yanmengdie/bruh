@@ -225,11 +225,36 @@ def extract_media_urls(status: dict) -> list[str]:
         seen.add(candidate)
         urls.append(candidate)
 
+    def preferred_pic_info_url(info: dict) -> str | None:
+        for key in ("largest", "large", "original", "mw2000", "bmiddle", "thumbnail"):
+            variant = info.get(key)
+            if not isinstance(variant, dict):
+                continue
+            url = variant.get("url")
+            if isinstance(url, str) and url.strip():
+                return url.strip()
+        return None
+
     for pic in status.get("pics", []) if isinstance(status.get("pics"), list) else []:
         if not isinstance(pic, dict):
             continue
         add_url(pic.get("large", {}).get("url") if isinstance(pic.get("large"), dict) else None)
         add_url(pic.get("url"))
+
+    pic_infos = status.get("pic_infos") if isinstance(status.get("pic_infos"), dict) else {}
+    ordered_pic_ids = status.get("pic_ids") if isinstance(status.get("pic_ids"), list) else []
+    for pic_id in ordered_pic_ids:
+        if not isinstance(pic_id, str):
+            continue
+        info = pic_infos.get(pic_id)
+        if not isinstance(info, dict):
+            continue
+        add_url(preferred_pic_info_url(info))
+
+    for info in pic_infos.values():
+        if not isinstance(info, dict):
+            continue
+        add_url(preferred_pic_info_url(info))
 
     page_info = status.get("page_info") if isinstance(status.get("page_info"), dict) else {}
     page_pic = page_info.get("page_pic") if isinstance(page_info.get("page_pic"), dict) else {}
