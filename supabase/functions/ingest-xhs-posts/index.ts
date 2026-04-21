@@ -39,6 +39,10 @@ function slugify(value: string): string {
   return normalized || crypto.randomUUID();
 }
 
+function personaShadowHandle(personaId: string): string {
+  return `persona:${slugify(personaId)}`;
+}
+
 function parseCount(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value !== "string") return 0;
@@ -213,8 +217,6 @@ Deno.serve({ port }, async (request) => {
     const displayName = asString(body.displayName);
     const personaId = asString(body.personaId) || displayName;
     const userId = asString(body.userId);
-    const sourceHandle = asString(body.sourceHandle) ||
-      `xhs:${userId || slugify(displayName || personaId)}`;
     const profileUrl = asString(body.profileUrl) || null;
     const notes = Array.isArray(body.notes) ? body.notes as IncomingNote[] : [];
     const contentSafety = { blocked: 0, sanitized: 0 };
@@ -241,13 +243,28 @@ Deno.serve({ port }, async (request) => {
       .from("personas")
       .upsert({
         id: personaId,
-        x_username: sourceHandle,
+        x_username: personaShadowHandle(personaId),
         display_name: displayName,
         is_active: true,
       }, { onConflict: "id" });
 
     if (personaError) {
       throw new Error(personaError.message);
+    }
+
+    const { error: accountError } = await supabase
+      .from("persona_accounts")
+      .upsert({
+        persona_id: personaId,
+        platform: "xiaohongshu",
+        handle: displayName,
+        profile_url: profileUrl ? stripQuery(profileUrl) : null,
+        is_primary: true,
+        is_active: true,
+      }, { onConflict: "platform,handle" });
+
+    if (accountError) {
+      throw new Error(accountError.message);
     }
 
     const rows = notes.map((note, index) => {

@@ -75,7 +75,7 @@ struct ContactsView: View {
         "sam_altman",
         "papi",
         "justin_sun",
-        "liu_jingkang",
+        "影石刘靖康",
     ]
 
     private var currentProfile: UserProfile? {

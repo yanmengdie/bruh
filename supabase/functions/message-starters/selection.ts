@@ -65,7 +65,7 @@ function personaVisualShareBase(
       break
     case "sam_altman":
     case "zhang_peng":
-    case "liu_jingkang":
+    case "影石刘靖康":
       probability -= 0.03
       break
     default:
@@ -91,7 +91,7 @@ function personaSourceShareBase(
   switch (persona.personaId) {
     case "sam_altman":
     case "zhang_peng":
-    case "liu_jingkang":
+    case "影石刘靖康":
       probability += 0.14
       break
     case "musk":

@@ -244,7 +244,7 @@ struct ContactTagsView: View {
     }
 
     private func countryTag(for persona: Persona) -> String? {
-        let chinaPersonaIds: Set<String> = ["zhang_peng", "lei_jun", "liu_jingkang", "luo_yonghao", "justin_sun", "papi"]
+        let chinaPersonaIds: Set<String> = ["zhang_peng", "lei_jun", "影石刘靖康", "luo_yonghao", "justin_sun", "papi"]
         let usPersonaIds: Set<String> = ["trump", "musk", "zuckerberg", "sam_altman", "kim_kardashian"]
 
         if chinaPersonaIds.contains(persona.id) { return "中国" }
@@ -278,7 +278,7 @@ struct ContactTagsView: View {
         case "lei_jun": return "📱"
         case "luo_yonghao": return "🎤"
         case "justin_sun": return "🧑‍💼"
-        case "liu_jingkang": return "📷"
+        case "影石刘靖康": return "📷"
         case "papi": return "🎬"
         default: return "😎"
         }

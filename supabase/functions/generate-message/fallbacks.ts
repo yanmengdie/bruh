@@ -82,7 +82,7 @@ export function fallbackPersonaReply(
       return english
         ? (topic ? `${topic} only matters if it lands in product, delivery, and user value. Which one are you asking about?` : "Directly tell me the product point.")
         : (topic ? `${topic} 真正有价值，得落到产品、交付和用户价值上。你想问哪一层？` : "直接说产品点。")
-    case "liu_jingkang":
+    case "影石刘靖康":
       return english
         ? (topic ? `${topic} is only worth discussing if it maps to a real user pain point. Which one?` : "Tell me the actual pain point.")
         : (topic ? `${topic} 值不值得聊，先看它是不是打到了真实痛点。你说哪一个？` : "先说真实痛点。")

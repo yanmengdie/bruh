@@ -365,7 +365,7 @@ export function defaultStarterMessage(personaId: string, title: string) {
       return `${title} 不是一条普通新闻，更像是技术周期又往前走了一格。`
     case "lei_jun":
       return `${title} 背后一定不只是热度，产品、供应链和节奏都在一起变化。`
-    case "liu_jingkang":
+    case "影石刘靖康":
       return `${title} 这种消息我会先看它到底解决了什么真实用户问题。`
     case "luo_yonghao":
       return `${title} 听着像新闻，实际上更值得看的是它到底有没有把事做对。`

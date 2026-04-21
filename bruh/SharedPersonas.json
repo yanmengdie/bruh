@@ -64,12 +64,12 @@
     ],
     "defaultVoiceSpeakerId": "upload:13ae480ff27644d29dc8ff1a29604d32",
     "defaultVoiceLabel": "Elon's voice",
-    "socialCircleIds": ["trump", "sam_altman", "lei_jun", "liu_jingkang", "justin_sun"],
+    "socialCircleIds": ["trump", "sam_altman", "lei_jun", "影石刘靖康", "justin_sun"],
     "relationshipHints": {
       "trump": "Political ally who reacts when industrial policy, trade, or national competition shows up.",
       "sam_altman": "Close-in AI rival and collaborator figure who reacts when frontier-model dynamics change.",
       "lei_jun": "Hardware and EV founder who can react when products, manufacturing, or supply chains move.",
-      "liu_jingkang": "Hardware founder who reacts to creator tools, cameras, and product craft.",
+      "影石刘靖康": "Hardware founder who reacts to creator tools, cameras, and product craft.",
       "justin_sun": "Crypto-native operator who joins when tech, markets, or attention collide."
     }
   },
@@ -130,12 +130,12 @@
     "platformAccounts": [],
     "defaultVoiceSpeakerId": "example:voice_zhang_peng",
     "defaultVoiceLabel": "张鹏 voice",
-    "socialCircleIds": ["sam_altman", "musk", "lei_jun", "liu_jingkang", "luo_yonghao", "papi"],
+    "socialCircleIds": ["sam_altman", "musk", "lei_jun", "影石刘靖康", "luo_yonghao", "papi"],
     "relationshipHints": {
       "sam_altman": "AI 平台建设者，适合在技术周期和变量层面展开对话。",
       "musk": "高能见度技术企业家，适合在产业趋势和系统性变化上接话。",
       "lei_jun": "中国硬件与汽车代表人物，适合谈产品节奏、供应链和产业落点。",
-      "liu_jingkang": "硬件创业者，会从真实用户场景和全球化产品判断来接话。",
+      "影石刘靖康": "硬件创业者，会从真实用户场景和全球化产品判断来接话。",
       "luo_yonghao": "表达型创业者，适合从产品体验和表达价值去延展。",
       "papi": "内容创作者，适合在内容情绪和表达方式上补充视角。"
     }
@@ -169,17 +169,17 @@
     ],
     "defaultVoiceSpeakerId": "example:voice_lei_jun",
     "defaultVoiceLabel": "雷军 voice",
-    "socialCircleIds": ["musk", "sam_altman", "zhang_peng", "liu_jingkang", "luo_yonghao"],
+    "socialCircleIds": ["musk", "sam_altman", "zhang_peng", "影石刘靖康", "luo_yonghao"],
     "relationshipHints": {
       "musk": "全球 EV 和硬件创业者，会在产品、工厂和执行效率上形成互相回应。",
       "sam_altman": "当 AI 开始落到设备和产品层，双方的话题天然会重叠。",
       "zhang_peng": "科技观察者，适合把产品新闻放回产业周期里理解。",
-      "liu_jingkang": "同属硬件创业者，适合围绕真实痛点和产品定义展开。",
+      "影石刘靖康": "同属硬件创业者，适合围绕真实痛点和产品定义展开。",
       "luo_yonghao": "对产品体验和表达都敏感，适合在消费电子和用户感知上接话。"
     }
   },
   {
-    "id": "liu_jingkang",
+    "id": "影石刘靖康",
     "displayName": "刘瞬间",
     "avatarName": "Avatar_LiuJingkang",
     "handle": "@影石刘靖康",
@@ -236,11 +236,11 @@
     "platformAccounts": [],
     "defaultVoiceSpeakerId": "example:voice_luo_yonghao",
     "defaultVoiceLabel": "罗永浩 voice",
-    "socialCircleIds": ["lei_jun", "zhang_peng", "liu_jingkang", "papi"],
+    "socialCircleIds": ["lei_jun", "zhang_peng", "影石刘靖康", "papi"],
     "relationshipHints": {
       "lei_jun": "同样做过消费电子和发布会叙事，适合从产品体验和表达切入。",
       "zhang_peng": "科技内容人，适合把行业热闹翻译成真正的变量。",
-      "liu_jingkang": "硬件创业者，适合聊产品打磨和用户真实痛点。",
+      "影石刘靖康": "硬件创业者，适合聊产品打磨和用户真实痛点。",
       "papi": "内容表达者，适合从表达方式和情绪共鸣继续往下聊。"
     }
   },

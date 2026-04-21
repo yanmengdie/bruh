@@ -58,7 +58,7 @@ enum PersonaCatalog {
     static var samAltman: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "sam_altman") }
     static var zhangPeng: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "zhang_peng") }
     static var leiJun: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "lei_jun") }
-    static var liuJingkang: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "liu_jingkang") }
+    static var yingShiLiuJingkang: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "影石刘靖康") }
     static var luoYonghao: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "luo_yonghao") }
     static var justinSun: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "justin_sun") }
     static var kimKardashian: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "kim_kardashian") }
