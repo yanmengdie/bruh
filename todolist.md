@@ -184,8 +184,8 @@
   已完成：服务器已补齐 `tools/xhs` 运行依赖、Playwright 与 Chromium，并新增 `scripts/run_xhs_sync.sh` 与 `scripts/push_xhs_auth_to_server.mjs`。当前不再尝试把 Mac 上的整套浏览器 profile 直接复制到 Linux，而是把本地登录态导出为 Playwright `storageState` 并同步到服务器 `/opt/bruh-selfhost/runtime/xhs-storage-state.json`，稳定性更高；`run_xhs_sync.sh` 会自动加载服务器 `.env`、调用本地 `ingest-xhs-posts`，并在 cron 中以 `45 * * * *` 定时运行。已在服务器手动验证成功抓取并入库 `影石刘靖康` 的 5 条最新小红书内容，随后由 `55 * * * *` 的统一 `build-feed` 重建 feed。后续更新：因小红书账号风控风险过高，已从服务器 cron 移除 `run_xhs_sync.sh`，删除服务器侧 XHS 登录态，并通过 `0021_retire_yingshi_liu_jingkang.sql` 下线仅依赖小红书的 `影石刘靖康` persona；代码保留但当前不再作为自动数据源。
 - [x] 为中文 persona 补微博账号映射和授权 cookie 抓取入口，替代高风险小红书自动化。
   已完成：在 `SharedPersonas.json` 和数据库迁移中补充 `zhang_peng -> geekpark`、`lei_jun -> leijun`、`luo_yonghao -> luoyonghaoniuhulu`、`papi -> xiaopapi` 的微博账号映射；新增 `scripts/ingest_weibo.py` 与 `scripts/run_weibo_ingest.sh`，使用用户授权的 `WEIBO_COOKIE` 读取微博 AJAX 数据并写入 `source_posts`，不依赖 Playwright，也不实现反检测绕过。
-- [ ] 等用户提供可用 `WEIBO_COOKIE` 后，在服务器低频试跑微博入库并决定是否接 cron。
-  说明：微博未登录公共访问当前会命中 Visitor System、Forbidden 或 HTTP 432；下一步需要用户用真实浏览器登录一次并提供 cookie。通过后先手动跑 `scripts/run_weibo_ingest.sh` 验证张鹏、雷军、老罗、papi 四个中文 persona 的增量内容，再决定是否加入低频 cron。
+- [x] 等用户提供可用 `WEIBO_COOKIE` 后，在服务器低频试跑微博入库并决定是否接 cron。
+  已完成：已通过本地普通 Edge 登录态提取并验证微博 cookie，可正常访问 `profile/info` 和 `mymblog`。服务器已同步微博环境并手动跑通 `scripts/ingest_weibo.py`，为 `zhang_peng`、`lei_jun`、`luo_yonghao`、`papi` 各入库 10 条微博，共 40 条。随后已把微博抓取加入服务器低频 cron，每 6 小时在 `40` 分执行一次，复用 runtime `.env`，并继续由 `55` 分的统一 `build-feed` job 完成 feed 重建。
 - [ ] 配置 `.env.staging.local` 或 `.env.prod.local`，用真实 self-hosted REST gateway、compat service-role JWT、functions base URL 和 compat anon key 跑通 `./scripts/run_release_preflight.sh`。
   说明：当前 preflight 脚本和 env loader 已就绪，但本机尚未提供一套稳定的“正式自建入口”配置；在仍使用 Cloudflare Quick Tunnel 的情况下，env 可以临时填当前 URL 做验证，但这不适合作为长期发布配置。
 - [ ] 用真实 self-hosted 环境执行 `./scripts/run_backend_health_snapshot.sh --strict`，确认 `pipeline_job_locks`、`news_articles`、`news_events`、`persona_news_scores`、`feed_items`、`source_posts` 的 freshness 和 job 状态达标。

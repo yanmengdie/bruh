@@ -3,6 +3,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+RUNTIME_ENV_FILE="${BRUH_RUNTIME_ENV_FILE:-/opt/bruh-selfhost/runtime/.env}"
+
+if [[ -f "$RUNTIME_ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$RUNTIME_ENV_FILE"
+  set +a
+fi
 
 cd "$ROOT_DIR"
 
