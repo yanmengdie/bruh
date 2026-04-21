@@ -2,6 +2,19 @@ type NormalizeUrlOptions = {
   allowHttp?: boolean
 }
 
+const trustedAssetHttpUpgradeHostSuffixes = [
+  "video.weibocdn.com",
+]
+
+function shouldUpgradeAssetHttpHost(hostname: string) {
+  const normalized = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "")
+  if (!normalized) return false
+
+  return trustedAssetHttpUpgradeHostSuffixes.some((suffix) =>
+    normalized === suffix || normalized.endsWith(`.${suffix}`)
+  )
+}
+
 function isLoopbackOrPrivateHost(hostname: string) {
   const normalized = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "")
   if (!normalized) return true
@@ -54,6 +67,11 @@ function normalizeRemoteUrl(value: unknown, options: NormalizeUrlOptions = {}) {
     // allowed
   } else if (protocol === "http:" && options.allowHttp === true) {
     // allowed
+  } else if (protocol === "http:" && shouldUpgradeAssetHttpHost(parsed.hostname)) {
+    parsed.protocol = "https:"
+    if (parsed.port === "80") {
+      parsed.port = ""
+    }
   } else {
     return null
   }

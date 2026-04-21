@@ -1,6 +1,10 @@
 import Foundation
 
 enum RemoteMediaPolicy {
+    private static let trustedAssetHTTPUpgradeHostSuffixes = [
+        "video.weibocdn.com"
+    ]
+
     static func normalizedSourceURLString(_ rawValue: String?) -> String? {
         normalizedURLString(rawValue, allowHTTP: true)
     }
@@ -56,6 +60,11 @@ enum RemoteMediaPolicy {
             break
         case "http" where allowHTTP:
             break
+        case "http" where shouldUpgradeAssetHTTPHost(host):
+            components.scheme = "https"
+            if components.port == 80 {
+                components.port = nil
+            }
         default:
             return nil
         }
@@ -102,5 +111,14 @@ enum RemoteMediaPolicy {
             (parsed[0] == 169 && parsed[1] == 254) ||
             (parsed[0] == 172 && (16...31).contains(parsed[1])) ||
             (parsed[0] == 192 && parsed[1] == 168)
+    }
+
+    private static func shouldUpgradeAssetHTTPHost(_ host: String) -> Bool {
+        let normalized = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]")).lowercased()
+        guard !normalized.isEmpty else { return false }
+
+        return trustedAssetHTTPUpgradeHostSuffixes.contains { suffix in
+            normalized == suffix || normalized.hasSuffix(".\(suffix)")
+        }
     }
 }

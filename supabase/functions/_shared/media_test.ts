@@ -27,6 +27,20 @@ Deno.test("normalizeAssetUrl requires https and rejects private hosts", () => {
   }
 })
 
+Deno.test("normalizeAssetUrl upgrades trusted Weibo video CDN assets", () => {
+  const normalized = normalizeAssetUrl(
+    "http://f.video.weibocdn.com/o0/sample.mp4?label=mp4_hd#preview",
+  )
+  if (normalized !== "https://f.video.weibocdn.com/o0/sample.mp4?label=mp4_hd") {
+    throw new Error(`unexpected normalized Weibo asset url: ${normalized ?? "null"}`)
+  }
+
+  const podcast = normalizeAssetUrl("http://podcast.video.weibocdn.com/ol/sample.mp3")
+  if (podcast !== "https://podcast.video.weibocdn.com/ol/sample.mp3") {
+    throw new Error(`unexpected normalized Weibo podcast url: ${podcast ?? "null"}`)
+  }
+})
+
 Deno.test("normalizeMediaUrls deduplicates and limits image lists", () => {
   const urls = normalizeMediaUrls([
     "https://cdn.example.com/1.jpg#hero",
@@ -61,5 +75,12 @@ Deno.test("extractNormalizedVideoUrl reads direct and payload-backed candidates"
   })
   if (nested !== "https://video.example.com/from-note.mp4") {
     throw new Error(`unexpected nested video url: ${nested ?? "null"}`)
+  }
+
+  const trustedWeibo = extractNormalizedVideoUrl({
+    video_url: "http://f.video.weibocdn.com/o0/from-weibo.mp4",
+  })
+  if (trustedWeibo !== "https://f.video.weibocdn.com/o0/from-weibo.mp4") {
+    throw new Error(`unexpected Weibo video url: ${trustedWeibo ?? "null"}`)
   }
 })
