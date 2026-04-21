@@ -405,8 +405,6 @@ struct HomeScreen: View {
             return Color(red: 0.72, green: 0.54, blue: 0.42)
         case "papi":
             return Color(red: 0.88, green: 0.11, blue: 0.55)
-        case "kobe_bryant":
-            return Color(red: 0.99, green: 0.73, blue: 0.15)
         case "cristiano_ronaldo":
             return Color(red: 0.05, green: 0.58, blue: 0.53)
         default:

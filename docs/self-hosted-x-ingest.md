@@ -104,9 +104,12 @@ What it does:
 
 Required on the local machine:
 
-- `tools/xhs/node_modules/playwright`
 - `Microsoft Edge.app`
 - SSH access to the self-hosted server
+
+The default `edge_cdp` login mode talks to the real local Edge browser over
+Chrome DevTools Protocol and does not depend on the removed Xiaohongshu tooling.
+Playwright is only needed for the optional non-CDP browser mode.
 
 The helper defaults to:
 

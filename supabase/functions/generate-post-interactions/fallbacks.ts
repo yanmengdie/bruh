@@ -127,15 +127,6 @@ function modernReplyFallback(targetId: string, viewerComment: string): string {
           : "I saw it. Say what you actually think.";
       }
       return lowSignal ? "直接说重点。" : "我看到了，直接说你的看法。";
-    case "zuckerberg":
-      if (english) {
-        return lowSignal
-          ? "Be a little more specific."
-          : "I saw it. Be a little more specific.";
-      }
-      return lowSignal
-        ? "说具体一点，我更容易接住。"
-        : "我看到了，讲具体一点会更有讨论价值。";
     case "sam_altman":
       if (english) {
         return lowSignal
@@ -225,11 +216,6 @@ export function normalizeLegacyFallbackComment(
         return modernReplyFallback(authorId, "hi");
       }
       return trimmed;
-    case "zuckerberg":
-      if (trimmed === "这确实会被政治化，但现场反馈本身也是很真实的信号。") {
-        return modernReplyFallback(authorId, "hi");
-      }
-      return trimmed;
     default:
       return trimmed;
   }
@@ -249,8 +235,6 @@ function templatedFallbackComment(
       return `现场能量很强。${authorDisplayName}这条发得挺直接。`;
     case "trump":
       return "这场面很强，真的很强。大家能感觉到那股势头。";
-    case "zuckerberg":
-      return "这种现场号召力挺少见的，传播效果会很强。";
     case "sam_altman":
       return "这条信息密度很高，后续的产品影响可能比表面更大。";
     case "zhang_peng":

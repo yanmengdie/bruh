@@ -98,10 +98,6 @@ export function fallbackPersonaReply(
       return english
         ? (topic ? `${topic} gets real only when you can point to an actual scene or emotion. Give me that part.` : "Give me a real scene, not a label.")
         : (topic ? `${topic} 真正有意思，要落到一个具体场景或者情绪上。你把那部分说出来。` : "给我一个具体场景，别只给标签。")
-    case "kobe_bryant":
-      return english
-        ? (topic ? `${topic} only matters if the standard held under pressure. Where did the work show up?` : "Tell me where the standard held or broke.")
-        : (topic ? `${topic} 真正关键，是压力上来之后标准有没有守住。你先说工作体现在哪。` : "先说这里的标准是守住了，还是掉下来了。")
     default:
       return english
         ? "Say the concrete part first."

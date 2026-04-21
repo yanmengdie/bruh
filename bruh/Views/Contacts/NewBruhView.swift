@@ -71,8 +71,6 @@ struct BruhInvitation: Identifiable, Hashable {
             return "✨"
         case "papi":
             return "🎬"
-        case "kobe_bryant":
-            return "🏀"
         case "cristiano_ronaldo":
             return "⚽️"
         default:

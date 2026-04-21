@@ -62,7 +62,6 @@ enum PersonaCatalog {
     static var justinSun: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "justin_sun") }
     static var kimKardashian: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "kim_kardashian") }
     static var papi: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "papi") }
-    static var kobeBryant: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "kobe_bryant") }
     static var cristianoRonaldo: PersonaCatalogEntry { PersonaCatalogStore.requiredEntry(for: "cristiano_ronaldo") }
 
     static var all: [PersonaCatalogEntry] {

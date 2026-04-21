@@ -36,7 +36,6 @@ Pipeline and ingestion functions:
 - `build-news-events`
 - `ingest-top-news`
 - `ingest-x-posts`
-- `ingest-xhs-posts`
 
 Provider metric coverage:
 

@@ -54,7 +54,6 @@ These are already reachable through the self-hosted functions gateway.
 - `build-news-events`
 - `ingest-top-news`
 - `ingest-x-posts`
-- `ingest-xhs-posts`
 
 These are also running on the self-hosted server.
 

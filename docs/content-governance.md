@@ -20,7 +20,6 @@ External ingestion paths:
 
 - `ingest-top-news`
 - `ingest-x-posts`
-- `ingest-xhs-posts`
 
 ## What The Safety Layer Does
 

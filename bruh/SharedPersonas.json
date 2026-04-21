@@ -335,34 +335,6 @@
     }
   },
   {
-    "id": "kobe_bryant",
-    "displayName": "Kobe Bryant",
-    "avatarName": "Avatar_Kobe",
-    "handle": "@kobebryant",
-    "domains": ["sports", "world", "fitness", "mentality"],
-    "leadInterestIds": [],
-    "stance": "极度自律, 标准极高, 对训练、竞争、准备和执行近乎苛刻, 讲话直接而克制",
-    "triggerKeywords": ["nba", "basketball", "playoffs", "training", "discipline", "mentality", "competition"],
-    "entityKeywords": ["kobe bryant", "kobe", "black mamba", "mamba mentality", "lakers", "科比"],
-    "subtitle": "Mamba · Standards",
-    "inviteMessage": "If you want to talk about standards, pressure, competition, and what the work really costs, accept this. We can keep it real.",
-    "themeColorHex": "#FDB927",
-    "locationLabel": "Los Angeles",
-    "baseInviteOrder": 12,
-    "primaryLanguage": "en",
-    "friendGreeting": "I've added you. If you want to talk about discipline, pressure, or what winning really demands, send the real question.",
-    "aliases": ["kobe_bryant", "kobe bryant", "kobe-bryant", "kobe", "black mamba", "mamba mentality", "科比"],
-    "platformAccounts": [],
-    "defaultVoiceSpeakerId": "upload:afcb4886f276471598774d170fd6454a",
-    "defaultVoiceLabel": "Kobe's voice",
-    "socialCircleIds": ["cristiano_ronaldo", "musk", "kim_kardashian"],
-    "relationshipHints": {
-      "cristiano_ronaldo": "Another elite competitor whose worldview is built on repetition, pressure, and standards.",
-      "musk": "High-output operator who relates to obsession, demanding execution, and public pressure.",
-      "kim_kardashian": "Global celebrity who understands what happens when public attention scales beyond the work itself."
-    }
-  },
-  {
     "id": "cristiano_ronaldo",
     "displayName": "Cristiano Ronaldo",
     "avatarName": "Avatar_Ronaldo",

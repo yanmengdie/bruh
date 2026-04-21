@@ -21,7 +21,6 @@ func defaultPhoneNumber(for personaId: String) -> String {
         "justin_sun": "+852 5550 0133",
         "kim_kardashian": "+1 323 555 0199",
         "papi": "+86 21 5555 0126",
-        "kobe_bryant": "+1 213 555 0824",
         "cristiano_ronaldo": "+351 21 555 0107",
     ]
 
@@ -39,7 +38,6 @@ func defaultEmail(for personaId: String) -> String {
         "justin_sun": "justin@tron.network",
         "kim_kardashian": "kim@skims.com",
         "papi": "papi@papitube.com",
-        "kobe_bryant": "kobe@mamba.local",
         "cristiano_ronaldo": "cr7@cr7.com",
     ]
 

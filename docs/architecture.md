@@ -148,7 +148,7 @@ Functions:
 - `generate-message`
 - `message-starters`
 - `generate-post-interactions`
-- ingestion functions for top news / X / XHS
+- ingestion functions for top news / X
 
 Boundary:
 
@@ -239,7 +239,6 @@ Boundary:
 Writer:
 
 - `ingest-x-posts`
-- `ingest-xhs-posts`
 
 Readers:
 

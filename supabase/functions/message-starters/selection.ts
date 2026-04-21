@@ -57,7 +57,6 @@ function personaVisualShareBase(
   switch (persona.personaId) {
     case "trump":
     case "kim_kardashian":
-    case "kobe_bryant":
     case "cristiano_ronaldo":
     case "musk":
     case "justin_sun":
@@ -96,7 +95,6 @@ function personaSourceShareBase(
       break
     case "kim_kardashian":
     case "papi":
-    case "kobe_bryant":
     case "cristiano_ronaldo":
       probability -= 0.04
       break

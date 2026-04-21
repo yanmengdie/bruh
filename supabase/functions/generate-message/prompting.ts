@@ -216,7 +216,6 @@ function personaSourceShareBase(persona: PersonaDefinition) {
       break
     case "kim_kardashian":
     case "papi":
-    case "kobe_bryant":
     case "cristiano_ronaldo":
       probability -= 0.03
       break

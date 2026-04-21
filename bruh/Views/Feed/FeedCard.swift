@@ -203,7 +203,6 @@ struct FeedCard: View {
         case "justin_sun": Color(red: 0.11, green: 0.74, blue: 0.63)
         case "kim_kardashian": Color(red: 0.72, green: 0.54, blue: 0.42)
         case "papi": Color(red: 0.88, green: 0.11, blue: 0.55)
-        case "kobe_bryant": Color(red: 0.99, green: 0.73, blue: 0.15)
         case "cristiano_ronaldo": Color(red: 0.05, green: 0.58, blue: 0.53)
         default: .gray
         }
@@ -421,10 +420,6 @@ struct FeedCard: View {
     }
 
     private var locationText: String {
-        if sourceItem?.sourceType == "xiaohongshu" {
-            return "中国"
-        }
-
         if let location = contact?.locationLabel, !location.isEmpty {
             return location
         }
@@ -439,7 +434,6 @@ struct FeedCard: View {
         case "justin_sun": return "Hong Kong"
         case "kim_kardashian": return "Los Angeles"
         case "papi": return "上海"
-        case "kobe_bryant": return "Los Angeles"
         case "cristiano_ronaldo": return "Europe"
         default: return "中国"
         }

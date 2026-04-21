@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Bruh** is a SwiftUI iOS app where users chat with AI-powered personas (public figures, personalities) and browse a curated social content feed. It pairs a SwiftUI/SwiftData frontend with a Supabase backend (PostgreSQL + Deno Edge Functions) and Python/Playwright ingestion scripts.
+**Bruh** is a SwiftUI iOS app where users chat with AI-powered personas (public figures, personalities) and browse a curated social content feed. It pairs a SwiftUI/SwiftData frontend with a Supabase-compatible backend (PostgreSQL + Deno Edge Functions) and ingestion scripts.
 
 ## Build & Run Commands
 
@@ -49,7 +49,7 @@ There is no XCTest target. Validate iOS changes by building + smoke-testing on s
 
 **Ingestion**
 - `scripts/ingest_x.py` — fetches Twitter/X posts via `twitter-cli`, upserts to Supabase
-- `tools/xhs/` — Playwright scraper for Xiaohongshu (Red)
+- `scripts/ingest_weibo.py` — fetches configured Weibo posts with an operator-provided cookie
 
 **Persona Assets**
 - `SharedPersonas.json` — catalog of persona metadata (handle, avatar, domains, themes); seeded into SwiftData on first launch

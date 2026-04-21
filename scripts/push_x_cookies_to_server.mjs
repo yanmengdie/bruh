@@ -2,21 +2,16 @@
 
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline/promises";
 import { setTimeout as sleep } from "node:timers/promises";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
-const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PLAYWRIGHT_MODULE = path.join(
-  ROOT_DIR,
-  "tools",
-  "xhs",
-  "node_modules",
-  "playwright",
-  "index.mjs",
-);
+const require = createRequire(import.meta.url);
+const PLAYWRIGHT_MODULE = process.env.BRUH_PLAYWRIGHT_MODULE ||
+  resolveOptionalModule("playwright");
 const DEFAULT_EDGE_EXECUTABLE =
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge";
 
@@ -36,10 +31,24 @@ const DEFAULTS = {
   cdpPort: Number.parseInt(process.env.BRUH_X_LOGIN_CDP_PORT || "9222", 10),
 };
 
+function resolveOptionalModule(moduleName) {
+  try {
+    return require.resolve(moduleName);
+  } catch {
+    return "";
+  }
+}
+
 function ensurePlaywrightAvailable() {
+  if (!PLAYWRIGHT_MODULE) {
+    throw new Error(
+      "Playwright not found. Use the default BRUH_X_LOGIN_MODE=edge_cdp, run `npm install playwright`, or set BRUH_PLAYWRIGHT_MODULE to playwright/index.mjs.",
+    );
+  }
+
   return import(pathToFileURL(PLAYWRIGHT_MODULE).href).catch(() => {
     throw new Error(
-      `Playwright not found at ${PLAYWRIGHT_MODULE}. Run 'cd tools/xhs && npm install' first.`,
+      `Playwright not found at ${PLAYWRIGHT_MODULE}. Run 'npm install playwright' or set BRUH_PLAYWRIGHT_MODULE.`,
     );
   });
 }
@@ -213,6 +222,111 @@ async function waitForDevToolsEndpoint() {
   throw new Error(`Edge DevTools endpoint did not become ready on ${endpoint}.`);
 }
 
+async function waitForPageTarget(endpoint) {
+  const deadline = Date.now() + 15000;
+
+  while (Date.now() < deadline) {
+    const response = await fetch(`${endpoint}/json/list`);
+    if (!response.ok) {
+      throw new Error(`Failed to list Edge DevTools targets: HTTP ${response.status}`);
+    }
+
+    const targets = await response.json();
+    const pages = targets.filter((target) =>
+      target.type === "page" && target.webSocketDebuggerUrl
+    );
+    const xPage = pages.find((target) =>
+      /https?:\/\/(x|twitter)\.com\//i.test(target.url || "")
+    );
+    if (xPage) {
+      return xPage;
+    }
+    if (pages[0]) {
+      return pages[0];
+    }
+
+    await sleep(250);
+  }
+
+  throw new Error("Edge DevTools did not expose a page target.");
+}
+
+function openWebSocket(url) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(url);
+    const cleanup = () => {
+      ws.removeEventListener("open", onOpen);
+      ws.removeEventListener("error", onError);
+    };
+    const onOpen = () => {
+      cleanup();
+      resolve(ws);
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error(`Failed to connect Edge DevTools websocket: ${url}`));
+    };
+
+    ws.addEventListener("open", onOpen);
+    ws.addEventListener("error", onError);
+  });
+}
+
+function createCdpClient(ws) {
+  let nextId = 1;
+  const pending = new Map();
+
+  ws.addEventListener("message", (event) => {
+    let message;
+    try {
+      message = JSON.parse(String(event.data));
+    } catch {
+      return;
+    }
+
+    const request = pending.get(message.id);
+    if (!request) {
+      return;
+    }
+
+    pending.delete(message.id);
+    if (message.error) {
+      request.reject(
+        new Error(
+          `${request.method} failed: ${message.error.message || JSON.stringify(message.error)}`,
+        ),
+      );
+      return;
+    }
+
+    request.resolve(message.result || {});
+  });
+
+  ws.addEventListener("close", () => {
+    for (const request of pending.values()) {
+      request.reject(new Error("Edge DevTools websocket closed."));
+    }
+    pending.clear();
+  });
+
+  return {
+    send(method, params = {}) {
+      if (ws.readyState !== WebSocket.OPEN) {
+        return Promise.reject(new Error("Edge DevTools websocket is not open."));
+      }
+
+      const id = nextId++;
+      return new Promise((resolve, reject) => {
+        pending.set(id, { method, resolve, reject });
+        ws.send(JSON.stringify({ id, method, params }));
+      });
+    },
+    close() {
+      ws.close();
+    },
+  };
+}
+
 function stopDetachedProcess(pid) {
   if (!pid) {
     return;
@@ -225,32 +339,20 @@ function stopDetachedProcess(pid) {
 }
 
 async function captureCookiesWithEdgeCdp() {
-  const { chromium } = await ensurePlaywrightAvailable();
   const userDataDir = await mkdtemp(path.join(os.tmpdir(), "bruh-x-edge-cdp-"));
   const launchedEdge = launchEdgeWithRemoteDebugging(userDataDir);
-  let browser;
+  let cdp;
 
   try {
     const endpoint = await waitForDevToolsEndpoint();
-    browser = await chromium.connectOverCDP(endpoint);
+    const target = await waitForPageTarget(endpoint);
+    const ws = await openWebSocket(target.webSocketDebuggerUrl);
+    cdp = createCdpClient(ws);
 
-    let context = browser.contexts()[0];
-    const deadline = Date.now() + 15000;
-    while (!context && Date.now() < deadline) {
-      await sleep(250);
-      context = browser.contexts()[0];
+    if (!/https?:\/\/(x|twitter)\.com\//i.test(target.url || "")) {
+      await cdp.send("Page.navigate", { url: "https://x.com/i/flow/login" });
     }
-    if (!context) {
-      throw new Error("Edge CDP connected, but no browser context was available.");
-    }
-
-    const page = context.pages()[0] || await context.newPage();
-    if (!page.url() || page.url() === "about:blank") {
-      await page.goto("https://x.com/i/flow/login", {
-        waitUntil: "domcontentloaded",
-        timeout: 60000,
-      });
-    }
+    await cdp.send("Network.enable").catch(() => null);
 
     console.log("已启动真实 Microsoft Edge，并通过 CDP 附着。");
     console.log("请在浏览器里完成 X 登录。");
@@ -262,7 +364,9 @@ async function captureCookiesWithEdgeCdp() {
         throw new Error("登录已取消，未采集到 auth_token/ct0。");
       }
 
-      const cookies = await context.cookies(["https://x.com", "https://twitter.com"]);
+      const { cookies = [] } = await cdp.send("Network.getCookies", {
+        urls: ["https://x.com", "https://twitter.com"],
+      });
       const authToken = cookieValue(cookies, "auth_token");
       const ct0 = cookieValue(cookies, "ct0");
 
@@ -273,7 +377,7 @@ async function captureCookiesWithEdgeCdp() {
       console.log("还没有拿到 auth_token/ct0，请确认浏览器里已登录完成后再重试。");
     }
   } finally {
-    await browser?.close().catch(() => null);
+    cdp?.close();
     stopDetachedProcess(launchedEdge.pid);
     await rm(userDataDir, { recursive: true, force: true }).catch(() => null);
   }

@@ -31,7 +31,7 @@ Run locally:
 
 - `supabase/functions/_shared/content_safety.ts` is the shared lightweight interception layer for generated text and externally ingested text
 - generated text in `generate-message`, `message-starters`, and `generate-post-interactions` is sanitized before returning or persisting
-- external content in `ingest-top-news`, `ingest-x-posts`, and `ingest-xhs-posts` is sanitized before entering the main ranking / generation tables
+- external content in `ingest-top-news` and `ingest-x-posts` is sanitized before entering the main ranking / generation tables
 - obvious prompt injection, assistant leakage, and dangerous HTML/script payloads are blocked instead of silently flowing into prompt context
 
 See `docs/content-governance.md` for the concrete runtime policy.

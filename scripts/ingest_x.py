@@ -56,7 +56,6 @@ HTTPS_PROXY = resolve_env("HTTPS_PROXY", default="")
 PERSONAS = {
     "elonmusk": "musk",
     "realdonaldtrump": "trump",
-    "finkd": "zuckerberg",
 }
 
 # Fetch this many posts per user each run — large enough to cover bursts

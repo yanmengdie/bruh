@@ -373,8 +373,6 @@ export function defaultStarterMessage(personaId: string, title: string) {
       return `${title} is not just a headline. It is a culture-and-brand signal if you read it correctly.`
     case "papi":
       return `${title} 这种事我第一反应不是热度，而是大家到底在情绪上共鸣了什么。`
-    case "kobe_bryant":
-      return `${title} is about standards. Pressure only exposes whether the work was really there.`
     case "cristiano_ronaldo":
       return `${title} is the kind of moment where mentality, discipline, and pressure decide everything.`
     default:

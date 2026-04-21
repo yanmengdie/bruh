@@ -16,22 +16,12 @@ function keywordOverlapScore(text: string, keywords: string[]): number {
 function relationshipHint(authorId: string, contactId: string): string {
   const hints: Record<string, Record<string, string>> = {
     musk: {
-      zuckerberg:
-        "Fellow tech builder and platform rival who reacts to AI and product strategy.",
       trump:
         "High-profile political ally who jumps into policy, tariffs, and culture-war topics.",
     },
     trump: {
       musk:
         "Political ally who reacts when business, AI, or national power is involved.",
-      zuckerberg:
-        "Platform founder whose products and moderation choices intersect with politics.",
-    },
-    zuckerberg: {
-      musk:
-        "Peer founder and competitor who reacts to AI, product launches, and internet culture.",
-      trump:
-        "Political figure whose media presence affects social products and public discourse.",
     },
   };
 
@@ -43,16 +33,10 @@ function acquaintanceIdsFor(authorId: string): string[] {
   return Object.keys(
     ({
       musk: {
-        zuckerberg: true,
         trump: true,
       },
       trump: {
         musk: true,
-        zuckerberg: true,
-      },
-      zuckerberg: {
-        musk: true,
-        trump: true,
       },
     } as Record<string, Record<string, boolean>>)[authorId] ?? {},
   );

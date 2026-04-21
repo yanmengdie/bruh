@@ -49,18 +49,6 @@ extension FeedLocalInteractionGenerator {
                     "\(cueOrFallback(cue, fallback: "这件事"))有意义，前提是它真的改变下一步能做什么。",
                     "如果这会改变大家接下来能做成的东西，那信号就是真的。",
                 ])
-        case "kobe_bryant":
-            return english
-                ? englishVariant(variant, options: [
-                    "Pressure only shows whether the work was really there.",
-                    "\(cueOrFallback(cue, fallback: "This")) comes down to standards and execution.",
-                    "The part that matters is what they were prepared to do when it got hard.",
-                ])
-                : chineseVariant(variant, options: [
-                    "压力只会暴露训练是不是真的到位。",
-                    "\(cueOrFallback(cue, fallback: "这件事"))最后还是标准和执行的问题。",
-                    "真正值得看的是，难的时候他们有没有准备好。",
-                ])
         default:
             let trimmedAuthorName = postAuthorDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
             return english
@@ -103,11 +91,6 @@ extension FeedLocalInteractionGenerator {
                 return lowSignal ? "Give me the concrete version." : "I saw it. What is the concrete unlock here?"
             }
             return lowSignal ? "先说具体一点。" : "我看到了，你先说这里最具体的 unlock 是什么。"
-        case "kobe_bryant":
-            if english {
-                return lowSignal ? "Say the standard." : "I saw it. Tell me where the standard held or broke."
-            }
-            return lowSignal ? "直接说标准。" : "我看到了，你直接说这里到底是标准没守住，还是执行没到位。"
         default:
             if english {
                 return lowSignal ? "Say a little more." : "I saw it. Say what part of this you want to discuss."
