@@ -14,6 +14,10 @@ struct FeedView: View {
     @Query private var profiles: [UserProfile]
 
     @State private var isPresentingComposer = false
+    @State private var hasRequestedInitialRemoteRefresh = false
+    @State private var isRefreshingRemoteMoments = false
+
+    private let remoteSyncService = PengyouMomentRemoteSyncService()
 
     private var currentProfile: UserProfile? {
         profiles.first(where: { $0.id == CurrentUserProfileStore.userId })
@@ -52,6 +56,12 @@ struct FeedView: View {
         .background(Color.white)
         .sheet(isPresented: $isPresentingComposer) {
             PengyouComposerSheet()
+        }
+        .refreshable {
+            await refreshRemoteMoments()
+        }
+        .task {
+            await refreshRemoteMomentsIfNeeded()
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -124,6 +134,26 @@ struct FeedView: View {
     private var momentsHeaderHeight: CGFloat {
         let width = UIScreen.main.bounds.width
         return min(max(width * 0.68, 236), 320)
+    }
+
+    @MainActor
+    private func refreshRemoteMomentsIfNeeded() async {
+        guard !hasRequestedInitialRemoteRefresh else { return }
+        hasRequestedInitialRemoteRefresh = true
+        await refreshRemoteMoments()
+    }
+
+    @MainActor
+    private func refreshRemoteMoments() async {
+        guard !isRefreshingRemoteMoments else { return }
+        isRefreshingRemoteMoments = true
+        defer { isRefreshingRemoteMoments = false }
+
+        do {
+            _ = try await remoteSyncService.refreshMoments(modelContext: modelContext)
+        } catch {
+            print("Pengyou remote refresh failed: \(error)")
+        }
     }
 }
 
