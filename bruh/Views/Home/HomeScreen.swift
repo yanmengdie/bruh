@@ -397,8 +397,6 @@ struct HomeScreen: View {
             return Color(red: 0.15, green: 0.39, blue: 0.92)
         case "lei_jun":
             return Color(red: 1.00, green: 0.41, blue: 0.00)
-        case "影石刘靖康":
-            return Color(red: 0.06, green: 0.62, blue: 0.58)
         case "luo_yonghao":
             return Color(red: 0.50, green: 0.11, blue: 0.11)
         case "justin_sun":

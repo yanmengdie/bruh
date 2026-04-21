@@ -63,8 +63,6 @@ struct BruhInvitation: Identifiable, Hashable {
             return "🎙️"
         case "lei_jun":
             return "📱"
-        case "影石刘靖康":
-            return "📷"
         case "luo_yonghao":
             return "🎤"
         case "justin_sun":

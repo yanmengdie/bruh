@@ -163,15 +163,6 @@ function modernReplyFallback(targetId: string, viewerComment: string): string {
       return lowSignal
         ? "直接说产品点。"
         : "我看到了，直接说你最关心的产品点。";
-    case "影石刘靖康":
-      if (english) {
-        return lowSignal
-          ? "What's the actual pain point?"
-          : "I saw it. What's the actual pain point here?";
-      }
-      return lowSignal
-        ? "痛点是什么？"
-        : "我看到了，你直接说这里真正的痛点是什么。";
     case "luo_yonghao":
       if (english) {
         return lowSignal
@@ -266,8 +257,6 @@ function templatedFallbackComment(
       return "这条像是一个更大周期里的前置信号。";
     case "lei_jun":
       return "这条不只是热度，背后一定有产品和交付层的东西。";
-    case "影石刘靖康":
-      return "这条我会先看它到底击中了哪个真实场景。";
     case "luo_yonghao":
       return "这条确实值得聊，不然太浪费表达欲了。";
     case "justin_sun":
