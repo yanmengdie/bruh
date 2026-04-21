@@ -126,7 +126,15 @@
     "primaryLanguage": "zh",
     "friendGreeting": "今天科技圈有几条消息，热度都不小，但真正值得深聊的就那么一两条。你最近在关注哪个方向？",
     "aliases": ["zhang_peng", "zhang peng", "zhang-peng", "张鹏", "geekpark"],
-    "platformAccounts": [],
+    "platformAccounts": [
+      {
+        "platform": "weibo",
+        "handle": "geekpark",
+        "profileUrl": "https://weibo.com/geekpark",
+        "isPrimary": true,
+        "isActive": true
+      }
+    ],
     "defaultVoiceSpeakerId": "example:voice_zhang_peng",
     "defaultVoiceLabel": "张鹏 voice",
     "socialCircleIds": ["sam_altman", "musk", "lei_jun", "luo_yonghao", "papi"],
@@ -163,6 +171,13 @@
         "profileUrl": "https://x.com/leijun",
         "isPrimary": true,
         "isActive": true
+      },
+      {
+        "platform": "weibo",
+        "handle": "leijun",
+        "profileUrl": "https://weibo.com/leijun",
+        "isPrimary": true,
+        "isActive": true
       }
     ],
     "defaultVoiceSpeakerId": "example:voice_lei_jun",
@@ -193,7 +208,15 @@
     "primaryLanguage": "zh",
     "friendGreeting": "今天这几条消息，有一条我看完忍不住想开骂，有一条我觉得被严重低估了。废话不说，你想先听哪条？",
     "aliases": ["luo_yonghao", "luo yonghao", "luo-yonghao", "罗永浩", "老罗"],
-    "platformAccounts": [],
+    "platformAccounts": [
+      {
+        "platform": "weibo",
+        "handle": "luoyonghaoniuhulu",
+        "profileUrl": "https://weibo.com/luoyonghaoniuhulu",
+        "isPrimary": true,
+        "isActive": true
+      }
+    ],
     "defaultVoiceSpeakerId": "example:voice_luo_yonghao",
     "defaultVoiceLabel": "罗永浩 voice",
     "socialCircleIds": ["lei_jun", "zhang_peng", "papi"],
@@ -293,7 +316,15 @@
     "primaryLanguage": "zh",
     "friendGreeting": "今天又有几条让我看完沉默三秒的新闻，是那种“我没法评论但我全程看完了”的那种。想吃瓜吗？",
     "aliases": ["papi", "papijiang", "papi酱", "姜逸磊", "Hahi酱"],
-    "platformAccounts": [],
+    "platformAccounts": [
+      {
+        "platform": "weibo",
+        "handle": "xiaopapi",
+        "profileUrl": "https://weibo.com/xiaopapi",
+        "isPrimary": true,
+        "isActive": true
+      }
+    ],
     "defaultVoiceSpeakerId": "example:voice_papi",
     "defaultVoiceLabel": "papi酱 voice",
     "socialCircleIds": ["luo_yonghao", "zhang_peng", "kim_kardashian"],
