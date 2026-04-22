@@ -938,6 +938,7 @@ private struct ProfileAccountView: View {
             VStack(alignment: .leading, spacing: 18) {
                 profileSummaryCard
                 avatarActionCard
+                settingsEntryCard
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -1076,6 +1077,44 @@ private struct ProfileAccountView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("重新设置头像")
+    }
+
+    private var settingsEntryCard: some View {
+        NavigationLink {
+            SettingsScreen()
+        } label: {
+            HStack(spacing: 14) {
+                Circle()
+                    .fill(Color.black.opacity(0.08))
+                    .frame(width: 48, height: 48)
+                    .overlay {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(Color.black.opacity(0.68))
+                    }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("偏好与设置")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(Color.black.opacity(0.84))
+
+                    Text("切换首页模式，查看版本信息和后续开放项。")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.black.opacity(0.42))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.black.opacity(0.24))
+            }
+            .padding(18)
+            .background(Color.white.opacity(0.72))
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private func loadCurrentAvatarIfNeeded() {

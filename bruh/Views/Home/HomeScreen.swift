@@ -132,6 +132,11 @@ struct HomeScreen: View {
         .padding(.bottom, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(homeBackgroundColor.ignoresSafeArea())
+        .overlay(alignment: .topTrailing) {
+            settingsShortcut
+                .padding(.top, 8)
+                .padding(.trailing, 14)
+        }
         .onAppear {
             prepareVoiceIfNeeded()
         }
@@ -139,6 +144,24 @@ struct HomeScreen: View {
             voicePlayer?.stop()
             isVoiceBubblePlaying = false
         }
+    }
+
+    private var settingsShortcut: some View {
+        Button {
+            onNavigate(.settings)
+        } label: {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.black.opacity(0.72))
+                .frame(width: 38, height: 38)
+                .background(Color.white.opacity(0.72), in: Circle())
+                .overlay {
+                    Circle()
+                        .stroke(Color.white.opacity(0.45), lineWidth: 0.8)
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("打开设置")
     }
 
     private var dateTimePanel: some View {
@@ -525,7 +548,7 @@ struct HomeScreen: View {
 
                 Spacer(minLength: 0)
 
-                Text(isVoiceBubblePlaying ? "样例播放中" : "团队样例")
+                Text(isVoiceBubblePlaying ? "播放中" : "语音卡片")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.black.opacity(0.56))
 
