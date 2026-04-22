@@ -124,7 +124,8 @@ struct ContactsView: View {
                 .scrollIndicators(.hidden)
                 .background(AppTheme.messagesBackground)
                 .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
-                .navigationTitle("")
+                .navigationTitle("鸽们")
+                .navigationBarTitleDisplayMode(.inline)
 
                 if !derivedState.isSearching && !derivedState.sectionedContacts.isEmpty {
                     alphabetIndex(proxy: proxy, availableSectionKeys: derivedState.availableSectionKeys)

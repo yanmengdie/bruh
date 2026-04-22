@@ -35,6 +35,15 @@ struct FeedView: View {
         return UIImage(data: data)
     }
 
+    private var currentProfileDisplayName: String {
+        let rawName = currentProfile?.displayName ?? "我"
+        return rawName == "You" ? "我" : rawName
+    }
+
+    private var currentProfileHandle: String {
+        currentProfile?.bruhHandle ?? "@yourboi"
+    }
+
     private var visibleMoments: [PengyouMoment] {
         ContentGraphSelectors.visibleMoments(
             from: moments,
@@ -107,6 +116,8 @@ struct FeedView: View {
             guard !visibleMoments.isEmpty else { return }
             markFeedAsViewed()
         }
+        .navigationTitle("朋友圈")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -167,33 +178,47 @@ struct FeedView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("更换朋友圈背景")
 
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.orange.opacity(0.92), Color.pink.opacity(0.82)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            HStack(alignment: .bottom, spacing: 12) {
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(currentProfileDisplayName)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.24), radius: 6, y: 2)
+
+                    Text(currentProfileHandle)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.86))
+                        .shadow(color: .black.opacity(0.18), radius: 4, y: 1)
+                }
+
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.orange.opacity(0.92), Color.pink.opacity(0.82)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .frame(width: 72, height: 72)
-                .overlay {
-                    if let avatar = currentProfileAvatarImage {
-                        Image(uiImage: avatar)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 72, height: 72)
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    } else {
-                        Text("📸")
-                            .font(.system(size: 34))
+                    .frame(width: 72, height: 72)
+                    .overlay {
+                        if let avatar = currentProfileAvatarImage {
+                            Image(uiImage: avatar)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 72, height: 72)
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        } else {
+                            Text("📸")
+                                .font(.system(size: 34))
+                        }
                     }
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.white, lineWidth: 4)
-                }
-                .padding(.trailing, 18)
-                .padding(.bottom, 12)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white, lineWidth: 4)
+                    }
+            }
+            .padding(.trailing, 18)
+            .padding(.bottom, 12)
         }
         .frame(height: momentsHeaderHeight)
         .padding(.bottom, 34)
