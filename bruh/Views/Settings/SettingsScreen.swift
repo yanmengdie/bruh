@@ -28,6 +28,8 @@ struct SettingsScreen: View {
             Label("内容偏好", systemImage: "slider.horizontal.3")
             Label("关于 Bruh", systemImage: "info.circle")
         }
+        .listStyle(.insetGrouped)
         .navigationTitle("设置")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

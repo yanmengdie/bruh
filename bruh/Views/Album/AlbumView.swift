@@ -222,45 +222,29 @@ private struct AlbumPreviewView: View {
     let asset: AlbumAssetSelection
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black.ignoresSafeArea()
+        NavigationStack {
+            ZStack(alignment: .bottomLeading) {
+                Color.black.ignoresSafeArea()
 
-            AsyncImage(url: asset.url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.black)
-                case .failure:
-                    ContentUnavailableView("图片加载失败", systemImage: "photo")
-                        .foregroundStyle(.white)
-                case .empty:
-                    ProgressView()
-                        .tint(.white)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                @unknown default:
-                    EmptyView()
-                }
-            }
-
-            VStack(spacing: 0) {
-                HStack {
-                    Spacer()
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.white.opacity(0.92))
+                AsyncImage(url: asset.url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Color.black)
+                    case .failure:
+                        ContentUnavailableView("图片加载失败", systemImage: "photo")
+                            .foregroundStyle(.white)
+                    case .empty:
+                        ProgressView()
+                            .tint(.white)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    @unknown default:
+                        EmptyView()
                     }
-                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 18)
-
-                Spacer()
 
                 VStack(alignment: .leading, spacing: 6) {
                     if !asset.caption.isEmpty {
@@ -278,6 +262,15 @@ private struct AlbumPreviewView: View {
                 .padding(.horizontal, 18)
                 .padding(.bottom, 28)
             }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
 }

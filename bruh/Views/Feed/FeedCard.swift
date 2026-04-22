@@ -604,25 +604,27 @@ private struct FeedImagePreview: View {
     @State private var currentIndex: Int = 0
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black.ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-            TabView(selection: $currentIndex) {
-                ForEach(Array(urls.enumerated()), id: \.offset) { index, url in
-                    ZoomablePreviewImage(url: url)
-                        .tag(index)
+                TabView(selection: $currentIndex) {
+                    ForEach(Array(urls.enumerated()), id: \.offset) { index, url in
+                        ZoomablePreviewImage(url: url)
+                            .tag(index)
+                    }
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: urls.count > 1 ? .always : .never))
-
-            Button {
-                isPresented = false
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .padding(20)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        isPresented = false
+                    }
+                }
             }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .onAppear {
             currentIndex = min(max(selectedIndex, 0), max(urls.count - 1, 0))
@@ -637,27 +639,29 @@ private struct FeedVideoPreview: View {
     @State private var player: AVPlayer?
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black.ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-            Group {
-                if let player {
-                    VideoPlayer(player: player)
-                        .ignoresSafeArea()
-                } else {
-                    ProgressView()
-                        .tint(.white)
+                Group {
+                    if let player {
+                        VideoPlayer(player: player)
+                            .ignoresSafeArea()
+                    } else {
+                        ProgressView()
+                            .tint(.white)
+                    }
                 }
             }
-
-            Button {
-                isPresented = false
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .padding(20)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        isPresented = false
+                    }
+                }
             }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .onAppear {
             let player = AVPlayer(url: url)
