@@ -16,6 +16,12 @@ struct FeedView: View {
     @State private var isPresentingComposer = false
     @State private var hasRequestedInitialRemoteRefresh = false
     @State private var isRefreshingRemoteMoments = false
+    @State private var coverImage: UIImage?
+    @State private var isShowingCoverOptions = false
+    @State private var isPresentingCoverPicker = false
+    @State private var pickerAlertTitle = ""
+    @State private var pickerAlertMessage = ""
+    @State private var isShowingPickerAlert = false
 
     private let remoteSyncService = PengyouMomentRemoteSyncService()
 
@@ -57,10 +63,33 @@ struct FeedView: View {
         .sheet(isPresented: $isPresentingComposer) {
             PengyouComposerSheet()
         }
+        .confirmationDialog("更换朋友圈背景", isPresented: $isShowingCoverOptions, titleVisibility: .visible) {
+            Button("从相册选择") {
+                presentCoverPicker()
+            }
+
+            if coverImage != nil {
+                Button("恢复默认灰色", role: .destructive) {
+                    resetCoverImage()
+                }
+            }
+
+            Button("取消", role: .cancel) {}
+        }
+        .sheet(isPresented: $isPresentingCoverPicker, onDismiss: persistCoverImageIfNeeded) {
+            PengyouCoverImagePicker(image: $coverImage)
+                .ignoresSafeArea()
+        }
+        .alert(pickerAlertTitle, isPresented: $isShowingPickerAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text(pickerAlertMessage)
+        }
         .refreshable {
             await refreshRemoteMoments()
         }
         .task {
+            loadCoverImageIfNeeded()
             await refreshRemoteMomentsIfNeeded()
         }
         .toolbar {
@@ -77,11 +106,51 @@ struct FeedView: View {
 
     private var momentsHeader: some View {
         ZStack(alignment: .bottomTrailing) {
-            Image("Moments_Background")
-                .resizable()
-                .scaledToFill()
+            Button {
+                isShowingCoverOptions = true
+            } label: {
+                ZStack(alignment: .bottomLeading) {
+                    if let coverImage {
+                        Image(uiImage: coverImage)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.70, green: 0.71, blue: 0.72),
+                                        Color(red: 0.60, green: 0.61, blue: 0.63)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    }
+
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(0.0),
+                            Color.black.opacity(coverImage == nil ? 0.12 : 0.34)
+                        ],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+
+                    Label(coverImage == nil ? "设置背景" : "更换背景", systemImage: "photo")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.black.opacity(0.22), in: Capsule())
+                        .padding(.leading, 16)
+                        .padding(.bottom, 16)
+                }
                 .frame(height: momentsHeaderHeight)
                 .clipped()
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("更换朋友圈背景")
 
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(
@@ -153,6 +222,131 @@ struct FeedView: View {
             _ = try await remoteSyncService.refreshMoments(modelContext: modelContext)
         } catch {
             print("Pengyou remote refresh failed: \(error)")
+        }
+    }
+
+    private func loadCoverImageIfNeeded() {
+        guard coverImage == nil else { return }
+        coverImage = PengyouCoverImageStore.load()
+    }
+
+    private func persistCoverImageIfNeeded() {
+        guard let coverImage else { return }
+        PengyouCoverImageStore.save(coverImage)
+    }
+
+    private func resetCoverImage() {
+        coverImage = nil
+        PengyouCoverImageStore.reset()
+    }
+
+    private func presentCoverPicker() {
+        guard UIImagePickerController.isSourceTypeAvailable(.photoLibrary) else {
+            pickerAlertTitle = "当前设备无法访问相册"
+            pickerAlertMessage = "请检查系统权限后重试。"
+            isShowingPickerAlert = true
+            return
+        }
+
+        isPresentingCoverPicker = true
+    }
+}
+
+private enum PengyouCoverImageStore {
+    private static var fileURL: URL {
+        let supportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return supportDirectory
+            .appendingPathComponent("PengyouCover", isDirectory: true)
+            .appendingPathComponent("cover-\(AppEnvironment.current.rawValue).jpg")
+    }
+
+    static func load() -> UIImage? {
+        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        return UIImage(data: data)
+    }
+
+    static func save(_ image: UIImage) {
+        let url = fileURL
+        do {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            guard let data = image.preparedPengyouCoverImage().jpegData(compressionQuality: 0.86) else {
+                return
+            }
+            try data.write(to: url, options: [.atomic])
+        } catch {
+            print("Pengyou cover image save failed: \(error)")
+        }
+    }
+
+    static func reset() {
+        try? FileManager.default.removeItem(at: fileURL)
+    }
+}
+
+private struct PengyouCoverImagePicker: UIViewControllerRepresentable {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var image: UIImage?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(image: $image, dismiss: dismiss)
+    }
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let controller = UIImagePickerController()
+        controller.sourceType = .photoLibrary
+        controller.allowsEditing = false
+        controller.delegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        @Binding private var image: UIImage?
+        private let dismiss: DismissAction
+
+        init(image: Binding<UIImage?>, dismiss: DismissAction) {
+            _image = image
+            self.dismiss = dismiss
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            dismiss()
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            if let originalImage = info[.originalImage] as? UIImage {
+                image = originalImage.preparedPengyouCoverImage()
+            }
+            dismiss()
+        }
+    }
+}
+
+private extension UIImage {
+    func preparedPengyouCoverImage(maxPixel: CGFloat = 1800) -> UIImage {
+        let largestSide = max(size.width, size.height)
+        guard largestSide > 0 else { return self }
+
+        let scale = largestSide > maxPixel ? maxPixel / largestSide : 1
+        let targetSize = CGSize(
+            width: max(size.width * scale, 1),
+            height: max(size.height * scale, 1)
+        )
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+
+        return UIGraphicsImageRenderer(size: targetSize, format: format).image { context in
+            UIColor(red: 0.64, green: 0.65, blue: 0.66, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: targetSize))
+            draw(in: CGRect(origin: .zero, size: targetSize))
         }
     }
 }

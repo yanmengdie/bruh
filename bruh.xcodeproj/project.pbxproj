@@ -694,7 +694,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_BRUH_APP_ENV = dev;
 				INFOPLIST_KEY_NSCameraUsageDescription = "用于拍摄你的头像照片。";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于从相册选择你的头像照片。";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于从相册选择你的头像照片或朋友圈背景。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
@@ -724,7 +724,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_BRUH_APP_ENV = prod;
 				INFOPLIST_KEY_NSCameraUsageDescription = "用于拍摄你的头像照片。";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于从相册选择你的头像照片。";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于从相册选择你的头像照片或朋友圈背景。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
