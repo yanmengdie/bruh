@@ -86,7 +86,8 @@ struct MessagesScreen: View {
             }
         }
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
-        .navigationTitle("")
+        .navigationTitle("消息")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var divider: some View {
@@ -135,10 +136,6 @@ struct MessagesScreen: View {
                     }
                 }
             }
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)

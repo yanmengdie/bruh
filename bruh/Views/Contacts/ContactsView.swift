@@ -935,19 +935,15 @@ private struct ProfileAccountView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text("我的账号")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(Color.black.opacity(0.88))
-                    .padding(.top, 8)
-
                 profileSummaryCard
                 avatarActionCard
             }
             .padding(.horizontal, 16)
+            .padding(.top, 8)
             .padding(.bottom, 28)
         }
         .background(AppTheme.messagesBackground)
-        .navigationTitle("")
+        .navigationTitle("我的账号")
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog("选择头像", isPresented: $isShowingImageSourceOptions, titleVisibility: .visible) {
             Button("拍照") {

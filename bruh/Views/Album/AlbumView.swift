@@ -57,12 +57,9 @@ struct AlbumView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                topBar
-                    .padding(.top, 8)
-
                 if sections.isEmpty {
                     albumEmptyState
-                        .padding(.top, 18)
+                        .padding(.top, 8)
                 } else {
                     ForEach(sections) { section in
                         VStack(alignment: .leading, spacing: 10) {
@@ -82,11 +79,13 @@ struct AlbumView: View {
                 }
             }
             .padding(.horizontal, 16)
+            .padding(.top, 8)
             .padding(.bottom, 28)
         }
         .scrollIndicators(.hidden)
         .background(AppTheme.messagesBackground)
-        .navigationTitle("")
+        .navigationTitle("相册")
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             markAlbumAsViewed()
         }
@@ -103,16 +102,6 @@ struct AlbumView: View {
         let latestItemId = albumItems.first?.id ?? ""
         let latestSortDate = albumItems.first?.sortDate.timeIntervalSince1970 ?? 0
         return "\(albumItems.count)|\(latestItemId)|\(latestSortDate)"
-    }
-
-    private var topBar: some View {
-        HStack(alignment: .center) {
-            Text("相册")
-                .font(.system(size: 24, weight: .black, design: .rounded))
-                .foregroundStyle(Color.black.opacity(0.9))
-
-            Spacer()
-        }
     }
 
     private func sectionTitle(title: String, subtitle: String) -> some View {

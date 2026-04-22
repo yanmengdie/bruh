@@ -525,7 +525,7 @@ struct HomeScreen: View {
 
                 Spacer(minLength: 0)
 
-                Text(isVoiceBubblePlaying ? "播放中" : "语音消息")
+                Text(isVoiceBubblePlaying ? "样例播放中" : "团队样例")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.black.opacity(0.56))
 

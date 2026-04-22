@@ -127,7 +127,7 @@ struct AddBruhView: View {
         }
         .scrollIndicators(.hidden)
         .background(AppTheme.messagesBackground)
-        .navigationTitle("")
+        .navigationTitle("新鸽们")
         .navigationBarTitleDisplayMode(.inline)
         .enableUnifiedSwipeBack()
     }

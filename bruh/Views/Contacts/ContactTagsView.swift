@@ -75,7 +75,7 @@ struct ContactTagsView: View {
         }
         .scrollIndicators(.hidden)
         .background(AppTheme.messagesBackground)
-        .navigationTitle("")
+        .navigationTitle("标签")
         .navigationBarTitleDisplayMode(.inline)
         .enableUnifiedSwipeBack()
     }

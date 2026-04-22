@@ -212,7 +212,7 @@ struct NewBruhView: View {
         }
         .scrollIndicators(.hidden)
         .background(AppTheme.messagesBackground)
-        .navigationTitle("")
+        .navigationTitle("好友请求")
         .navigationBarTitleDisplayMode(.inline)
         .enableUnifiedSwipeBack()
     }
