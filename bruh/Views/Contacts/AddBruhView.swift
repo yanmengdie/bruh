@@ -2,7 +2,6 @@ import SwiftUI
 import UIKit
 
 struct AddBruhView: View {
-    @Environment(\.dismiss) private var dismiss
     @AppStorage private var pendingNamesStorage: String
     @State private var searchText = ""
 
@@ -130,14 +129,6 @@ struct AddBruhView: View {
         .background(AppTheme.messagesBackground)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                AppBackButton {
-                    dismiss()
-                }
-            }
-        }
         .enableUnifiedSwipeBack()
     }
 

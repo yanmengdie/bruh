@@ -1,30 +1,6 @@
 import SwiftUI
 import UIKit
 
-struct AppBackIcon: View {
-    var body: some View {
-        Image(systemName: "chevron.left")
-            .font(.system(size: 20, weight: .bold))
-            .foregroundStyle(Color(red: 0.52, green: 0.54, blue: 0.57))
-    }
-}
-
-struct AppBackButton: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            AppBackIcon()
-                .frame(width: 20, height: 20, alignment: .leading)
-                .padding(.vertical, 12)
-                .padding(.trailing, 18)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("返回")
-    }
-}
-
 struct SwipeBackGestureEnabler: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> SwipeBackGestureController {
         SwipeBackGestureController()

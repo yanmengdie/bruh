@@ -908,7 +908,6 @@ private struct ContactFormView: View {
 }
 
 private struct ProfileAccountView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [UserProfile]
 
@@ -950,14 +949,6 @@ private struct ProfileAccountView: View {
         .background(AppTheme.messagesBackground)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                AppBackButton {
-                    dismiss()
-                }
-            }
-        }
         .confirmationDialog("选择头像", isPresented: $isShowingImageSourceOptions, titleVisibility: .visible) {
             Button("拍照") {
                 presentImagePicker(sourceType: .camera)

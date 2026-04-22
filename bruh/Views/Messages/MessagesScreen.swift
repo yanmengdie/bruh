@@ -379,7 +379,6 @@ private struct MessageDetailView: View {
     private static let bottomScrollAnchor = "message-detail-bottom-scroll-anchor"
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
     @Query private var messages: [PersonaMessage]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
 
@@ -418,71 +417,66 @@ private struct MessageDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            detailHeader
-                .padding(.horizontal, 16)
-                .padding(.top, 2)
-                .padding(.bottom, 8)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 14) {
+                    LazyVStack(spacing: 10) {
+                        ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                            if let timestamp = timestampProvider.timestampLabel(
+                                for: message,
+                                previous: index > 0 ? messages[index - 1] : nil
+                            ) {
+                                messageTimestamp(timestamp)
+                            }
 
-            Divider()
-
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: 14) {
-                        LazyVStack(spacing: 10) {
-                            ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
-                                if let timestamp = timestampProvider.timestampLabel(
-                                    for: message,
-                                    previous: index > 0 ? messages[index - 1] : nil
-                                ) {
-                                    messageTimestamp(timestamp)
-                                }
-
-                                messageRow(for: message)
+                            messageRow(for: message)
                                 .id(message.id)
-                            }
-
-                            if isSending {
-                                waitingMessageRow
-                                    .id("pending-reply-indicator")
-                            }
-
-                            Color.clear
-                                .frame(height: 1)
-                                .id(Self.bottomScrollAnchor)
                         }
+
+                        if isSending {
+                            waitingMessageRow
+                                .id("pending-reply-indicator")
+                        }
+
+                        Color.clear
+                            .frame(height: 1)
+                            .id(Self.bottomScrollAnchor)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 12)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        isComposerFocused = false
-                    }
                 }
-                .scrollDismissesKeyboard(.interactively)
-                .onAppear {
-                    scheduleScrollToBottom(with: proxy, animated: false)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    isComposerFocused = false
                 }
-                .task(id: latestMessageId) {
-                    guard latestMessageId != nil else { return }
-                    let shouldAnimate = hasCompletedInitialScroll
-                    scheduleScrollToBottom(with: proxy, animated: shouldAnimate)
-                    hasCompletedInitialScroll = true
-                }
-                .onChange(of: isSending) { _, sending in
-                    guard sending else { return }
-                    scheduleScrollToBottom(with: proxy)
-                }
-                .onChange(of: isComposerFocused) { _, focused in
-                    guard focused else { return }
-                    scheduleScrollToBottom(with: proxy)
-                }
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onAppear {
+                scheduleScrollToBottom(with: proxy, animated: false)
+            }
+            .task(id: latestMessageId) {
+                guard latestMessageId != nil else { return }
+                let shouldAnimate = hasCompletedInitialScroll
+                scheduleScrollToBottom(with: proxy, animated: shouldAnimate)
+                hasCompletedInitialScroll = true
+            }
+            .onChange(of: isSending) { _, sending in
+                guard sending else { return }
+                scheduleScrollToBottom(with: proxy)
+            }
+            .onChange(of: isComposerFocused) { _, focused in
+                guard focused else { return }
+                scheduleScrollToBottom(with: proxy)
             }
         }
         .background(AppTheme.messagesBackground)
         .enableUnifiedSwipeBack()
-        .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                detailNavigationTitle
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             composerBar
         }
@@ -537,32 +531,24 @@ private struct MessageDetailView: View {
         }
     }
 
-    private var detailHeader: some View {
-        HStack(alignment: .center, spacing: 0) {
-            AppBackButton {
-                dismiss()
-            }
+    private var detailNavigationTitle: some View {
+        HStack(spacing: 8) {
+            avatarCircle(size: 30)
 
-            Spacer(minLength: 12)
-
-            VStack(spacing: 2) {
-                headerAvatar
-
+            VStack(spacing: 1) {
                 Text(displayName)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.primary)
+                    .lineLimit(1)
 
                 Text("鸽们 · \(presenceText)")
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-
-            Spacer(minLength: 12)
-
-            Color.clear
-                .frame(width: 44, height: 44)
         }
-        .frame(maxWidth: .infinity, alignment: .top)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
     }
 
     private var matchedContact: Contact? {
@@ -652,10 +638,6 @@ private struct MessageDetailView: View {
             .padding(.bottom, 8)
         }
         .background(.ultraThinMaterial)
-    }
-
-    private var headerAvatar: some View {
-        avatarCircle(size: 52)
     }
 
     private func markThreadAsRead() {

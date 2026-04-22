@@ -3,7 +3,6 @@ import SwiftData
 import UIKit
 
 struct ContactTagsView: View {
-    @Environment(\.dismiss) private var dismiss
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
     @Query(sort: [SortDescriptor(\Persona.inviteOrder, order: .forward)]) private var personas: [Persona]
 
@@ -78,14 +77,6 @@ struct ContactTagsView: View {
         .background(AppTheme.messagesBackground)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                AppBackButton {
-                    dismiss()
-                }
-            }
-        }
         .enableUnifiedSwipeBack()
     }
 

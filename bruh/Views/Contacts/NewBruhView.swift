@@ -80,8 +80,6 @@ struct BruhInvitation: Identifiable, Hashable {
 }
 
 struct NewBruhView: View {
-    @Environment(\.dismiss) private var dismiss
-
     let invitation: BruhInvitation
     let lockedCandidateNames: [String]
     let onAccept: (BruhInvitation) -> Void
@@ -216,12 +214,6 @@ struct NewBruhView: View {
         .background(AppTheme.messagesBackground)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                AppBackButton(action: { dismiss() })
-            }
-        }
         .enableUnifiedSwipeBack()
     }
 

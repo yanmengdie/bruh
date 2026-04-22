@@ -262,19 +262,10 @@ struct ContentView: View {
 }
 
 private struct HomeRoutedScreen<Content: View>: View {
-    @Environment(\.dismiss) private var dismiss
     @ViewBuilder let content: Content
 
     var body: some View {
         content
-            .navigationBarBackButtonHidden(true)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    AppBackButton {
-                        dismiss()
-                    }
-                }
-            }
             .enableUnifiedSwipeBack()
     }
 }
