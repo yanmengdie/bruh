@@ -76,6 +76,7 @@ struct FeedView: View {
                 .background(.white)
             }
         }
+        .ignoresSafeArea(edges: .top)
         .background(Color.white)
         .sheet(isPresented: $isPresentingComposer) {
             PengyouComposerSheet()
@@ -118,6 +119,7 @@ struct FeedView: View {
         }
         .navigationTitle("朋友圈")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -143,10 +145,11 @@ struct FeedView: View {
                             .overlay {
                                 LinearGradient(
                                     colors: [
+                                        Color.black.opacity(0.18),
                                         Color.black.opacity(0.0),
                                         Color.black.opacity(0.34)
                                     ],
-                                    startPoint: .center,
+                                    startPoint: .top,
                                     endPoint: .bottom
                                 )
                             }
