@@ -529,20 +529,16 @@ private struct MessageDetailView: View {
     }
 
     private var detailNavigationTitle: some View {
-        HStack(spacing: 8) {
-            avatarCircle(size: 30)
+        VStack(spacing: 1) {
+            Text(displayName)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
 
-            VStack(spacing: 1) {
-                Text(displayName)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-
-                Text("鸽们 · \(presenceText)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+            Text("鸽们 · \(presenceText)")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)

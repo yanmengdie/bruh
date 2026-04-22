@@ -47,31 +47,31 @@ struct HomeScreen: View {
         [
             .init(
                 name: "羊崽",
-                imageAsset: "Icon_xhs",
+                imageAsset: "Icon_team_yangzai",
                 destination: nil,
                 fallbackWebURL: URL(string: "https://xhslink.com/m/60xxnORQs5V")
             ),
             .init(
                 name: "欢崽",
-                imageAsset: "Icon_xhs",
+                imageAsset: "Icon_team_huanzai",
                 destination: nil,
                 fallbackWebURL: URL(string: "https://xhslink.com/m/5zzSVyHYq3b")
             ),
             .init(
                 name: "SlashZ",
-                imageAsset: "Icon_xhs",
+                imageAsset: "Icon_team_slashz",
                 destination: nil,
                 fallbackWebURL: URL(string: "https://xhslink.com/m/8B1ScfZyQnZ")
             ),
             .init(
                 name: "星星",
-                imageAsset: "Icon_xhs",
+                imageAsset: "Icon_team_xingxing",
                 destination: nil,
                 fallbackWebURL: URL(string: "https://xhslink.com/m/ABy083gT7yW")
             ),
             .init(
             name: "LightYear",
-            imageAsset: "Icon_xhs",
+            imageAsset: "Icon_team_lightyear",
             destination: nil,
             fallbackWebURL: URL(string: "https://xhslink.com/m/AQ6ODzD5O1m")
         ),
