@@ -92,6 +92,13 @@ struct FeedView: View {
             loadCoverImageIfNeeded()
             await refreshRemoteMomentsIfNeeded()
         }
+        .onAppear {
+            markFeedAsViewed()
+        }
+        .onChange(of: latestMomentTrackingKey) { _, _ in
+            guard !moments.isEmpty else { return }
+            markFeedAsViewed()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -205,6 +212,12 @@ struct FeedView: View {
         return min(max(width * 0.68, 236), 320)
     }
 
+    private var latestMomentTrackingKey: String {
+        let latestMomentId = moments.first?.id ?? ""
+        let latestPublishedAt = moments.first?.publishedAt.timeIntervalSince1970 ?? 0
+        return "\(moments.count)|\(latestMomentId)|\(latestPublishedAt)"
+    }
+
     @MainActor
     private func refreshRemoteMomentsIfNeeded() async {
         guard !hasRequestedInitialRemoteRefresh else { return }
@@ -249,6 +262,11 @@ struct FeedView: View {
         }
 
         isPresentingCoverPicker = true
+    }
+
+    private func markFeedAsViewed() {
+        let scopedDefaults = ScopedUserDefaultsStore()
+        scopedDefaults.set(Date().timeIntervalSince1970, for: "lastViewedFeedAt")
     }
 }
 

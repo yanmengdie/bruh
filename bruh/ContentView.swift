@@ -187,11 +187,14 @@ struct ContentView: View {
     }
 
     private var totalUnreadMessages: Int {
-        max(0, acceptedPersonaIds.reduce(0) { count, personaId in
-            guard let thread = threads.first(where: { $0.personaId == personaId }) else {
-                return count
-            }
-            return count + MessageThreadReadState.unreadCount(for: thread, deliveries: messageDeliveries)
+        let acceptedThreads = threads.filter { acceptedPersonaIds.contains($0.personaId) }
+        let unreadCountByThreadId = MessageThreadReadState.unreadCountsByThreadId(
+            threads: acceptedThreads,
+            deliveries: messageDeliveries
+        )
+
+        return max(0, acceptedThreads.reduce(0) { count, thread in
+            count + (unreadCountByThreadId[thread.id] ?? max(0, thread.unreadCount))
         })
     }
 

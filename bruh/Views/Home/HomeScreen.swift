@@ -325,18 +325,10 @@ struct HomeScreen: View {
     }
 
     private var unreadCountByThreadId: [String: Int] {
-        let readCutoffByThreadId = Dictionary(
-            uniqueKeysWithValues: threads.map { ($0.id, $0.lastReadAt ?? .distantPast) }
+        MessageThreadReadState.unreadCountsByThreadId(
+            threads: threads,
+            deliveries: messageDeliveries
         )
-        var counts: [String: Int] = [:]
-
-        for delivery in messageDeliveries {
-            guard let threadId = canonicalThreadId(for: delivery) else { continue }
-            guard delivery.sortDate > (readCutoffByThreadId[threadId] ?? .distantPast) else { continue }
-            counts[threadId, default: 0] += 1
-        }
-
-        return counts
     }
 
     private var messageSummaries: [HomeMessageSummary] {
