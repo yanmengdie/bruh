@@ -1,6 +1,18 @@
 import Foundation
 import SwiftData
 
+enum SystemInvitePersonaAllowlist {
+    static let ids: Set<String> = [
+        "trump",
+        "musk",
+        "lei_jun",
+        "luo_yonghao",
+        "sam_altman",
+        "papi",
+        "justin_sun",
+    ]
+}
+
 struct SystemContactProfileOverride: Codable {
     var name: String?
     var phoneNumber: String?
@@ -246,7 +258,10 @@ func resolvedInviteStatus(
 func normalizeInviteFrontier(in context: ModelContext) {
     let contacts: [Contact] = (try? context.fetch(FetchDescriptor<Contact>())) ?? []
     let personaContacts = contacts
-        .filter { $0.linkedPersonaId != nil }
+        .filter { contact in
+            guard let personaId = contact.linkedPersonaId else { return false }
+            return SystemInvitePersonaAllowlist.ids.contains(personaId)
+        }
         .sorted { ($0.inviteOrder ?? 999) < ($1.inviteOrder ?? 999) }
 
     var frontierLocked = false

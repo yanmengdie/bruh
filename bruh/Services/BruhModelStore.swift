@@ -43,30 +43,20 @@ enum BruhModelStore {
             return try makePersistentContainer(configuration: configuration)
         } catch {
             backupDefaultStoreFiles(reason: "container_boot_failure")
-            clearDefaultStoreFiles()
+            print("Persistent SwiftData store boot failed: \(error)")
 
+            // Keep the on-disk store intact and fall back to memory instead of wiping user data.
+            let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
             do {
-                return try makePersistentContainer(configuration: configuration)
+                return try ModelContainer(for: schema, migrationPlan: BruhSchemaMigrationPlan.self, configurations: [memoryConfig])
             } catch {
-                // Last-resort fallback to keep app bootable.
-                let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-                do {
-                    return try ModelContainer(for: schema, migrationPlan: BruhSchemaMigrationPlan.self, configurations: [memoryConfig])
-                } catch {
-                    fatalError("Failed to create SwiftData ModelContainer: \(error)")
-                }
+                fatalError("Failed to create SwiftData ModelContainer: \(error)")
             }
         }
     }
 
     private static func makePersistentContainer(configuration: ModelConfiguration) throws -> ModelContainer {
         try ModelContainer(for: schema, migrationPlan: BruhSchemaMigrationPlan.self, configurations: [configuration])
-    }
-
-    private static func clearDefaultStoreFiles(fileManager: FileManager = .default) {
-        for url in defaultStoreFileURLs() where fileManager.fileExists(atPath: url.path) {
-            try? fileManager.removeItem(at: url)
-        }
     }
 
     private static func backupDefaultStoreFiles(reason: String, fileManager: FileManager = .default) {

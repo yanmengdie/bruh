@@ -67,15 +67,7 @@ struct ContactsView: View {
     private let trumpFollowUpMessageId = "demo:trump-news-1"
     private let trumpFollowUpSourcePostIds = ["trump-news-1"]
     private let trumpFollowUpURL = "https://www.reuters.com/world/asia-pacific/trump-agrees-two-week-ceasefire-iran-says-safe-passage-through-hormuz-possible-2026-04-08/"
-    private let invitePersonaAllowlist: Set<String> = [
-        "trump",
-        "musk",
-        "lei_jun",
-        "luo_yonghao",
-        "sam_altman",
-        "papi",
-        "justin_sun",
-    ]
+    private let invitePersonaAllowlist = SystemInvitePersonaAllowlist.ids
 
     private var currentProfile: UserProfile? {
         profiles.first(where: { $0.id == CurrentUserProfileStore.userId })

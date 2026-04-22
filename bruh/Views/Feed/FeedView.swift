@@ -11,6 +11,7 @@ struct FeedView: View {
         sort: [SortDescriptor(\PengyouMoment.publishedAt, order: .reverse)],
         animation: .default
     ) private var moments: [PengyouMoment]
+    @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
     @Query private var profiles: [UserProfile]
 
     @State private var isPresentingComposer = false
@@ -34,16 +35,23 @@ struct FeedView: View {
         return UIImage(data: data)
     }
 
+    private var visibleMoments: [PengyouMoment] {
+        ContentGraphSelectors.visibleMoments(
+            from: moments,
+            contacts: contacts
+        )
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
                 momentsHeader
 
                 LazyVStack(spacing: 0) {
-                    if moments.isEmpty {
+                    if visibleMoments.isEmpty {
                         emptyState
                     } else {
-                        ForEach(moments) { moment in
+                        ForEach(visibleMoments) { moment in
                             PengyouMomentCard(
                                 moment: moment,
                                 currentProfileAvatarImage: currentProfileAvatarImage
@@ -96,7 +104,7 @@ struct FeedView: View {
             markFeedAsViewed()
         }
         .onChange(of: latestMomentTrackingKey) { _, _ in
-            guard !moments.isEmpty else { return }
+            guard !visibleMoments.isEmpty else { return }
             markFeedAsViewed()
         }
         .toolbar {
@@ -213,9 +221,9 @@ struct FeedView: View {
     }
 
     private var latestMomentTrackingKey: String {
-        let latestMomentId = moments.first?.id ?? ""
-        let latestPublishedAt = moments.first?.publishedAt.timeIntervalSince1970 ?? 0
-        return "\(moments.count)|\(latestMomentId)|\(latestPublishedAt)"
+        let latestMomentId = visibleMoments.first?.id ?? ""
+        let latestPublishedAt = visibleMoments.first?.publishedAt.timeIntervalSince1970 ?? 0
+        return "\(visibleMoments.count)|\(latestMomentId)|\(latestPublishedAt)"
     }
 
     @MainActor

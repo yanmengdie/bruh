@@ -18,6 +18,7 @@ enum SystemContactSeedWriter {
         let legacyInviteState = legacyInviteStateByPersonaId()
         let selectedInterestIds = CurrentUserProfileStore.selectedInterests(in: context)
         let inviteOrderMap = PersonaCatalog.inviteOrderMap(for: selectedInterestIds)
+            .filter { SystemInvitePersonaAllowlist.ids.contains($0.key) }
         let firstPendingPersonaId = inviteOrderMap
             .filter { !deletedPersonaIds.contains($0.key) }
             .sorted(by: { $0.value < $1.value })

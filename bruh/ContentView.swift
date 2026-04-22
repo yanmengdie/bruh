@@ -203,9 +203,13 @@ struct ContentView: View {
     }
 
     private var totalUnreadMoments: Int {
-        guard lastViewedFeedAtInterval > 0 else { return pengyouMoments.count }
+        let visibleMoments = ContentGraphSelectors.visibleMoments(
+            from: pengyouMoments,
+            contacts: contacts
+        )
+        guard lastViewedFeedAtInterval > 0 else { return visibleMoments.count }
         let lastViewed = Date(timeIntervalSince1970: lastViewedFeedAtInterval)
-        return pengyouMoments.reduce(0) { count, moment in
+        return visibleMoments.reduce(0) { count, moment in
             count + (moment.publishedAt > lastViewed ? 1 : 0)
         }
     }

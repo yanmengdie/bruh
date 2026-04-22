@@ -9,6 +9,15 @@ enum ContentGraphSelectors {
         )
     }
 
+    static func visibleMoments(
+        from moments: [PengyouMoment],
+        contacts: [Contact]
+    ) -> [PengyouMoment] {
+        let visiblePersonaIds = acceptedPersonaIds(from: contacts)
+            .union([CurrentUserProfileStore.userId])
+        return moments.filter { visiblePersonaIds.contains($0.personaId) }
+    }
+
     static func visibleMessageDeliveries(
         from deliveries: [ContentDelivery],
         contacts: [Contact]
