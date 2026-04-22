@@ -203,61 +203,6 @@ Deno.serve({ port }, async (request) => {
       }
     }
 
-    let sourceQuery = supabase
-      .from("source_posts")
-      .select(
-        "id, persona_id, content, source_type, source_url, topic, importance_score, published_at, media_urls, video_url, raw_payload",
-      )
-      .in("persona_id", featureFlags.enabledPersonaIds)
-      .order("published_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(selectionWindow);
-
-    if (since) {
-      sourceQuery = sourceQuery.gt(
-        "published_at",
-        new Date(since).toISOString(),
-      );
-    }
-
-    if (featureFlags.feedReadSource !== "feed_items") {
-      const { data: sourcePosts, error: sourceError } = await sourceQuery;
-      if (sourceError && featureFlags.feedReadSource === "source_posts") {
-        const errorCategory = classifyError(sourceError.message);
-        logEdgeFailure(
-          observation,
-          "source_posts_query_failed",
-          sourceError.message,
-          {
-            feedReadSource: featureFlags.feedReadSource,
-            clientVersion,
-          },
-        );
-        return Response.json(
-          { error: sourceError.message, errorCategory },
-          { status: 500, headers: responseHeaders },
-        );
-      }
-
-      if (!sourceError && (sourcePosts?.length ?? 0) > 0) {
-        const payload = mapFeed(
-          (sourcePosts ?? []) as FeedRow[],
-          featureFlags.feedRankingStrategy,
-          request,
-          limit,
-        );
-        logEdgeSuccess(observation, "request_succeeded", {
-          itemCount: payload.length,
-          dataSource: "source_posts",
-          rankingStrategy: featureFlags.feedRankingStrategy,
-          clientVersion,
-        });
-        return Response.json(payload, {
-          headers: responseHeaders,
-        });
-      }
-    }
-
     let fallbackQuery = supabase
       .from("feed_items")
       .select(
@@ -275,8 +220,120 @@ Deno.serve({ port }, async (request) => {
       );
     }
 
-    const { data: feedItems, error: feedError } = await fallbackQuery;
+    let sourceQuery = supabase
+      .from("source_posts")
+      .select(
+        "id, persona_id, content, source_type, source_url, topic, importance_score, published_at, media_urls, video_url, raw_payload",
+      )
+      .in("persona_id", featureFlags.enabledPersonaIds)
+      .order("published_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(selectionWindow);
 
+    if (since) {
+      sourceQuery = sourceQuery.gt(
+        "published_at",
+        new Date(since).toISOString(),
+      );
+    }
+
+    const shouldPreferFeedItems = featureFlags.feedReadSource !== "source_posts"
+    const shouldAllowSourceFallback = featureFlags.feedReadSource !== "feed_items"
+
+    if (shouldPreferFeedItems) {
+      const { data: feedItems, error: feedError } = await fallbackQuery;
+
+      if (!feedError && (feedItems?.length ?? 0) > 0) {
+        const payload = mapFeed(
+          (feedItems ?? []) as FeedRow[],
+          featureFlags.feedRankingStrategy,
+          request,
+          limit,
+        );
+        logEdgeSuccess(observation, "request_succeeded", {
+          itemCount: payload.length,
+          dataSource: "feed_items",
+          rankingStrategy: featureFlags.feedRankingStrategy,
+          clientVersion,
+        });
+        return Response.json(payload, {
+          headers: responseHeaders,
+        });
+      }
+
+      if (feedError && !shouldAllowSourceFallback) {
+        const errorCategory = classifyError(feedError.message);
+        logEdgeFailure(
+          observation,
+          "feed_items_query_failed",
+          feedError.message,
+          {
+            feedReadSource: featureFlags.feedReadSource,
+            clientVersion,
+          },
+        );
+        return Response.json(
+          { error: feedError.message, errorCategory },
+          { status: 500, headers: responseHeaders },
+        );
+      }
+
+      if (!shouldAllowSourceFallback) {
+        const payload = mapFeed(
+          (feedItems ?? []) as FeedRow[],
+          featureFlags.feedRankingStrategy,
+          request,
+          limit,
+        );
+        logEdgeSuccess(observation, "request_succeeded", {
+          itemCount: payload.length,
+          dataSource: "feed_items",
+          rankingStrategy: featureFlags.feedRankingStrategy,
+          clientVersion,
+        });
+        return Response.json(payload, {
+          headers: responseHeaders,
+        });
+      }
+    }
+
+    const { data: sourcePosts, error: sourceError } = await sourceQuery;
+    if (sourceError) {
+      const errorCategory = classifyError(sourceError.message);
+      logEdgeFailure(
+        observation,
+        "source_posts_query_failed",
+        sourceError.message,
+        {
+          feedReadSource: featureFlags.feedReadSource,
+          clientVersion,
+        },
+      );
+      return Response.json(
+        { error: sourceError.message, errorCategory },
+        { status: 500, headers: responseHeaders },
+      );
+    }
+
+    if ((sourcePosts?.length ?? 0) > 0) {
+      const payload = mapFeed(
+        (sourcePosts ?? []) as FeedRow[],
+        featureFlags.feedRankingStrategy,
+        request,
+        limit,
+      );
+      logEdgeSuccess(observation, "request_succeeded", {
+        itemCount: payload.length,
+        dataSource: "source_posts",
+        rankingStrategy: featureFlags.feedRankingStrategy,
+        clientVersion,
+      });
+      return Response.json(payload, {
+        headers: responseHeaders,
+      });
+    }
+
+    const { data: feedItems, error: feedError } = await fallbackQuery;
     if (feedError) {
       const errorCategory = classifyError(feedError.message);
       logEdgeFailure(
@@ -302,7 +359,7 @@ Deno.serve({ port }, async (request) => {
     );
     logEdgeSuccess(observation, "request_succeeded", {
       itemCount: payload.length,
-      dataSource: "feed_items",
+      dataSource: "feed_items_fallback",
       rankingStrategy: featureFlags.feedRankingStrategy,
       clientVersion,
     });

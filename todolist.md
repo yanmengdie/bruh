@@ -198,6 +198,8 @@
   说明：OpenAI 相关配置已迁入服务器并验证可用，但若后续要恢复 X 抓取、TTS 或图片生成，还需要用户提供 `APIFY_TOKEN`、`VOICE_*`、`NANO_BANANA_*` 等明文值；这些值不能从 Supabase secrets digest 直接恢复。
 - [x] 处理 `ingest-top-news` 的外网连通问题，替换目前服务器抓不到的 RSS 源。
   已完成：确认服务器到 `feeds.bbci.co.uk` 的 `80/443` 出口都超时后，已将默认热榜源从 BBC RSS 切换为服务器可直连的 `baidu-hot-search`，并在 `ingest-top-news` 中补齐对应解析和热度加权逻辑。服务器实测 `invoke_function.sh ingest-top-news '{"timeoutMs":20000}'` 已稳定返回 `feeds=[{"feed":"baidu-hot-search","ok":true,"fetched":11}]`，当前新闻抓取默认不再依赖 BBC。
+- [x] 将朋友圈里的 X / 微博媒体从“客户端直连外站”收口为“服务端代理 + 本地镜像缓存”，避免国内用户刷到无图。
+  已完成：新增 `supabase/functions/_shared/media_cache.ts`，为 `build-feed`、`feed`、`media-proxy` 打通统一媒体镜像链路。当前 `build-feed` 会优先把可镜像的图片/视频预热到服务器本地缓存目录，再把 `feed_items.media_urls/video_url` 写成自有 `media-proxy?key=` 地址；`media-proxy` 同时支持按 `key` 直接回本地缓存、按 `url` 首次拉取并落盘后再返回，国内用户不再依赖直连 `pbs.twimg.com` / `video.twimg.com` 才能看朋友圈。服务器现已配置 `BRUH_MEDIA_CACHE_DIR=/opt/bruh-selfhost/runtime/media-cache` 并重建一次 feed，缓存目录已有实际镜像文件；同时补齐对 `?format=jpg/png` 这类 query 资源的扩展名识别，避免后续 feed rebuild 反复回源抓同一张图。当前仍有少量超大 X 视频继续走 `media-proxy?url=` 的按需代理模式，但客户端同样只访问自有后端，不需要直接连外站。
 
 ### 时间映射
 

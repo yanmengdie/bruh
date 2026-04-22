@@ -3,9 +3,12 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { resolveSupabaseServiceConfig } from "../_shared/environment.ts";
 import {
   extractNormalizedVideoUrl,
-  normalizeMediaUrls,
   normalizeSourceUrl,
 } from "../_shared/media.ts";
+import {
+  mirrorMediaUrls,
+  mirrorVideoUrl,
+} from "../_shared/media_cache.ts";
 import {
   classifyError,
   createObservationContext,
@@ -19,6 +22,30 @@ import {
 } from "../_shared/pipeline_lock.ts";
 
 const port = Number(Deno.env.get("PORT") ?? "8000");
+const mirrorConcurrency = 6;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+) {
+  const results: R[] = new Array(items.length)
+  let nextIndex = 0
+
+  async function worker() {
+    while (true) {
+      const currentIndex = nextIndex
+      nextIndex += 1
+      if (currentIndex >= items.length) return
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex)
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(Math.max(concurrency, 1), items.length || 1) }, () => worker()),
+  )
+  return results
+}
 
 Deno.serve({ port }, async (request) => {
   if (request.method === "OPTIONS") {
@@ -74,7 +101,7 @@ Deno.serve({ port }, async (request) => {
         throw new Error(sourceError.message);
       }
 
-      const rows = (sourcePosts ?? []).map((post) => ({
+      const rows = await mapWithConcurrency(sourcePosts ?? [], mirrorConcurrency, async (post) => ({
         id: `feed-${post.id}`,
         source_post_id: post.id,
         persona_id: post.persona_id,
@@ -84,8 +111,8 @@ Deno.serve({ port }, async (request) => {
         topic: post.topic,
         importance_score: post.importance_score,
         published_at: post.published_at,
-        media_urls: normalizeMediaUrls(post.media_urls),
-        video_url: extractNormalizedVideoUrl(post),
+        media_urls: await mirrorMediaUrls(post.media_urls),
+        video_url: await mirrorVideoUrl(extractNormalizedVideoUrl(post)),
         delivered_at: new Date().toISOString(),
       }));
 
