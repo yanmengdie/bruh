@@ -87,9 +87,22 @@ struct AlbumView: View {
         .scrollIndicators(.hidden)
         .background(AppTheme.messagesBackground)
         .navigationTitle("")
+        .onAppear {
+            markAlbumAsViewed()
+        }
+        .onChange(of: latestAlbumTrackingKey) { _, _ in
+            guard !albumItems.isEmpty else { return }
+            markAlbumAsViewed()
+        }
         .fullScreenCover(item: $selectedAsset) { asset in
             AlbumPreviewView(asset: asset)
         }
+    }
+
+    private var latestAlbumTrackingKey: String {
+        let latestItemId = albumItems.first?.id ?? ""
+        let latestSortDate = albumItems.first?.sortDate.timeIntervalSince1970 ?? 0
+        return "\(albumItems.count)|\(latestItemId)|\(latestSortDate)"
     }
 
     private var topBar: some View {
@@ -193,6 +206,11 @@ struct AlbumView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
+    }
+
+    private func markAlbumAsViewed() {
+        let scopedDefaults = ScopedUserDefaultsStore()
+        scopedDefaults.set(Date().timeIntervalSince1970, for: "lastViewedAlbumAt")
     }
 }
 
