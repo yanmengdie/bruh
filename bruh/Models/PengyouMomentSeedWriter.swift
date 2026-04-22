@@ -4,7 +4,9 @@ import SwiftData
 enum PengyouMomentSeedWriter {
     @MainActor
     static func sync(_ seeds: [PengyouMomentSeed], into context: ModelContext) {
-        let validIds = Set(seeds.map(\.id))
+        let deletedPersonaIds = SystemContactUserStateStore.deletedPersonaIds()
+        let activeSeeds = seeds.filter { !deletedPersonaIds.contains($0.personaId) }
+        let validIds = Set(activeSeeds.map { $0.id })
         let moments: [PengyouMoment] = (try? context.fetch(FetchDescriptor<PengyouMoment>())) ?? []
         let existingById = Dictionary(uniqueKeysWithValues: moments.map { ($0.id, $0) })
 
@@ -12,7 +14,7 @@ enum PengyouMomentSeedWriter {
             context.delete(moment)
         }
 
-        for seed in seeds {
+        for seed in activeSeeds {
             if let moment = existingById[seed.id] {
                 apply(seed, to: moment)
             } else {

@@ -20,7 +20,9 @@ final class FeedService {
         try demoteSeedPostsIfNeeded(posts: posts, modelContext: modelContext)
 
         var postsById = Dictionary(uniqueKeysWithValues: posts.map { ($0.id, $0) })
+        let deletedPersonaIds = SystemContactUserStateStore.deletedPersonaIds()
         let dtos = try await api.fetchFeed(limit: remoteFeedWindow)
+            .filter { !deletedPersonaIds.contains($0.personaId) }
         let fetchDate = Date()
         var newCount = 0
         var syncedPosts: [PersonaPost] = []
@@ -169,11 +171,12 @@ final class PengyouMomentRemoteSyncService {
 
     @MainActor
     func refreshMoments(modelContext: ModelContext) async throws -> Int {
+        let deletedPersonaIds = SystemContactUserStateStore.deletedPersonaIds()
         let dtos = try await api.fetchFeed(limit: remoteFeedWindow)
+            .filter { !deletedPersonaIds.contains($0.personaId) }
         let fetchedAt = Date()
         let moments = try modelContext.fetch(FetchDescriptor<PengyouMoment>())
         var momentsById = Dictionary(uniqueKeysWithValues: moments.map { ($0.id, $0) })
-        let activeRemoteIds = Set(dtos.map { Self.momentId(forFeedId: $0.id) })
         var insertedCount = 0
 
         for dto in dtos {
@@ -190,21 +193,11 @@ final class PengyouMomentRemoteSyncService {
             insertedCount += 1
         }
 
-        if !activeRemoteIds.isEmpty {
-            for moment in moments where Self.isRemoteMoment(moment) && !activeRemoteIds.contains(moment.id) {
-                modelContext.delete(moment)
-            }
-        }
-
         if modelContext.hasChanges {
             try modelContext.save()
         }
 
         return insertedCount
-    }
-
-    private static func isRemoteMoment(_ moment: PengyouMoment) -> Bool {
-        moment.id.hasPrefix(remoteIdPrefix)
     }
 
     private static func momentId(forFeedId feedId: String) -> String {

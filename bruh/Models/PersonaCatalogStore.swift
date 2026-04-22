@@ -88,8 +88,7 @@ enum PersonaCatalogStore {
             }
         }
 
-        assertionFailure("SharedPersonas.json could not be loaded from the app bundle.")
-        return []
+        preconditionFailure("SharedPersonas.json could not be loaded from the app bundle.")
     }
 
     private static func candidateBundles() -> [Bundle] {

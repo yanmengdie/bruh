@@ -494,6 +494,7 @@ struct ContactsView: View {
         guard let contact = contact(for: invitation.personaId) else { return }
         presentedInvitation = nil
         let wasAccepted = contact.relationshipStatusValue == .accepted
+        SystemContactUserStateStore.clearDeleted(invitation.personaId)
 
         contact.relationshipStatusValue = .accepted
         contact.acceptedAt = contact.acceptedAt ?? .now
@@ -568,8 +569,21 @@ struct ContactsView: View {
             editingContact.phoneNumber = normalizedPhone
             editingContact.email = normalizedEmail
             editingContact.isFavorite = draft.isFavorite
-            editingContact.relationshipStatusValue = .custom
+            if editingContact.linkedPersonaId == nil {
+                editingContact.relationshipStatusValue = .custom
+            } else if editingContact.relationshipStatusValue == .custom {
+                editingContact.relationshipStatusValue = .accepted
+                editingContact.acceptedAt = editingContact.acceptedAt ?? .now
+            }
             editingContact.updatedAt = .now
+
+            if let personaId = editingContact.linkedPersonaId {
+                SystemContactUserStateStore.clearDeleted(personaId)
+                persistLinkedPersonaProfileOverride(
+                    personaId: personaId,
+                    contact: editingContact
+                )
+            }
         } else {
             let contact = Contact(
                 name: normalizedName,
@@ -591,14 +605,45 @@ struct ContactsView: View {
     }
 
     private func delete(_ contact: Contact) {
-        modelContext.delete(contact)
-        try? modelContext.save()
+        guard let personaId = contact.linkedPersonaId else {
+            modelContext.delete(contact)
+            try? modelContext.save()
+            return
+        }
+
+        SystemContactUserStateStore.markDeleted(personaId)
+        SystemContactUserStateStore.clearProfileOverride(for: personaId)
+        PersonaRetirementCleaner.purgeLocalData(
+            for: personaId,
+            removeContact: true,
+            into: modelContext
+        )
+        normalizeInviteFrontier()
     }
 
     private func toggleFavorite(_ contact: Contact) {
         contact.isFavorite.toggle()
         contact.updatedAt = .now
         try? modelContext.save()
+    }
+
+    private func persistLinkedPersonaProfileOverride(
+        personaId: String,
+        contact: Contact
+    ) {
+        if let profileOverride = SystemContactUserStateStore.makeProfileOverride(
+            personaId: personaId,
+            name: contact.name,
+            phoneNumber: contact.phoneNumber,
+            email: contact.email
+        ) {
+            SystemContactUserStateStore.saveProfileOverride(
+                profileOverride,
+                for: personaId
+            )
+        } else {
+            SystemContactUserStateStore.clearProfileOverride(for: personaId)
+        }
     }
 
     private func normalizeInviteFrontier() {

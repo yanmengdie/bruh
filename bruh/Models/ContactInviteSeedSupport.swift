@@ -1,6 +1,169 @@
 import Foundation
 import SwiftData
 
+struct SystemContactProfileOverride: Codable {
+    var name: String?
+    var phoneNumber: String?
+    var email: String?
+
+    var hasValues: Bool {
+        name != nil || phoneNumber != nil || email != nil
+    }
+}
+
+enum SystemContactUserStateStore {
+    private static let deletedPersonaIdsKey = "systemContacts.deletedPersonaIds"
+    private static let profileOverridesKey = "systemContacts.profileOverrides"
+
+    static func deletedPersonaIds(userDefaults: UserDefaults = .standard) -> Set<String> {
+        let scopedDefaults = ScopedUserDefaultsStore(userDefaults: userDefaults)
+
+        guard let data = scopedDefaults.data(for: deletedPersonaIdsKey),
+              let decoded = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+
+        return Set(decoded)
+    }
+
+    static func markDeleted(_ personaId: String, userDefaults: UserDefaults = .standard) {
+        var ids = deletedPersonaIds(userDefaults: userDefaults)
+        ids.insert(personaId)
+        saveDeletedPersonaIds(ids, userDefaults: userDefaults)
+    }
+
+    static func clearDeleted(_ personaId: String, userDefaults: UserDefaults = .standard) {
+        var ids = deletedPersonaIds(userDefaults: userDefaults)
+        ids.remove(personaId)
+        saveDeletedPersonaIds(ids, userDefaults: userDefaults)
+    }
+
+    static func profileOverride(
+        for personaId: String,
+        userDefaults: UserDefaults = .standard
+    ) -> SystemContactProfileOverride? {
+        profileOverrides(userDefaults: userDefaults)[personaId]
+    }
+
+    static func saveProfileOverride(
+        _ override: SystemContactProfileOverride,
+        for personaId: String,
+        userDefaults: UserDefaults = .standard
+    ) {
+        var overrides = profileOverrides(userDefaults: userDefaults)
+        if override.hasValues {
+            overrides[personaId] = override
+        } else {
+            overrides.removeValue(forKey: personaId)
+        }
+        saveProfileOverrides(overrides, userDefaults: userDefaults)
+    }
+
+    static func clearProfileOverride(
+        for personaId: String,
+        userDefaults: UserDefaults = .standard
+    ) {
+        var overrides = profileOverrides(userDefaults: userDefaults)
+        overrides.removeValue(forKey: personaId)
+        saveProfileOverrides(overrides, userDefaults: userDefaults)
+    }
+
+    static func makeProfileOverride(
+        personaId: String,
+        name: String,
+        phoneNumber: String,
+        email: String
+    ) -> SystemContactProfileOverride? {
+        let normalizedName = normalize(name)
+        let normalizedPhoneNumber = normalize(phoneNumber)
+        let normalizedEmail = normalize(email)
+        let defaultName = PersonaCatalog.entry(for: personaId)?.displayName ?? personaId
+        let defaultPhoneNumberValue = normalize(defaultPhoneNumber(for: personaId))
+        let defaultEmailValue = normalize(defaultEmail(for: personaId))
+
+        let override = SystemContactProfileOverride(
+            name: normalizedName == defaultName ? nil : normalizedName,
+            phoneNumber: normalizedPhoneNumber == defaultPhoneNumberValue ? nil : normalizedPhoneNumber,
+            email: normalizedEmail == defaultEmailValue ? nil : normalizedEmail
+        )
+
+        return override.hasValues ? override : nil
+    }
+
+    static func migrateLegacyProfileOverrideIfNeeded(
+        from contact: Contact,
+        userDefaults: UserDefaults = .standard
+    ) {
+        guard let personaId = contact.linkedPersonaId else { return }
+        guard contact.relationshipStatusValue == .custom else { return }
+        guard profileOverride(for: personaId, userDefaults: userDefaults) == nil else { return }
+
+        let baselineOverride = makeProfileOverride(
+            personaId: personaId,
+            name: contact.name,
+            phoneNumber: contact.phoneNumber,
+            email: contact.email
+        )
+
+        if let baselineOverride {
+            saveProfileOverride(baselineOverride, for: personaId, userDefaults: userDefaults)
+        } else {
+            clearProfileOverride(for: personaId, userDefaults: userDefaults)
+        }
+    }
+
+    static func applyProfileOverride(
+        _ override: SystemContactProfileOverride,
+        to contact: Contact
+    ) {
+        if let name = override.name {
+            contact.name = name
+        }
+        if let phoneNumber = override.phoneNumber {
+            contact.phoneNumber = phoneNumber
+        }
+        if let email = override.email {
+            contact.email = email
+        }
+    }
+
+    private static func profileOverrides(
+        userDefaults: UserDefaults = .standard
+    ) -> [String: SystemContactProfileOverride] {
+        let scopedDefaults = ScopedUserDefaultsStore(userDefaults: userDefaults)
+
+        guard let data = scopedDefaults.data(for: profileOverridesKey),
+              let decoded = try? JSONDecoder().decode([String: SystemContactProfileOverride].self, from: data) else {
+            return [:]
+        }
+
+        return decoded
+    }
+
+    private static func saveDeletedPersonaIds(
+        _ ids: Set<String>,
+        userDefaults: UserDefaults = .standard
+    ) {
+        let scopedDefaults = ScopedUserDefaultsStore(userDefaults: userDefaults)
+        let sortedIds = ids.sorted()
+        let encoded = try? JSONEncoder().encode(sortedIds)
+        scopedDefaults.set(encoded, for: deletedPersonaIdsKey)
+    }
+
+    private static func saveProfileOverrides(
+        _ overrides: [String: SystemContactProfileOverride],
+        userDefaults: UserDefaults = .standard
+    ) {
+        let scopedDefaults = ScopedUserDefaultsStore(userDefaults: userDefaults)
+        let encoded = try? JSONEncoder().encode(overrides)
+        scopedDefaults.set(encoded, for: profileOverridesKey)
+    }
+
+    private static func normalize(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 @MainActor
 func fetchEngagedPersonaIds(from context: ModelContext) -> Set<String> {
     let threads: [MessageThread] = (try? context.fetch(FetchDescriptor<MessageThread>())) ?? []
