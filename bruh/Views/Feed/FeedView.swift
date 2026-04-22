@@ -135,48 +135,32 @@ struct FeedView: View {
             Button {
                 isShowingCoverOptions = true
             } label: {
-                ZStack(alignment: .bottomLeading) {
+                ZStack {
                     if let coverImage {
                         Image(uiImage: coverImage)
                             .resizable()
                             .scaledToFill()
-                    } else {
-                        Rectangle()
-                            .fill(
+                            .overlay {
                                 LinearGradient(
                                     colors: [
-                                        Color(red: 0.70, green: 0.71, blue: 0.72),
-                                        Color(red: 0.60, green: 0.61, blue: 0.63)
+                                        Color.black.opacity(0.0),
+                                        Color.black.opacity(0.34)
                                     ],
-                                    startPoint: .top,
+                                    startPoint: .center,
                                     endPoint: .bottom
                                 )
-                            )
+                            }
+                    } else {
+                        Rectangle()
+                            .fill(Color(red: 0.62, green: 0.63, blue: 0.65))
                     }
-
-                    LinearGradient(
-                        colors: [
-                            Color.black.opacity(0.0),
-                            Color.black.opacity(coverImage == nil ? 0.12 : 0.34)
-                        ],
-                        startPoint: .center,
-                        endPoint: .bottom
-                    )
-
-                    Label(coverImage == nil ? "设置背景" : "更换背景", systemImage: "photo")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.92))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(Color.black.opacity(0.22), in: Capsule())
-                        .padding(.leading, 16)
-                        .padding(.bottom, 16)
                 }
                 .frame(height: momentsHeaderHeight)
                 .clipped()
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("更换朋友圈背景")
+            .accessibilityLabel("朋友圈背景")
+            .accessibilityHint("点按更换朋友圈背景")
 
             HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .trailing, spacing: 3) {
