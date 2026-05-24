@@ -39,3 +39,4 @@ supabase/.postgres/
 tools/xhs/.auth/
 tools/xhs/output/
 tools/xhs/node_modules/
+.codegraph/
