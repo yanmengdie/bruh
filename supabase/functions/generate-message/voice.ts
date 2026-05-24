@@ -7,20 +7,10 @@ import {
   clamp,
   countRegexMatches,
   countSignalHits,
-  delay,
 } from "./helpers.ts"
-import type {
-  TTSResponse,
-  TTSStatusResponse,
-  VoiceMood,
-  VoicePlan,
-} from "./types.ts"
+import type { VoiceMood, VoicePlan } from "./types.ts"
 
-const MAX_TTS_RETRIES = 2
-const TTS_ASYNC_TIMEOUT_MS = 45_000
-const TTS_ASYNC_SUBMIT_TIMEOUT_MS = 20_000
-const TTS_STATUS_REQUEST_TIMEOUT_MS = 10_000
-const TTS_STATUS_POLL_INTERVAL_MS = 1_000
+const TTS_REQUEST_TIMEOUT_MS = 30_000
 
 export type VoiceReply = {
   audioUrl: string
@@ -28,14 +18,17 @@ export type VoiceReply = {
   voiceLabel: string
 }
 
-function isConfiguredVoiceSpeakerId(speakerId: string) {
-  const normalized = speakerId.trim()
-  return /^upload:[a-f0-9]+$/i.test(normalized) || /^example:voice_(0[1-9]|1[0-2])$/i.test(normalized)
-}
-
 function resolveVoiceSpeakerId(persona: PersonaDefinition) {
   const overrideKey = `VOICE_SPEAKER_${persona.personaId.toUpperCase()}`
   return asString(getOptionalScopedEnv(overrideKey)) || persona.defaultVoiceSpeakerId
+}
+
+function isValidVoiceSpeakerId(speakerId: string) {
+  const normalized = speakerId.trim()
+  // 小米 mimo TTS 预置音色：冰糖、茉莉、苏打、白桦、Mia、Chloe、Milo、Dean
+  const presetVoices = ["冰糖", "茉莉", "苏打", "白桦", "Mia", "Chloe", "Milo", "Dean"]
+  // VoiceClone 格式：data:audio/mpeg;base64,... 或 data:audio/wav;base64,...
+  return presetVoices.includes(normalized) || normalized.startsWith("data:audio/")
 }
 
 export function normalizeVoiceError(error: unknown) {
@@ -61,60 +54,28 @@ export function normalizeVoiceError(error: unknown) {
 function classifyVoiceMood(content: string): VoiceMood {
   const lower = content.toLowerCase()
   const angerSignals = [
-    "fake news",
-    "lie",
-    "liar",
-    "disaster",
-    "ridiculous",
-    "离谱",
-    "假的",
-    "胡扯",
-    "扯淡",
-    "weak",
-    "loser",
-    "losers",
-    "wrong",
-    "stupid",
-    "terrible",
+    "fake news", "lie", "liar", "disaster", "ridiculous",
+    "离谱", "假的", "胡扯", "扯淡", "weak", "loser", "losers",
+    "wrong", "stupid", "terrible",
   ]
   const smugSignals = [
-    "believe me",
-    "everyone knows",
-    "obviously",
-    "of course",
-    "keep up",
-    "i told you",
+    "believe me", "everyone knows", "obviously", "of course",
+    "keep up", "i told you",
   ]
   const urgentSignals = [
-    "now",
-    "right now",
-    "asap",
-    "immediately",
-    "today",
-    "马上",
-    "现在",
-    "立刻",
-    "move fast",
-    "ship it",
-    "accelerate",
+    "now", "right now", "asap", "immediately", "today",
+    "马上", "现在", "立刻", "move fast", "ship it", "accelerate",
   ]
   const firedUpSignals = [
-    "huge",
-    "massive",
-    "crazy",
-    "wild",
-    "insane",
-    "winning",
-    "absolutely",
-    "let's go",
-    "lets go",
-    "炸了",
-    "太猛了",
+    "huge", "massive", "crazy", "wild", "insane", "winning",
+    "absolutely", "let's go", "lets go", "炸了", "太猛了",
   ]
+
   const exclamationCount = countRegexMatches(content, /[!！]/g)
   const uppercaseWordCount = countRegexMatches(content, /\b[A-Z]{3,}\b/g)
   const emojiCount = countRegexMatches(content, /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu)
   const emphasisScore = clamp(exclamationCount, 0, 2) + clamp(uppercaseWordCount, 0, 1) + clamp(emojiCount, 0, 1)
+
   const angerHits = countSignalHits(lower, angerSignals)
   const smugHits = countSignalHits(lower, smugSignals)
   const urgentHits = countSignalHits(lower, urgentSignals)
@@ -130,22 +91,6 @@ function classifyVoiceMood(content: string): VoiceMood {
   return "calm"
 }
 
-function voiceMoodVector(mood: VoiceMood) {
-  switch (mood) {
-    case "calm":
-      return [0.12, 0.12, 0.08, 0.1, 0.08, 0.14, 0.12, 0.24]
-    case "angry":
-      return [0.08, 0.34, 0.05, 0.07, 0.12, 0.05, 0.08, 0.21]
-    case "smug":
-      return [0.22, 0.05, 0.03, 0.03, 0.02, 0.03, 0.16, 0.46]
-    case "urgent":
-      return [0.12, 0.14, 0.04, 0.12, 0.04, 0.03, 0.18, 0.33]
-    case "fired_up":
-    default:
-      return [0.24, 0.1, 0.04, 0.04, 0.03, 0.03, 0.23, 0.29]
-  }
-}
-
 function voiceMoodText(persona: PersonaDefinition, mood: VoiceMood) {
   switch (mood) {
     case "calm":
@@ -159,23 +104,6 @@ function voiceMoodText(persona: PersonaDefinition, mood: VoiceMood) {
     case "fired_up":
     default:
       return `${persona.displayName}, animated but conversational, clear momentum, confident emphasis, energized without yelling`
-  }
-}
-
-function voiceMoodAlpha(mood: VoiceMood) {
-  switch (mood) {
-    case "calm":
-      return 0.22
-    case "smug":
-      return 0.36
-    case "urgent":
-      return 0.44
-    case "fired_up":
-      return 0.5
-    case "angry":
-      return 0.56
-    default:
-      return 0.3
   }
 }
 
@@ -196,28 +124,9 @@ function shouldReplyWithVoice(
   const uppercaseWordCount = countRegexMatches(trimmed, /\b[A-Z]{3,}\b/g)
   const emojiCount = countRegexMatches(trimmed, /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu)
   const intenseSignalCount = [
-    "huge",
-    "massive",
-    "crazy",
-    "wild",
-    "insane",
-    "ridiculous",
-    "离谱",
-    "假的",
-    "马上",
-    "立刻",
-    "fake news",
-    "lie",
-    "wrong",
-    "winning",
-    "believe me",
-    "brutal",
-    "disaster",
-    "everyone knows",
-    "move fast",
-    "accelerate",
-    "ship it",
-    "absolutely",
+    "huge", "massive", "crazy", "wild", "insane", "ridiculous", "离谱", "假的", "马上", "立刻",
+    "fake news", "lie", "wrong", "winning", "believe me", "brutal", "disaster", "everyone knows",
+    "move fast", "accelerate", "ship it", "absolutely",
   ].reduce((score, signal) => score + (lower.includes(signal) ? 1 : 0), 0)
 
   let score = 0
@@ -253,7 +162,7 @@ export function buildVoicePlan(
     (!requestImage) &&
     trimmed.length > 0 &&
     trimmed.length <= maxCharacters &&
-    isConfiguredVoiceSpeakerId(speakerId) &&
+    isValidVoiceSpeakerId(speakerId) &&
     (forceVoice || (automaticRepliesEnabled && ttsMode !== "force_only" && shouldReplyWithVoice(persona.personaId, content, requestImage)))
 
   if (!shouldGenerateVoice) {
@@ -273,42 +182,12 @@ export function buildVoicePlan(
     speakerId,
     voiceLabel: persona.defaultVoiceLabel,
     emoText: voiceMoodText(persona, mood),
-    emoVector: voiceMoodVector(mood),
-    emoAlpha: voiceMoodAlpha(mood),
+    emoVector: [],
+    emoAlpha: 0,
   }
 }
 
-function buildAbsoluteVoiceUrl(baseUrl: string, relativeOrAbsoluteUrl: string, taskId: string) {
-  const sanitizedBaseUrl = baseUrl.replace(/\/$/, "")
-  if (/^https?:\/\//i.test(relativeOrAbsoluteUrl)) return relativeOrAbsoluteUrl
-  const normalizedPath = relativeOrAbsoluteUrl
-    ? relativeOrAbsoluteUrl.replace(/^\//, "")
-    : `audio/${taskId}`
-  return new URL(normalizedPath, `${sanitizedBaseUrl}/`).toString()
-}
-
-function buildVoiceRequestBody(plan: VoicePlan, content: string) {
-  return {
-    text: content,
-    speaker_id: plan.speakerId,
-    use_emo_text: true,
-    emo_text: plan.emoText,
-    emo_vector: plan.emoVector,
-    emo_alpha: plan.emoAlpha,
-    max_text_tokens_per_segment: 120,
-    top_p: 0.78,
-    top_k: 30,
-    temperature: 0.72,
-    repetition_penalty: 6,
-  }
-}
-
-function isVoiceTimeoutError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error)
-  return /signal timed out|aborted|timeout/i.test(message)
-}
-
-async function synthesizeVoiceReplyAsync(
+async function synthesizeVoiceReply(
   voiceApiBaseUrl: string,
   voiceApiKey: string | null,
   plan: VoicePlan,
@@ -316,66 +195,58 @@ async function synthesizeVoiceReplyAsync(
 ): Promise<VoiceReply> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(voiceApiKey ? { Authorization: `Bearer ${voiceApiKey}` } : {}),
+    ...(voiceApiKey ? { "api-key": voiceApiKey } : {}),
   }
 
-  const submitResponse = await fetch(`${voiceApiBaseUrl}/tts/async`, {
+  // 判断是使用预置音色还是 VoiceClone
+  const isVoiceClone = plan.speakerId.startsWith("data:audio/")
+  const model = isVoiceClone ? "mimo-v2.5-tts-voiceclone" : "mimo-v2.5-tts"
+
+  const requestBody = {
+    model,
+    messages: [
+      { role: "user", content: isVoiceClone ? "" : plan.emoText },
+      { role: "assistant", content: content },
+    ],
+    audio: {
+      format: "wav",
+      voice: plan.speakerId,
+    },
+    stream: false,
+  }
+
+  const response = await fetch(`${voiceApiBaseUrl}/chat/completions`, {
     method: "POST",
     headers,
-    body: JSON.stringify(buildVoiceRequestBody(plan, content)),
-    signal: AbortSignal.timeout(TTS_ASYNC_SUBMIT_TIMEOUT_MS),
+    body: JSON.stringify(requestBody),
+    signal: AbortSignal.timeout(TTS_REQUEST_TIMEOUT_MS),
   })
 
-  if (!submitResponse.ok) {
-    const responseText = (await submitResponse.text()).trim()
+  if (!response.ok) {
+    const responseText = (await response.text()).trim()
     throw new Error(
       responseText
-        ? `TTS async request failed (${submitResponse.status}): ${responseText}`
-        : `TTS async request failed (${submitResponse.status})`,
+        ? `TTS request failed (${response.status}): ${responseText}`
+        : `TTS request failed (${response.status})`,
     )
   }
 
-  const submitted = await submitResponse.json() as TTSResponse
-  const taskId = asString(submitted.task_id)
-  if (!taskId) {
-    throw new Error("TTS async response missing task_id")
+  const result = await response.json()
+  const audioData = result.choices?.[0]?.message?.audio?.data
+
+  if (!audioData) {
+    throw new Error("TTS response missing audio data")
   }
 
-  const deadline = Date.now() + TTS_ASYNC_TIMEOUT_MS
-  while (Date.now() < deadline) {
-    await delay(TTS_STATUS_POLL_INTERVAL_MS)
+  const audioBytes = Uint8Array.from(atob(audioData), c => c.charCodeAt(0))
+  const audioBlob = new Blob([audioBytes], { type: "audio/wav" })
+  const audioUrl = URL.createObjectURL(audioBlob)
 
-    const statusResponse = await fetch(`${voiceApiBaseUrl}/tts/status/${taskId}`, {
-      method: "GET",
-      headers: voiceApiKey ? { Authorization: `Bearer ${voiceApiKey}` } : undefined,
-      signal: AbortSignal.timeout(TTS_STATUS_REQUEST_TIMEOUT_MS),
-    })
-
-    if (!statusResponse.ok) {
-      const responseText = (await statusResponse.text()).trim()
-      throw new Error(
-        responseText
-          ? `TTS status request failed (${statusResponse.status}): ${responseText}`
-          : `TTS status request failed (${statusResponse.status})`,
-      )
-    }
-
-    const statusPayload = await statusResponse.json() as TTSStatusResponse
-    const status = asString(statusPayload.status)
-    if (status === "completed") {
-      return {
-        audioUrl: buildAbsoluteVoiceUrl(voiceApiBaseUrl, "", taskId),
-        duration: null,
-        voiceLabel: plan.voiceLabel,
-      }
-    }
-
-    if (status === "failed") {
-      throw new Error(asString(statusPayload.error_message) || "TTS async task failed")
-    }
+  return {
+    audioUrl,
+    duration: null,
+    voiceLabel: plan.voiceLabel,
   }
-
-  throw new Error("TTS async polling timed out")
 }
 
 export async function synthesizeVoiceReplyWithRetries(
@@ -386,11 +257,11 @@ export async function synthesizeVoiceReplyWithRetries(
   forceVoice: boolean,
 ): Promise<VoiceReply> {
   let lastError: unknown = null
-  const attemptCount = forceVoice ? MAX_TTS_RETRIES : 1
+  const attemptCount = forceVoice ? 2 : 1
 
   for (let attempt = 1; attempt <= attemptCount; attempt += 1) {
     try {
-      return await synthesizeVoiceReplyAsync(
+      return await synthesizeVoiceReply(
         voiceApiBaseUrl,
         voiceApiKey,
         plan,
@@ -398,8 +269,8 @@ export async function synthesizeVoiceReplyWithRetries(
       )
     } catch (error) {
       lastError = error
-      if (attempt < attemptCount && (forceVoice || isVoiceTimeoutError(error))) {
-        await delay(200 * attempt)
+      if (attempt < attemptCount) {
+        await new Promise(resolve => setTimeout(resolve, 200 * attempt))
       }
     }
   }

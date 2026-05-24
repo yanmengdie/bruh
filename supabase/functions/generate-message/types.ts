@@ -43,20 +43,3 @@ export type VoicePlan = {
   emoVector: number[]
   emoAlpha: number
 }
-
-export type TTSResponse = {
-  task_id?: string
-  status?: string
-  message?: string
-  output_path?: string | null
-  audio_url?: string | null
-  duration?: number | null
-}
-
-export type TTSStatusResponse = {
-  task_id?: string
-  status?: string
-  output_path?: string | null
-  error_message?: string | null
-  completed_at?: number | null
-}
