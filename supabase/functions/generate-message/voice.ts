@@ -6,9 +6,8 @@ import {
   asString,
   clamp,
   countRegexMatches,
-  countSignalHits,
 } from "./helpers.ts"
-import type { VoiceMood, VoicePlan } from "./types.ts"
+import type { VoicePlan } from "./types.ts"
 
 const TTS_REQUEST_TIMEOUT_MS = 30_000
 
@@ -21,14 +20,6 @@ export type VoiceReply = {
 function resolveVoiceSpeakerId(persona: PersonaDefinition) {
   const overrideKey = `VOICE_SPEAKER_${persona.personaId.toUpperCase()}`
   return asString(getOptionalScopedEnv(overrideKey)) || persona.defaultVoiceSpeakerId
-}
-
-function isValidVoiceSpeakerId(speakerId: string) {
-  const normalized = speakerId.trim()
-  // 小米 mimo TTS 预置音色：冰糖、茉莉、苏打、白桦、Mia、Chloe、Milo、Dean
-  const presetVoices = ["冰糖", "茉莉", "苏打", "白桦", "Mia", "Chloe", "Milo", "Dean"]
-  // VoiceClone 格式：data:audio/mpeg;base64,... 或 data:audio/wav;base64,...
-  return presetVoices.includes(normalized) || normalized.startsWith("data:audio/")
 }
 
 export function normalizeVoiceError(error: unknown) {
@@ -49,62 +40,6 @@ export function normalizeVoiceError(error: unknown) {
   }
 
   return trimmed.length > 240 ? `${trimmed.slice(0, 237)}...` : trimmed
-}
-
-function classifyVoiceMood(content: string): VoiceMood {
-  const lower = content.toLowerCase()
-  const angerSignals = [
-    "fake news", "lie", "liar", "disaster", "ridiculous",
-    "离谱", "假的", "胡扯", "扯淡", "weak", "loser", "losers",
-    "wrong", "stupid", "terrible",
-  ]
-  const smugSignals = [
-    "believe me", "everyone knows", "obviously", "of course",
-    "keep up", "i told you",
-  ]
-  const urgentSignals = [
-    "now", "right now", "asap", "immediately", "today",
-    "马上", "现在", "立刻", "move fast", "ship it", "accelerate",
-  ]
-  const firedUpSignals = [
-    "huge", "massive", "crazy", "wild", "insane", "winning",
-    "absolutely", "let's go", "lets go", "炸了", "太猛了",
-  ]
-
-  const exclamationCount = countRegexMatches(content, /[!！]/g)
-  const uppercaseWordCount = countRegexMatches(content, /\b[A-Z]{3,}\b/g)
-  const emojiCount = countRegexMatches(content, /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu)
-  const emphasisScore = clamp(exclamationCount, 0, 2) + clamp(uppercaseWordCount, 0, 1) + clamp(emojiCount, 0, 1)
-
-  const angerHits = countSignalHits(lower, angerSignals)
-  const smugHits = countSignalHits(lower, smugSignals)
-  const urgentHits = countSignalHits(lower, urgentSignals)
-  const firedUpHits = countSignalHits(lower, firedUpSignals)
-  const totalMoodHits = angerHits + smugHits + urgentHits + firedUpHits
-
-  if (angerHits >= 1 && (emphasisScore >= 1 || urgentHits >= 1 || totalMoodHits >= 2)) return "angry"
-  if (urgentHits >= 2 || (urgentHits >= 1 && emphasisScore >= 1)) return "urgent"
-  if (smugHits >= 2 || (smugHits >= 1 && emphasisScore >= 1)) return "smug"
-  if (firedUpHits >= 2 || (firedUpHits >= 1 && emphasisScore >= 1) || emphasisScore >= 3 || totalMoodHits >= 3) {
-    return "fired_up"
-  }
-  return "calm"
-}
-
-function voiceMoodText(persona: PersonaDefinition, mood: VoiceMood) {
-  switch (mood) {
-    case "calm":
-      return `${persona.displayName}, conversational, grounded, relaxed pace, natural pauses, calm confidence`
-    case "angry":
-      return `${persona.displayName}, firm and controlled, lightly frustrated, clipped delivery, strong conviction without shouting`
-    case "smug":
-      return `${persona.displayName}, dry confidence, lightly amused, relaxed control, understated swagger`
-    case "urgent":
-      return `${persona.displayName}, focused and direct, slightly faster pace, clear emphasis, controlled urgency`
-    case "fired_up":
-    default:
-      return `${persona.displayName}, animated but conversational, clear momentum, confident emphasis, energized without yelling`
-  }
 }
 
 function shouldReplyWithVoice(
@@ -158,32 +93,17 @@ export function buildVoicePlan(
   const automaticRepliesEnabled = options.automaticRepliesEnabled ?? true
   const speakerId = resolveVoiceSpeakerId(persona)
   const trimmed = content.trim()
-  const shouldGenerateVoice = ttsMode !== "disabled" &&
-    (!requestImage) &&
+  const shouldGenerate = ttsMode !== "disabled" &&
+    !requestImage &&
     trimmed.length > 0 &&
     trimmed.length <= maxCharacters &&
-    isValidVoiceSpeakerId(speakerId) &&
+    speakerId.startsWith("data:audio/") &&
     (forceVoice || (automaticRepliesEnabled && ttsMode !== "force_only" && shouldReplyWithVoice(persona.personaId, content, requestImage)))
 
-  if (!shouldGenerateVoice) {
-    return {
-      shouldGenerate: false,
-      speakerId: "",
-      voiceLabel: "",
-      emoText: "",
-      emoVector: [],
-      emoAlpha: 0,
-    }
-  }
-
-  const mood = classifyVoiceMood(content)
   return {
-    shouldGenerate: true,
-    speakerId,
-    voiceLabel: persona.defaultVoiceLabel,
-    emoText: voiceMoodText(persona, mood),
-    emoVector: [],
-    emoAlpha: 0,
+    shouldGenerate,
+    speakerId: shouldGenerate ? speakerId : "",
+    voiceLabel: shouldGenerate ? persona.defaultVoiceLabel : "",
   }
 }
 
@@ -198,27 +118,18 @@ async function synthesizeVoiceReply(
     ...(voiceApiKey ? { "api-key": voiceApiKey } : {}),
   }
 
-  // 判断是使用预置音色还是 VoiceClone
-  const isVoiceClone = plan.speakerId.startsWith("data:audio/")
-  const model = isVoiceClone ? "mimo-v2.5-tts-voiceclone" : "mimo-v2.5-tts"
-
-  const requestBody = {
-    model,
-    messages: [
-      { role: "user", content: isVoiceClone ? "" : plan.emoText },
-      { role: "assistant", content: content },
-    ],
-    audio: {
-      format: "wav",
-      voice: plan.speakerId,
-    },
-    stream: false,
-  }
-
   const response = await fetch(`${voiceApiBaseUrl}/chat/completions`, {
     method: "POST",
     headers,
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify({
+      model: "mimo-v2.5-tts-voiceclone",
+      messages: [
+        { role: "user", content: "" },
+        { role: "assistant", content },
+      ],
+      audio: { format: "wav", voice: plan.speakerId },
+      stream: false,
+    }),
     signal: AbortSignal.timeout(TTS_REQUEST_TIMEOUT_MS),
   })
 
@@ -261,12 +172,7 @@ export async function synthesizeVoiceReplyWithRetries(
 
   for (let attempt = 1; attempt <= attemptCount; attempt += 1) {
     try {
-      return await synthesizeVoiceReply(
-        voiceApiBaseUrl,
-        voiceApiKey,
-        plan,
-        content,
-      )
+      return await synthesizeVoiceReply(voiceApiBaseUrl, voiceApiKey, plan, content)
     } catch (error) {
       lastError = error
       if (attempt < attemptCount) {

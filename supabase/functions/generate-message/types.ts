@@ -33,13 +33,8 @@ export type OpenAIMessage = {
   content: string
 }
 
-export type VoiceMood = "calm" | "fired_up" | "angry" | "smug" | "urgent"
-
 export type VoicePlan = {
   shouldGenerate: boolean
   speakerId: string
   voiceLabel: string
-  emoText: string
-  emoVector: number[]
-  emoAlpha: number
 }
