@@ -48,6 +48,11 @@ enum RemoteMediaPolicy {
             return nil
         }
 
+        // Allow data: URLs (base64 audio/image) to pass through as-is
+        if trimmed.lowercased().hasPrefix("data:") {
+            return trimmed
+        }
+
         guard var components = URLComponents(string: trimmed),
               let scheme = components.scheme?.lowercased(),
               let host = components.host?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),

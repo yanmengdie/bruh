@@ -182,6 +182,21 @@ final class MessageAudioPlaybackController: NSObject, ObservableObject, @preconc
         let localURL = cacheDirectory.appendingPathComponent("\(messageId).\(fileExtension)")
         let fileManager = FileManager.default
 
+        // Handle data: URLs (base64 encoded audio) directly
+        if remoteURL.scheme == "data",
+           let dataString = remoteURL.absoluteString.components(separatedBy: ",").last,
+           let data = Data(base64Encoded: dataString) {
+            guard isLikelyPlayableAudio(data, mimeType: nil) else {
+                throw VoicePlaybackError.invalidAudioData
+            }
+            try data.write(to: localURL, options: .atomic)
+            return CachedVoicePayload(
+                data: data,
+                fileTypeHint: audioFileTypeHint(mimeType: "audio/wav", remoteURL: remoteURL, data: data),
+                localURL: localURL
+            )
+        }
+
         if forceRedownload, fileManager.fileExists(atPath: localURL.path) {
             try? fileManager.removeItem(at: localURL)
         }

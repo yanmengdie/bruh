@@ -16,7 +16,7 @@ struct APIClientConfiguration {
     ) {
         let resolvedEnvironment = appEnvironment ?? AppEnvironment.resolve(environment: environment, bundle: bundle)
         self.appEnvironment = resolvedEnvironment
-        let defaultFunctionsBaseURL = "http://8.141.119.22:3000/api"
+        let defaultFunctionsBaseURL = "http://8.141.119.22/api"
         self.functionsBaseURL = Self.resolveString(
             override: functionsBaseURL,
             environmentKeys: ["BRUH_FUNCTIONS_BASE_URL"],
