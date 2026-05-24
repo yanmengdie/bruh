@@ -3,6 +3,7 @@ import {
   type PersonaPlatformAccountRecord,
 } from "./persona_catalog_schema.ts"
 import personaCatalogData from "../../../bruh/SharedPersonas.json" with { type: "json" }
+import voiceSamples from "./voice_samples.json" with { type: "json" }
 
 export type PersonaPlatformAccount = PersonaPlatformAccountRecord
 
@@ -63,6 +64,13 @@ const personaRecords = personaCatalogData.map((record) => ({
     })).filter((account) => account.platform.length > 0 && account.handle.length > 0)
     : [],
 }))
+
+const voiceSampleMap = voiceSamples as Record<string, string>
+
+export function resolveVoiceSampleDataUrl(personaId: string): string | null {
+  const sample = voiceSampleMap[personaId]
+  return sample && sample.startsWith("data:audio/") ? sample : null
+}
 
 const personaDefinitions: PersonaDefinition[] = personaRecords.map((record) => {
   const xUsernames = record.platformAccounts

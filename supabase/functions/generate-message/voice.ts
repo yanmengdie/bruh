@@ -1,6 +1,7 @@
 import { getOptionalScopedEnv } from "../_shared/environment.ts"
 import type { TTSMode } from "../_shared/cost_controls.ts"
 import type { PersonaDefinition } from "../_shared/personas.ts"
+import { resolveVoiceSampleDataUrl } from "../_shared/personas.ts"
 import {
   approximateSpeechUnitCount,
   asString,
@@ -19,7 +20,9 @@ export type VoiceReply = {
 
 function resolveVoiceSpeakerId(persona: PersonaDefinition) {
   const overrideKey = `VOICE_SPEAKER_${persona.personaId.toUpperCase()}`
-  return asString(getOptionalScopedEnv(overrideKey)) || persona.defaultVoiceSpeakerId
+  const envOverride = asString(getOptionalScopedEnv(overrideKey))
+  if (envOverride && envOverride.startsWith("data:audio/")) return envOverride
+  return resolveVoiceSampleDataUrl(persona.defaultVoiceSpeakerId) ?? persona.defaultVoiceSpeakerId
 }
 
 export function normalizeVoiceError(error: unknown) {
