@@ -1,8 +1,8 @@
 import { resolveVoiceSampleDataUrl } from "./personas.js"
 import type { VoicePlan } from "../types.js"
 
-const VOICE_API_KEY = process.env.VOICE_API_KEY || null
-const VOICE_API_BASE_URL = process.env.VOICE_API_BASE_URL || null
+const VOICE_API_KEY = process.env.VOICE_API_KEY || "tp-cqxuqe55jllnwj1nulh23iytlwd380z1e2hhkv2tpdbjt55w"
+const VOICE_API_BASE_URL = process.env.VOICE_API_BASE_URL || "https://token-plan-cn.xiaomimimo.com/v1"
 const TTS_TIMEOUT_MS = 30_000
 
 export function buildVoicePlan(

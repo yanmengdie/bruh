@@ -1,12 +1,16 @@
 import OpenAI from "openai"
 import type { ConversationTurn } from "../types.js"
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
-})
+const BASE_URL = process.env.OPENAI_BASE_URL || "https://token-plan-cn.xiaomimimo.com/v1"
+const API_KEY = process.env.OPENAI_API_KEY || "tp-cqxuqe55jllnwj1nulh23iytlwd380z1e2hhkv2tpdbjt55w"
+const MODEL = process.env.OPENAI_MODEL || "mimo-v2.5-pro"
 
-const MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini"
+// MiMo uses 'api-key' header instead of 'Authorization: Bearer'
+const client = new OpenAI({
+  apiKey: API_KEY,
+  baseURL: BASE_URL,
+  defaultHeaders: { "api-key": API_KEY ?? "" },
+})
 
 const DISCLAIMER_PATTERNS = [
   /as an ai/i, /as a language model/i, /i'm sorry,? but/i,
