@@ -9,11 +9,9 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\PengyouMoment.publishedAt, order: .reverse)]) private var pengyouMoments: [PengyouMoment]
     @Query(sort: [SortDescriptor(\Contact.name, order: .forward)]) private var contacts: [Contact]
     @AppStorage private var hasCompletedOnboarding: Bool
-    @AppStorage private var useHomeScreenMode: Bool
     @AppStorage private var lastViewedFeedAtInterval: Double
     @AppStorage private var lastViewedAlbumAtInterval: Double
 
-    @State private var homePath: [AppDestination] = []
     @State private var selectedTab: MainTab = .contacts
     @State private var messageService = MessageService()
     @State private var bootstrapper = AppBootstrapper()
@@ -31,11 +29,6 @@ struct ContentView: View {
             scopedDefaults.key("hasCompletedOnboarding"),
             store: userDefaults
         )
-        _useHomeScreenMode = AppStorage(
-            wrappedValue: false,
-            scopedDefaults.key("useHomeScreenMode"),
-            store: userDefaults
-        )
         _lastViewedFeedAtInterval = AppStorage(
             wrappedValue: 0.0,
             scopedDefaults.key("lastViewedFeedAt"),
@@ -51,7 +44,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             if hasCompletedOnboarding {
-                mainContent
+                tabBarContent
                     .task {
                         await bootstrapper.bootstrap(
                             modelContext: modelContext,
@@ -66,65 +59,7 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
-    private var mainContent: some View {
-        if useHomeScreenMode {
-            homeScreenModeView
-        } else {
-            tabModeView
-        }
-    }
-
-    private var homeScreenModeView: some View {
-        NavigationStack(path: $homePath) {
-            HomeScreen(
-                onNavigate: handleHomeNavigation,
-                messageUnreadCount: totalUnreadMessages,
-                momentsUnreadCount: totalUnreadMoments,
-                hasNewAlbumBadge: unseenAlbumCount > 0
-            )
-            .navigationBarHidden(true)
-            .navigationDestination(for: AppDestination.self) { destination in
-                switch destination {
-                case .contacts:
-                    HomeRoutedScreen {
-                        ContactsView()
-                    }
-                case .imessage:
-                    HomeRoutedScreen {
-                        MessagesScreen(
-                            threads: threads,
-                            contacts: contacts,
-                            service: messageService,
-                            backgroundColor: messagesScreenBackground
-                        )
-                    }
-                case .feed:
-                    HomeRoutedScreen {
-                        FeedView()
-                            .onAppear {
-                                lastViewedFeedAtInterval = Date().timeIntervalSince1970
-                            }
-                    }
-                case .album:
-                    HomeRoutedScreen {
-                        AlbumView()
-                            .onAppear {
-                                lastViewedAlbumAtInterval = Date().timeIntervalSince1970
-                            }
-                    }
-                case .settings:
-                    HomeRoutedScreen {
-                        SettingsScreen()
-                    }
-                }
-            }
-        }
-        .enableUnifiedSwipeBack()
-        .onAppear(perform: configureNavigationAppearance)
-    }
-
-    private var tabModeView: some View {
+    private var tabBarContent: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
                 ContactsView()
@@ -140,7 +75,7 @@ struct ContentView: View {
                     threads: threads,
                     contacts: contacts,
                     service: messageService,
-                    backgroundColor: messagesScreenBackground
+                    backgroundColor: AppTheme.messagesBackground
                 )
             }
             .enableUnifiedSwipeBack()
@@ -198,10 +133,6 @@ struct ContentView: View {
         })
     }
 
-    private var messagesScreenBackground: Color {
-        AppTheme.messagesBackground
-    }
-
     private var totalUnreadMoments: Int {
         let visibleMoments = ContentGraphSelectors.visibleMoments(
             from: pengyouMoments,
@@ -240,10 +171,6 @@ struct ContentView: View {
         )
     }
 
-    private func handleHomeNavigation(_ destination: AppDestination) {
-        homePath.append(destination)
-    }
-
     private func configureNavigationAppearance() {
         let backColor = UIColor(red: 0.52, green: 0.54, blue: 0.57, alpha: 1.0)
         UINavigationBar.appearance().tintColor = backColor
@@ -258,15 +185,6 @@ struct ContentView: View {
         appearance.shadowColor = UIColor.black.withAlphaComponent(0.05)
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
-    }
-}
-
-private struct HomeRoutedScreen<Content: View>: View {
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        content
-            .enableUnifiedSwipeBack()
     }
 }
 

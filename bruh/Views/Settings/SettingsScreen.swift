@@ -1,33 +1,8 @@
 import SwiftUI
 
 struct SettingsScreen: View {
-    @AppStorage private var useHomeScreenMode: Bool
-
-    init(
-        userDefaults: UserDefaults = .standard,
-        appEnvironment: AppEnvironment = .current
-    ) {
-        let scopedDefaults = ScopedUserDefaultsStore(
-            userDefaults: userDefaults,
-            appEnvironment: appEnvironment
-        )
-        _useHomeScreenMode = AppStorage(
-            wrappedValue: true,
-            scopedDefaults.key("useHomeScreenMode"),
-            store: userDefaults
-        )
-    }
-
     var body: some View {
         List {
-            Section("界面模式") {
-                Toggle("使用桌面首页模式", isOn: $useHomeScreenMode)
-
-                Text(useHomeScreenMode ? "当前使用桌面首页布局。" : "当前使用标准标签布局。")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-            }
-
             Section("即将开放") {
                 placeholderRow(
                     title: "通知",
