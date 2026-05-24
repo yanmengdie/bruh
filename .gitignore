@@ -18,11 +18,9 @@ xcuserdata/
 .build/
 .swiftpm/
 
-# Supabase local/dev artifacts
-supabase/.temp/
-supabase/.branches/
-supabase/.postgres/
-.migration/
+# Backend
+backend/node_modules/
+backend/dist/
 
 # Env / secrets
 .env

@@ -16,9 +16,7 @@ bash -n \
   scripts/check_sensitive_strings.sh \
   scripts/check_client_boundary.sh \
   scripts/load_env.sh \
-  scripts/run_backend_health_snapshot.sh \
-  scripts/run_p1_validation.sh \
-  scripts/run_release_preflight.sh
+  scripts/run_p1_validation.sh
 
 ENV_LOADER_SMOKE_DIR="$BUILD_DIR/env_loader_smoke"
 rm -rf "$ENV_LOADER_SMOKE_DIR"
@@ -32,30 +30,10 @@ bash -lc '
   source "$root_dir/scripts/load_env.sh"
   load_bruh_env "$env_dir" prod
   [[ "$BRUH_APP_ENV" == "prod" ]]
-  [[ "$PROJECT_URL" == "https://example.supabase.co" ]]
-  [[ "$SERVICE_ROLE_KEY" == "test-service-role" ]]
-  [[ "$BRUH_FUNCTIONS_BASE_URL" == "https://example.supabase.co/functions/v1" ]]
-  [[ "$BRUH_SUPABASE_ANON_KEY" == "test-anon-key" ]]
-  [[ " ${BRUH_LOADED_ENV_FILES[*]} " == *" .env.prod.local "* ]]
+  [[ "$BRUH_FUNCTIONS_BASE_URL" == "http://8.141.119.22:3000/api" ]]
 ' bash "$ROOT_DIR" "$ENV_LOADER_SMOKE_DIR"
 
 rm -rf "$ENV_LOADER_SMOKE_DIR"
-
-deno test \
-  supabase/functions/_shared/api_contract_test.ts \
-  supabase/functions/_shared/content_safety_test.ts \
-  supabase/functions/_shared/media_test.ts \
-  supabase/functions/_shared/observability_test.ts \
-  supabase/functions/_shared/provider_metrics_test.ts \
-  supabase/functions/_shared/cost_controls_test.ts \
-  supabase/functions/_shared/environment_test.ts \
-  supabase/functions/_shared/feature_flags_test.ts \
-  supabase/functions/_shared/persona_catalog_schema_test.ts \
-  supabase/functions/_shared/news_test.ts \
-  supabase/functions/generate-message/fallbacks_test.ts \
-  supabase/functions/generate-post-interactions/fallbacks_test.ts \
-  scripts/backend_health_snapshot_test.ts \
-  scripts/release_preflight_test.ts
 
 swiftc \
   bruh/Services/AppEnvironment.swift \
