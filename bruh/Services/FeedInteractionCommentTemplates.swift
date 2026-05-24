@@ -102,7 +102,7 @@ extension FeedLocalInteractionGenerator {
         }
     }
 
-    static func cueText(from postContent: String, topic: String?, english: Bool) -> String {
+    private static func cueText(from postContent: String, topic: String?, english: Bool) -> String {
         let trimmedTopic = topic?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !trimmedTopic.isEmpty {
             return trimmedTopic
@@ -128,24 +128,24 @@ extension FeedLocalInteractionGenerator {
         return String(stripped.prefix(12))
     }
 
-    static func cueOrFallback(_ cue: String, fallback: String) -> String {
+    private static func cueOrFallback(_ cue: String, fallback: String) -> String {
         cue.isEmpty ? fallback : cue
     }
 
-    static func englishVariant(_ variant: Int, options: [String]) -> String {
+    private static func englishVariant(_ variant: Int, options: [String]) -> String {
         options[clampedVariant(variant, count: options.count)]
     }
 
-    static func chineseVariant(_ variant: Int, options: [String]) -> String {
+    private static func chineseVariant(_ variant: Int, options: [String]) -> String {
         options[clampedVariant(variant, count: options.count)]
     }
 
-    static func clampedVariant(_ variant: Int, count: Int) -> Int {
+    private static func clampedVariant(_ variant: Int, count: Int) -> Int {
         guard count > 0 else { return 0 }
         return max(0, min(variant, count - 1))
     }
 
-    static func isLikelyEnglishText(_ text: String) -> Bool {
+    private static func isLikelyEnglishText(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
         if trimmed.range(of: #"[一-龥]"#, options: .regularExpression) != nil {
@@ -154,7 +154,7 @@ extension FeedLocalInteractionGenerator {
         return trimmed.range(of: #"[A-Za-z]"#, options: .regularExpression) != nil
     }
 
-    static func isLowSignal(_ text: String) -> Bool {
+    private static func isLowSignal(_ text: String) -> Bool {
         let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !normalized.isEmpty else { return true }
         if normalized.count <= 4 {

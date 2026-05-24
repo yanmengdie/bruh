@@ -19,7 +19,6 @@
 		A100000A00000000000000A /* FeedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000A00000000000000A /* FeedService.swift */; };
 		A100000B00000000000000B /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000B00000000000000B /* APIClient.swift */; };
 		A100000C00000000000000C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B100000C00000000000000C /* Assets.xcassets */; };
-		A100000D00000000000000D /* PhoneFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000D00000000000000D /* PhoneFrame.swift */; };
 		A100000F00000000000000F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = B100000F00000000000000F /* LaunchScreen.storyboard */; };
 		A10000100000000000000010 /* MessageThread.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000100000000000000010 /* MessageThread.swift */; };
 		A10000110000000000000011 /* PersonaMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000110000000000000011 /* PersonaMessage.swift */; };
@@ -37,8 +36,7 @@
 		A10000F100000000000000F10 /* VoiceMessageBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000F100000000000000F10 /* VoiceMessageBubbleView.swift */; };
 		A10000170000000000000017 /* MessagesScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000170000000000000017 /* MessagesScreen.swift */; };
 		A10000180000000000000018 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000180000000000000018 /* AppTheme.swift */; };
-		A10000190000000000000019 /* AppBackIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000190000000000000019 /* AppBackIcon.swift */; };
-		A100001A000000000000001A /* SwipeBackGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001A000000000000001A /* SwipeBackGesture.swift */; };
+		A10000190000000000000019 /* UnifiedSwipeBack.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000190000000000000019 /* UnifiedSwipeBack.swift */; };
 		A100001B000000000000001B /* NewBruhView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001B000000000000001B /* NewBruhView.swift */; };
 		A100001C000000000000001C /* Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001C000000000000001C /* Onboarding.swift */; };
 		A100001E000000000000001E /* AddBruhView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100001E000000000000001E /* AddBruhView.swift */; };
@@ -66,7 +64,6 @@
 		A10000350000000000000035 /* PersonaCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000350000000000000035 /* PersonaCatalog.swift */; };
 		A10000360000000000000036 /* PersonaSeedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000360000000000000036 /* PersonaSeedStore.swift */; };
 		A10000370000000000000037 /* ContactInviteSeedSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000370000000000000037 /* ContactInviteSeedSupport.swift */; };
-		A10000380000000000000038 /* DemoFeedSeedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000380000000000000038 /* DemoFeedSeedStore.swift */; };
 		A10000390000000000000039 /* PengyouMomentSeedCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000390000000000000039 /* PengyouMomentSeedCatalog.swift */; };
 		A10000400000000000000040 /* FeedInteractionCandidateRanker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000400000000000000040 /* FeedInteractionCandidateRanker.swift */; };
 		A10000410000000000000041 /* FeedInteractionCommentTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000410000000000000041 /* FeedInteractionCommentTemplates.swift */; };
@@ -112,7 +109,6 @@
 		B100000A00000000000000A /* FeedService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedService.swift; sourceTree = "<group>"; };
 		B100000B00000000000000B /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		B100000C00000000000000C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		B100000D00000000000000D /* PhoneFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneFrame.swift; sourceTree = "<group>"; };
 		B100000F00000000000000F /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		B10000100000000000000010 /* MessageThread.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageThread.swift; sourceTree = "<group>"; };
 		B10000110000000000000011 /* PersonaMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaMessage.swift; sourceTree = "<group>"; };
@@ -130,8 +126,7 @@
 		B10000F100000000000000F10 /* VoiceMessageBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceMessageBubbleView.swift; sourceTree = "<group>"; };
 		B10000170000000000000017 /* MessagesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesScreen.swift; sourceTree = "<group>"; };
 		B10000180000000000000018 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
-		B10000190000000000000019 /* AppBackIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackIcon.swift; sourceTree = "<group>"; };
-		B100001A000000000000001A /* SwipeBackGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeBackGesture.swift; sourceTree = "<group>"; };
+		B10000190000000000000019 /* UnifiedSwipeBack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedSwipeBack.swift; sourceTree = "<group>"; };
 		B100001B000000000000001B /* NewBruhView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewBruhView.swift; sourceTree = "<group>"; };
 		B100001C000000000000001C /* Onboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Onboarding.swift; sourceTree = "<group>"; };
 		B100001E000000000000001E /* AddBruhView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBruhView.swift; sourceTree = "<group>"; };
@@ -159,7 +154,6 @@
 		B10000350000000000000035 /* PersonaCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaCatalog.swift; sourceTree = "<group>"; };
 		B10000360000000000000036 /* PersonaSeedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaSeedStore.swift; sourceTree = "<group>"; };
 		B10000370000000000000037 /* ContactInviteSeedSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactInviteSeedSupport.swift; sourceTree = "<group>"; };
-		B10000380000000000000038 /* DemoFeedSeedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoFeedSeedStore.swift; sourceTree = "<group>"; };
 		B10000390000000000000039 /* PengyouMomentSeedCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PengyouMomentSeedCatalog.swift; sourceTree = "<group>"; };
 		B10000400000000000000040 /* FeedInteractionCandidateRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedInteractionCandidateRanker.swift; sourceTree = "<group>"; };
 		B10000410000000000000041 /* FeedInteractionCommentTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedInteractionCommentTemplates.swift; sourceTree = "<group>"; };
@@ -251,7 +245,6 @@
 				B10000620000000000000062 /* PersonaRetirementCleaner.swift */,
 				B10000630000000000000063 /* SystemContactSeedWriter.swift */,
 				B10000370000000000000037 /* ContactInviteSeedSupport.swift */,
-				B10000380000000000000038 /* DemoFeedSeedStore.swift */,
 				B10000390000000000000039 /* PengyouMomentSeedCatalog.swift */,
 				B10000580000000000000058 /* PengyouMomentSeedStore.swift */,
 				B10000590000000000000059 /* PengyouMomentSeedSupport.swift */,
@@ -339,11 +332,9 @@
 		E1000008000000000000008 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				B10000190000000000000019 /* AppBackIcon.swift */,
+				B10000190000000000000019 /* UnifiedSwipeBack.swift */,
 				B10000180000000000000018 /* AppTheme.swift */,
 				B1000009000000000000009 /* PersonaAvatar.swift */,
-				B100000D00000000000000D /* PhoneFrame.swift */,
-				B100001A000000000000001A /* SwipeBackGesture.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -506,7 +497,6 @@
 				A10000620000000000000062 /* PersonaRetirementCleaner.swift in Sources */,
 				A10000630000000000000063 /* SystemContactSeedWriter.swift in Sources */,
 				A10000370000000000000037 /* ContactInviteSeedSupport.swift in Sources */,
-				A10000380000000000000038 /* DemoFeedSeedStore.swift in Sources */,
 				A10000390000000000000039 /* PengyouMomentSeedCatalog.swift in Sources */,
 				A10000580000000000000058 /* PengyouMomentSeedStore.swift in Sources */,
 				A10000590000000000000059 /* PengyouMomentSeedSupport.swift in Sources */,
@@ -532,7 +522,7 @@
 				A10000240000000000000024 /* ContactsView.swift in Sources */,
 				A100001C000000000000001C /* Onboarding.swift in Sources */,
 				A10000180000000000000018 /* AppTheme.swift in Sources */,
-				A10000190000000000000019 /* AppBackIcon.swift in Sources */,
+				A10000190000000000000019 /* UnifiedSwipeBack.swift in Sources */,
 				A1000009000000000000009 /* PersonaAvatar.swift in Sources */,
 				A10000250000000000000025 /* AlbumView.swift in Sources */,
 				A100000A00000000000000A /* FeedService.swift in Sources */,
@@ -568,9 +558,7 @@
 				A10000680000000000000068 /* APIClientInteractionEndpoints.swift in Sources */,
 				A100002A000000000000002A /* APIClientConfiguration.swift in Sources */,
 				A10000480000000000000048 /* NetworkRetryPolicy.swift in Sources */,
-				A100000D00000000000000D /* PhoneFrame.swift in Sources */,
 				A10000260000000000000026 /* SettingsScreen.swift in Sources */,
-				A100001A000000000000001A /* SwipeBackGesture.swift in Sources */,
 				A100002B000000000000002B /* PersonaCatalogValidator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

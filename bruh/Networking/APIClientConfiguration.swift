@@ -19,8 +19,8 @@ struct APIClientConfiguration {
         let defaultFunctionsBaseURL = "http://8.141.119.22:3000/api"
         self.functionsBaseURL = Self.resolveString(
             override: functionsBaseURL,
-            environmentKeys: ["BRUH_FUNCTIONS_BASE_URL", "SUPABASE_FUNCTIONS_BASE_URL"],
-            bundleKeys: ["BRUH_FUNCTIONS_BASE_URL", "SUPABASE_FUNCTIONS_BASE_URL"],
+            environmentKeys: ["BRUH_FUNCTIONS_BASE_URL"],
+            bundleKeys: ["BRUH_FUNCTIONS_BASE_URL"],
             appEnvironment: resolvedEnvironment,
             environment: environment,
             bundle: bundle,
@@ -29,8 +29,8 @@ struct APIClientConfiguration {
 
         self.anonKey = Self.resolveString(
             override: anonKey,
-            environmentKeys: ["BRUH_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY"],
-            bundleKeys: ["BRUH_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY"],
+            environmentKeys: ["BRUH_ANON_KEY"],
+            bundleKeys: ["BRUH_ANON_KEY"],
             appEnvironment: resolvedEnvironment,
             environment: environment,
             bundle: bundle,
