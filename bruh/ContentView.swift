@@ -32,7 +32,7 @@ struct ContentView: View {
             store: userDefaults
         )
         _useHomeScreenMode = AppStorage(
-            wrappedValue: true,
+            wrappedValue: false,
             scopedDefaults.key("useHomeScreenMode"),
             store: userDefaults
         )
