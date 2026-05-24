@@ -16,7 +16,7 @@ struct APIClientConfiguration {
     ) {
         let resolvedEnvironment = appEnvironment ?? AppEnvironment.resolve(environment: environment, bundle: bundle)
         self.appEnvironment = resolvedEnvironment
-        let defaultFunctionsBaseURL = "https://frequencies-main-saver-eggs.trycloudflare.com/functions/v1"
+        let defaultFunctionsBaseURL = "http://8.141.119.22:3000/api"
         self.functionsBaseURL = Self.resolveString(
             override: functionsBaseURL,
             environmentKeys: ["BRUH_FUNCTIONS_BASE_URL", "SUPABASE_FUNCTIONS_BASE_URL"],
